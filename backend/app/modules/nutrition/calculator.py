@@ -1,2 +1,297 @@
 # File: backend/app/modules/nutrition/calculator.py
-# TODO: Implement logic here
+# Pure nutrition calculator — stateless, no DB or framework dependencies.
+# Uses Mifflin-St Jeor equation for BMR.
+#
+# Rounding rules:
+#   BMR, TDEE          → 1 decimal place
+#   target_calories    → integer (round to whole number)
+#   protein/fat/carb   → 1 decimal place
+#   BMI                → 1 decimal place
+
+from __future__ import annotations
+
+from typing import List, Tuple
+
+from app.modules.nutrition.domain import (
+    MACRO_PRESETS,
+    MacroRatio,
+    NutritionTarget,
+    NutritionWarning,
+    NutritionWarningCode,
+)
+from app.modules.nutrition.exceptions import (
+    InvalidEnumValueError,
+    InvalidProfileDataError,
+    NutritionCalculationError,
+)
+from app.shared.enums import ActivityLevel, FitnessGoal, Gender
+
+# ---------------------------------------------------------------------------
+# Validation boundaries
+# ---------------------------------------------------------------------------
+
+_AGE_MIN, _AGE_MAX = 15, 100
+_WEIGHT_MIN, _WEIGHT_MAX = 30.0, 300.0
+_HEIGHT_MIN, _HEIGHT_MAX = 100.0, 250.0
+
+# Warning thresholds
+_BMI_UNDERWEIGHT = 18.5
+_BMI_OBESE = 30.0
+_CALORIES_TOO_LOW = 1200
+_CALORIES_TOO_HIGH = 4000
+
+# Infeasible threshold — below this, macro calculation is meaningless
+_MINIMUM_SAFE_CALORIES = 800
+
+
+class NutritionCalculator:
+    """Stateless calculator for BMR, TDEE, macro targets, and safety warnings.
+
+    All public methods are static — the class is used purely for namespace grouping.
+    """
+
+    # ------------------------------------------------------------------
+    # Input validation
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def validate_inputs(
+        age: int,
+        weight_kg: float,
+        height_cm: float,
+    ) -> None:
+        """Validate profile inputs are within acceptable ranges.
+
+        Raises:
+            InvalidProfileDataError: If any value is outside its valid range.
+        """
+        if not (_AGE_MIN <= age <= _AGE_MAX):
+            raise InvalidProfileDataError("age", age, _AGE_MIN, _AGE_MAX)
+        if not (_WEIGHT_MIN <= weight_kg <= _WEIGHT_MAX):
+            raise InvalidProfileDataError("weight_kg", weight_kg, _WEIGHT_MIN, _WEIGHT_MAX)
+        if not (_HEIGHT_MIN <= height_cm <= _HEIGHT_MAX):
+            raise InvalidProfileDataError("height_cm", height_cm, _HEIGHT_MIN, _HEIGHT_MAX)
+
+    # ------------------------------------------------------------------
+    # Core calculations
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def calculate_bmi(weight_kg: float, height_cm: float) -> float:
+        """Calculate Body Mass Index.
+
+        Formula: weight_kg / (height_m ** 2)
+        Returns: BMI rounded to 1 decimal place.
+        """
+        height_m = height_cm / 100.0
+        return round(weight_kg / (height_m ** 2), 1)
+
+    @staticmethod
+    def calculate_bmr(
+        gender: Gender,
+        weight_kg: float,
+        height_cm: float,
+        age: int,
+    ) -> float:
+        """Calculate Basal Metabolic Rate using Mifflin-St Jeor equation.
+
+        Male:   10 × weight + 6.25 × height − 5 × age + 5
+        Female: 10 × weight + 6.25 × height − 5 × age − 161
+
+        Returns: BMR rounded to 1 decimal place.
+
+        Raises:
+            InvalidEnumValueError: If gender is not a recognized Gender value.
+        """
+        base = 10 * weight_kg + 6.25 * height_cm - 5 * age
+        if gender == Gender.MALE:
+            return round(base + 5, 1)
+        elif gender == Gender.FEMALE:
+            return round(base - 161, 1)
+        else:
+            raise InvalidEnumValueError(
+                "gender", gender, [g.value for g in Gender]
+            )
+
+    @staticmethod
+    def calculate_tdee(bmr: float, activity_level: ActivityLevel) -> float:
+        """Calculate Total Daily Energy Expenditure.
+
+        Formula: BMR × activity multiplier.
+        Returns: TDEE rounded to 1 decimal place.
+        """
+        return round(bmr * activity_level.multiplier, 1)
+
+    @staticmethod
+    def adjust_calories(tdee: float, fitness_goal: FitnessGoal) -> int:
+        """Adjust TDEE based on fitness goal.
+
+        - maintain:     TDEE + 0
+        - lose_weight:  TDEE − 500
+        - gain_muscle:  TDEE + 300
+
+        Returns: target_calories rounded to integer. Never goes below 0.
+        """
+        adjusted = tdee + fitness_goal.calorie_adjustment
+        return round(max(adjusted, 0))
+
+    @staticmethod
+    def calculate_macros(
+        target_calories: int,
+        macro_ratio: MacroRatio,
+    ) -> Tuple[float, float, float]:
+        """Convert calorie target + macro ratio into grams.
+
+        - Protein: 4 kcal/g
+        - Fat:     9 kcal/g
+        - Carb:    4 kcal/g
+
+        Returns: (protein_g, fat_g, carb_g) each rounded to 1 decimal place.
+        """
+        protein_g = round((target_calories * macro_ratio.protein_pct / 100) / 4, 1)
+        fat_g = round((target_calories * macro_ratio.fat_pct / 100) / 9, 1)
+        carb_g = round((target_calories * macro_ratio.carb_pct / 100) / 4, 1)
+        return protein_g, fat_g, carb_g
+
+    # ------------------------------------------------------------------
+    # Safety warnings
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def check_warnings(
+        bmi: float,
+        tdee: float,
+        target_calories: int,
+    ) -> List[NutritionWarning]:
+        """Generate structured safety warnings for extreme values.
+
+        Checks:
+        - BMI < 18.5 → BMI_UNDERWEIGHT
+        - BMI > 30   → BMI_OBESE
+        - target_calories < 1200 → LOW_CALORIE_TARGET
+        - target_calories > 4000 → HIGH_CALORIE_TARGET
+
+        Note: INFEASIBLE_CALORIE_TARGET is handled separately in the
+        orchestrator, not here.
+        """
+        warnings: List[NutritionWarning] = []
+
+        if bmi < _BMI_UNDERWEIGHT:
+            warnings.append(NutritionWarning(
+                code=NutritionWarningCode.BMI_UNDERWEIGHT,
+                message=(
+                    f"BMI của bạn ({bmi}) thấp hơn mức khỏe mạnh (< {_BMI_UNDERWEIGHT}). "
+                    "Nên tham khảo ý kiến chuyên gia dinh dưỡng."
+                ),
+            ))
+        if bmi > _BMI_OBESE:
+            warnings.append(NutritionWarning(
+                code=NutritionWarningCode.BMI_OBESE,
+                message=(
+                    f"BMI của bạn ({bmi}) thuộc mức béo phì (> {_BMI_OBESE}). "
+                    "Nên tham khảo ý kiến bác sĩ trước khi thay đổi chế độ ăn đáng kể."
+                ),
+            ))
+        if target_calories < _CALORIES_TOO_LOW:
+            warnings.append(NutritionWarning(
+                code=NutritionWarningCode.LOW_CALORIE_TARGET,
+                message=(
+                    f"Mục tiêu calo ({target_calories} kcal/ngày) thấp hơn mức an toàn tối thiểu "
+                    f"({_CALORIES_TOO_LOW} kcal). Hệ thống khuyến nghị không ăn dưới mức này."
+                ),
+            ))
+        if target_calories > _CALORIES_TOO_HIGH:
+            warnings.append(NutritionWarning(
+                code=NutritionWarningCode.HIGH_CALORIE_TARGET,
+                message=(
+                    f"Mục tiêu calo ({target_calories} kcal/ngày) cao bất thường "
+                    f"(> {_CALORIES_TOO_HIGH} kcal). Hãy kiểm tra lại thông tin hồ sơ."
+                ),
+            ))
+
+        return warnings
+
+    # ------------------------------------------------------------------
+    # Orchestrator
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def calculate_nutrition_target(
+        gender: Gender,
+        age: int,
+        weight_kg: float,
+        height_cm: float,
+        activity_level: ActivityLevel,
+        fitness_goal: FitnessGoal,
+    ) -> NutritionTarget:
+        """Calculate the full daily nutrition target from user profile data.
+
+        Pipeline: validate → BMI → BMR → TDEE → adjust → feasibility check →
+                  macros (if feasible) → warnings.
+
+        If target_calories < _MINIMUM_SAFE_CALORIES (800 kcal), the result
+        is marked infeasible: macros are zeroed out, is_feasible=False,
+        and an INFEASIBLE_CALORIE_TARGET warning is added.
+
+        Raises:
+            InvalidProfileDataError: If input values are out of range.
+            InvalidEnumValueError: If gender is not a recognized value.
+            NutritionCalculationError: If an unexpected error occurs.
+        """
+        try:
+            NutritionCalculator.validate_inputs(age, weight_kg, height_cm)
+
+            bmi = NutritionCalculator.calculate_bmi(weight_kg, height_cm)
+            bmr = NutritionCalculator.calculate_bmr(gender, weight_kg, height_cm, age)
+            tdee = NutritionCalculator.calculate_tdee(bmr, activity_level)
+            target_calories = NutritionCalculator.adjust_calories(tdee, fitness_goal)
+
+            # --- Feasibility check ---
+            if target_calories < _MINIMUM_SAFE_CALORIES:
+                # Infeasible: skip macro calculation, zero everything out
+                warnings = NutritionCalculator.check_warnings(bmi, tdee, target_calories)
+                warnings.append(NutritionWarning(
+                    code=NutritionWarningCode.INFEASIBLE_CALORIE_TARGET,
+                    message=(
+                        f"Mục tiêu calo ({target_calories} kcal/ngày) quá thấp để lập "
+                        f"thực đơn an toàn (< {_MINIMUM_SAFE_CALORIES} kcal). "
+                        "Hãy tăng ngân sách, giảm mức giảm cân, hoặc tăng mức vận động."
+                    ),
+                ))
+                return NutritionTarget(
+                    bmr=bmr,
+                    tdee=tdee,
+                    target_calories=target_calories,
+                    daily_protein_g=0.0,
+                    daily_fat_g=0.0,
+                    daily_carb_g=0.0,
+                    bmi=bmi,
+                    is_feasible=False,
+                    warnings=tuple(warnings),
+                )
+
+            # --- Feasible path ---
+            macro_ratio = MACRO_PRESETS[fitness_goal]
+            protein_g, fat_g, carb_g = NutritionCalculator.calculate_macros(
+                target_calories, macro_ratio
+            )
+
+            warnings = NutritionCalculator.check_warnings(bmi, tdee, target_calories)
+
+            return NutritionTarget(
+                bmr=bmr,
+                tdee=tdee,
+                target_calories=target_calories,
+                daily_protein_g=protein_g,
+                daily_fat_g=fat_g,
+                daily_carb_g=carb_g,
+                bmi=bmi,
+                is_feasible=True,
+                warnings=tuple(warnings),
+            )
+        except (InvalidProfileDataError, InvalidEnumValueError, ValueError):
+            raise
+        except Exception as exc:
+            raise NutritionCalculationError(
+                f"Unexpected error calculating nutrition target: {exc}"
+            ) from exc
