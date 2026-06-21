@@ -62,3 +62,47 @@ _GOAL_ADJUSTMENTS: Dict[FitnessGoal, float] = {
     FitnessGoal.LOSE_WEIGHT: -500.0,
     FitnessGoal.GAIN_MUSCLE: 300.0,
 }
+
+
+# ---------------------------------------------------------------------------
+# Bổ sung bởi Bình (modules: identity, profiles, ingredients, meals)
+# Các enum dưới đây KHÔNG đụng tới phần trên — chỉ thêm mới.
+# ---------------------------------------------------------------------------
+
+class UserRole(str, Enum):
+    """Vai trò tài khoản."""
+    USER = "user"
+    ADMIN = "admin"
+
+
+class FoodGroup(str, Enum):
+    """Nhóm thực phẩm của nguyên liệu."""
+    PROTEIN = "protein"
+    VEGETABLE = "vegetable"
+    GRAIN = "grain"
+    DAIRY = "dairy"
+    FAT = "fat"
+    FRUIT = "fruit"
+    OTHER = "other"
+
+
+class MealType(str, Enum):
+    """Loại bữa ăn."""
+    BREAKFAST = "breakfast"
+    LUNCH = "lunch"
+    DINNER = "dinner"
+
+
+class CookingMethod(str, Enum):
+    """Cách chế biến món ăn."""
+    STIR_FRY = "stir_fry"
+    BOIL = "boil"
+    SOUP = "soup"
+    BRAISE = "braise"
+    STEAM = "steam"
+
+
+class ExclusionReason(str, Enum):
+    """Lý do loại trừ nguyên liệu khỏi thực đơn của một người dùng."""
+    ALLERGY = "allergy"
+    DISLIKE = "dislike"
