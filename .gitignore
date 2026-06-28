@@ -18,3 +18,4 @@ node_modules/
 # --- IDE ---
 .vscode/
 .idea/
+CLAUDE.md
