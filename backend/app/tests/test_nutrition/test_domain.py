@@ -64,6 +64,13 @@ class TestFitnessGoal:
     def test_gain_muscle_adjustment(self):
         assert FitnessGoal.GAIN_MUSCLE.calorie_adjustment == 300.0
 
+    def test_gain_weight_adjustment(self):
+        assert FitnessGoal.GAIN_WEIGHT.calorie_adjustment == 200.0
+
+    def test_gain_weight_value(self):
+        assert FitnessGoal.GAIN_WEIGHT == "gain_weight"
+        assert FitnessGoal("gain_weight") == FitnessGoal.GAIN_WEIGHT
+
 
 # ---------------------------------------------------------------------------
 # NutritionWarningCode enum
@@ -133,6 +140,12 @@ class TestMacroPresets:
         assert r.protein_pct == 35
         assert r.fat_pct == 20
         assert r.carb_pct == 45
+
+    def test_gain_weight_preset(self):
+        r = MACRO_PRESETS[FitnessGoal.GAIN_WEIGHT]
+        assert r.protein_pct == 25
+        assert r.fat_pct == 25
+        assert r.carb_pct == 50
 
 
 # ---------------------------------------------------------------------------
