@@ -47,8 +47,13 @@ CREATE TYPE activity_level AS ENUM (
 CREATE TYPE physical_goal AS ENUM (
     'maintain',            -- Duy trì cân nặng
     'lose_weight',         -- Giảm cân
-    'gain_muscle'          -- Tăng cơ / tăng protein
+    'gain_muscle',         -- Tăng cơ / tăng protein
+    'gain_weight'          -- Tăng cân (theo SRS; khớp FitnessGoal.GAIN_WEIGHT)
 );
+-- DB đã chạy trước đó (chưa drop/recreate): bổ sung giá trị mới bằng
+--   ALTER TYPE physical_goal ADD VALUE 'gain_weight';
+-- (ALTER TYPE ... ADD VALUE không chạy được bên trong transaction block của
+--  pgAdmin Query Tool — chạy riêng lệnh này ngoài BEGIN/COMMIT.)
 
 CREATE TYPE meal_type AS ENUM (
     'breakfast',           -- Bữa sáng
