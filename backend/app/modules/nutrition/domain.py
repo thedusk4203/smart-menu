@@ -54,6 +54,7 @@ MACRO_PRESETS: Dict[FitnessGoal, MacroRatio] = {
     FitnessGoal.MAINTAIN: MacroRatio(protein_pct=30, fat_pct=25, carb_pct=45),
     FitnessGoal.LOSE_WEIGHT: MacroRatio(protein_pct=40, fat_pct=25, carb_pct=35),
     FitnessGoal.GAIN_MUSCLE: MacroRatio(protein_pct=35, fat_pct=20, carb_pct=45),
+    FitnessGoal.GAIN_WEIGHT: MacroRatio(protein_pct=25, fat_pct=25, carb_pct=50),
 }
 
 

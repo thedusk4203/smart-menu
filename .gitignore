@@ -18,6 +18,10 @@ node_modules/
 # --- IDE ---
 .vscode/
 .idea/
+CLAUDE.md
+
+# Build artifacts
+*.egg-info/
 # --- Frontend---
 # Logs
 logs

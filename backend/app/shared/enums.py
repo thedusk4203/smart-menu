@@ -50,6 +50,7 @@ class FitnessGoal(str, Enum):
     MAINTAIN = "maintain"        # Keep current weight
     LOSE_WEIGHT = "lose_weight"  # Caloric deficit
     GAIN_MUSCLE = "gain_muscle"  # Caloric surplus
+    GAIN_WEIGHT = "gain_weight"  # Caloric surplus (tăng cân, theo SRS)
 
     @property
     def calorie_adjustment(self) -> float:
@@ -61,6 +62,7 @@ _GOAL_ADJUSTMENTS: Dict[FitnessGoal, float] = {
     FitnessGoal.MAINTAIN: 0.0,
     FitnessGoal.LOSE_WEIGHT: -500.0,
     FitnessGoal.GAIN_MUSCLE: 300.0,
+    FitnessGoal.GAIN_WEIGHT: 200.0,
 }
 
 
