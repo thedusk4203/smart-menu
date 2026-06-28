@@ -2,9 +2,7 @@
 -- init_db.sql — CƠ SỞ DỮ LIỆU ỨNG DỤNG TẠO THỰC ĐƠN
 -- Theo ngân sách & dinh dưỡng | Phụ trách: Nguyễn Văn Bình
 -- PostgreSQL 16/18
--- ------------------------------------------------------------
--- CÁCH CHẠY: pgAdmin → Query Tool (gắn với DB của đồ án)
---            → Open File → chọn file này → F5.
+-- ------------------------------------------------------------      
 -- Chạy lại nhiều lần đều được (mỗi lần tự xoá sạch rồi tạo lại).
 --
 -- !!! CẢNH BÁO: dòng DROP SCHEMA bên dưới XOÁ TOÀN BỘ mọi thứ
@@ -28,13 +26,7 @@ CREATE SCHEMA public;
 
 CREATE TYPE user_role AS ENUM ('user', 'admin');
 
--- LƯU Ý QUAN TRỌNG: gender / activity_level / physical_goal bên dưới được
--- CHỈNH KHỚP với app/shared/enums.py mà Đức đã viết cho module nutrition
--- (đã merge vào main), để ORM và bộ tính BMR/TDEE đọc/ghi đúng giá trị.
--- Hệ quả: gender hiện chỉ còn male/female (bỏ 'other'); physical_goal hiện
--- CHƯA có 'gain_weight' (tăng cân) dù SRS có đề cập — đây là khoảng trống
--- cần bàn với Đức để bổ sung vào FitnessGoal, lúc đó chỉ cần thêm 1 dòng
--- ALTER TYPE ... ADD VALUE ở đây là đủ, không phá vỡ gì khác.
+
 CREATE TYPE gender AS ENUM ('male', 'female');
 
 CREATE TYPE activity_level AS ENUM (
