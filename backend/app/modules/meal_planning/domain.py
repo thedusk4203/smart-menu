@@ -1,11 +1,3 @@
-# File: backend/app/modules/meal_planning/domain.py
-#
-# NOTE (Bình -> nhóm): file này hiện chỉ chứa entity cho phần LƯU TRỮ
-# thực đơn (API "lưu thực đơn" — deliverable của Bình). Phần sinh thực đơn
-# tự động (candidate filtering, scoring, constraint checking — xem
-# planner.py / scorer.py / constraint_checker.py) là trách nhiệm của Đức
-# theo docs/architecture.md mục 6 và sẽ bổ sung domain object riêng
-# (ví dụ PlanRequest, PlanCandidate...) khi anh triển khai phần đó.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -23,13 +15,6 @@ class MealPlanEntity:
     total_cost: float = 0
     total_calories: float = 0
     plan_data: dict = field(default_factory=dict)
-
-
-# ---------------------------------------------------------------------------
-# Phần sinh thực đơn tự động (Đức) — domain objects cho planner/scorer/
-# constraint_checker. Tất cả đều thuần Python (frozen dataclass), không import
-# FastAPI/SQLModel, theo đúng layer Domain trong docs/architecture.md.
-# ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -82,15 +67,6 @@ class ValidationResult:
     @property
     def is_feasible(self) -> bool:
         return self.status != "infeasible"
-
-
-# ---------------------------------------------------------------------------
-# Cấu trúc plan_data (JSONB) — mô tả schema thay vì "dict bay tự do"
-# (review D-10). Planner dựng các dataclass này rồi serialize bằng
-# dataclasses.asdict() khi ghi vào MealPlanEntity.plan_data, nên thay đổi
-# format ở một chỗ là biết ngay nơi nào hỏng.
-# ---------------------------------------------------------------------------
-
 
 @dataclass(frozen=True)
 class PlannedMeal:
