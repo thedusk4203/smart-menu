@@ -1,4 +1,3 @@
-# File: backend/app/modules/meal_planning/exceptions.py
 from __future__ import annotations
 
 from app.core.exceptions import NotFoundError, ValidationAppError
