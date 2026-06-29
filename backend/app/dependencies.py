@@ -1,7 +1,3 @@
-# File: backend/app/dependencies.py
-# Composition root: nối use case (application layer) với repository cụ thể
-# (infrastructure layer) thông qua FastAPI Depends(). Router chỉ phụ thuộc
-# vào các hàm provider ở đây, không tự new() repository.
 from __future__ import annotations
 
 from fastapi import Depends
@@ -9,9 +5,8 @@ from sqlmodel import Session
 
 from app.core.database import get_session
 
-# ---------------------------------------------------------------------------
 # identity
-# ---------------------------------------------------------------------------
+
 from app.modules.identity.repository import SqlUserRepository
 from app.modules.identity.use_cases import (
     CreateUserUseCase, DeleteUserUseCase, GetUserUseCase, ListUsersUseCase, UpdateUserUseCase,
@@ -37,10 +32,7 @@ def get_update_user_use_case(session: Session = Depends(get_session)) -> UpdateU
 def get_delete_user_use_case(session: Session = Depends(get_session)) -> DeleteUserUseCase:
     return DeleteUserUseCase(SqlUserRepository(session))
 
-
-# ---------------------------------------------------------------------------
 # profiles
-# ---------------------------------------------------------------------------
 from app.modules.profiles.repository import SqlExclusionRepository, SqlUserProfileRepository
 from app.modules.profiles.use_cases import (
     AddExclusionUseCase, CreateEmptyProfileUseCase, GetProfileUseCase, ListExclusionsUseCase,
@@ -71,10 +63,8 @@ def get_add_exclusion_use_case(session: Session = Depends(get_session)) -> AddEx
 def get_remove_exclusion_use_case(session: Session = Depends(get_session)) -> RemoveExclusionUseCase:
     return RemoveExclusionUseCase(SqlExclusionRepository(session))
 
-
-# ---------------------------------------------------------------------------
 # ingredients
-# ---------------------------------------------------------------------------
+
 from app.modules.ingredients.repository import SqlIngredientRepository
 from app.modules.ingredients.use_cases import (
     CreateIngredientUseCase, DeactivateIngredientUseCase, GetIngredientUseCase,
@@ -101,10 +91,8 @@ def get_update_ingredient_use_case(session: Session = Depends(get_session)) -> U
 def get_deactivate_ingredient_use_case(session: Session = Depends(get_session)) -> DeactivateIngredientUseCase:
     return DeactivateIngredientUseCase(SqlIngredientRepository(session))
 
-
-# ---------------------------------------------------------------------------
 # meals
-# ---------------------------------------------------------------------------
+
 from app.modules.meals.repository import SqlMealRepository
 from app.modules.meals.use_cases import (
     CreateMealUseCase, DeactivateMealUseCase, GetMealUseCase, ListMealsUseCase, UpdateMealUseCase,
@@ -130,10 +118,8 @@ def get_update_meal_use_case(session: Session = Depends(get_session)) -> UpdateM
 def get_deactivate_meal_use_case(session: Session = Depends(get_session)) -> DeactivateMealUseCase:
     return DeactivateMealUseCase(SqlMealRepository(session))
 
+# meal_planning
 
-# ---------------------------------------------------------------------------
-# meal_planning (chỉ phần lưu trữ — xem ghi chú trong use_cases.py)
-# ---------------------------------------------------------------------------
 from app.modules.meal_planning.candidate_repository import SqlMealCandidateProvider
 from app.modules.meal_planning.repository import SqlMealPlanRepository
 from app.modules.meal_planning.use_cases import (
