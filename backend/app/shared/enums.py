@@ -1,28 +1,17 @@
-# File: backend/app/shared/enums.py
-# Shared enums used across multiple modules (nutrition, profiles, meal_planning).
-
 from __future__ import annotations
 
 from enum import Enum
 from typing import Dict
 
-
-# ---------------------------------------------------------------------------
-# Gender
-# ---------------------------------------------------------------------------
-
 class Gender(str, Enum):
-    """Biological sex used for BMR calculation."""
+    """Giới tính sinh học được sử dụng để tính BMR"""
     MALE = "male"
     FEMALE = "female"
 
-
-# ---------------------------------------------------------------------------
 # Activity Level
-# ---------------------------------------------------------------------------
 
 class ActivityLevel(str, Enum):
-    """Physical activity level with corresponding TDEE multiplier."""
+    """Mức độ hoạt động thể chất với hệ số TDEE tương ứng"""
     SEDENTARY = "sedentary"      # Little or no exercise
     LIGHT = "light"              # Light exercise 1-3 days/week
     MODERATE = "moderate"        # Moderate exercise 3-5 days/week
@@ -46,7 +35,7 @@ _ACTIVITY_MULTIPLIERS: Dict[ActivityLevel, float] = {
 # ---------------------------------------------------------------------------
 
 class FitnessGoal(str, Enum):
-    """User's fitness objective with corresponding calorie adjustment."""
+    """Mục tiêu tập luyện của người dùng với việc điều chỉnh lượng calo tương ứng."""
     MAINTAIN = "maintain"        # Keep current weight
     LOSE_WEIGHT = "lose_weight"  # Caloric deficit
     GAIN_MUSCLE = "gain_muscle"  # Caloric surplus
@@ -64,12 +53,6 @@ _GOAL_ADJUSTMENTS: Dict[FitnessGoal, float] = {
     FitnessGoal.GAIN_MUSCLE: 300.0,
     FitnessGoal.GAIN_WEIGHT: 200.0,
 }
-
-
-# ---------------------------------------------------------------------------
-# Bổ sung bởi Bình (modules: identity, profiles, ingredients, meals)
-# Các enum dưới đây KHÔNG đụng tới phần trên — chỉ thêm mới.
-# ---------------------------------------------------------------------------
 
 class UserRole(str, Enum):
     """Vai trò tài khoản."""
