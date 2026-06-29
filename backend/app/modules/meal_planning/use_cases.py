@@ -1,8 +1,3 @@
-# File: backend/app/modules/meal_planning/use_cases.py
-#
-# NOTE: chứa use case cho việc LƯU/ĐỌC thực đơn (API cơ bản — Bình) và use
-# case SINH thực đơn tự động (GenerateMealPlanUseCase — Đức), gọi planner +
-# scorer + constraint_checker qua MealCandidateProviderPort.
 from __future__ import annotations
 
 from datetime import date
@@ -62,13 +57,7 @@ class DeleteMealPlanUseCase:
 
 
 class GenerateMealPlanUseCase:
-    """Sinh thực đơn tự động từ một PlanRequest đã chuẩn hóa.
-
-    Orchestration thuần: tải candidate qua port (đã loại trừ nguyên liệu dị
-    ứng/không ăn), rồi giao cho HeuristicPlanner. Trả về MealPlanEntity (chưa
-    lưu — client gọi POST /api/meal-plans nếu muốn lưu) hoặc ValidationResult
-    nếu bất khả thi. KHÔNG tự lưu để giữ tách bạch giữa "sinh" và "lưu"."""
-
+   
     def __init__(
         self,
         candidate_provider: MealCandidateProviderPort,
@@ -85,14 +74,6 @@ class GenerateMealPlanUseCase:
 
 
 class BuildPlanRequestUseCase:
-    """Chuẩn hóa input thô từ API/form thành PlanRequest (bước 1-3 SRS §5.3).
-
-    Tập hợp dữ liệu nằm rải rác ở nhiều module — hồ sơ + mục tiêu dinh dưỡng
-    (nutrition) và danh sách loại trừ (profiles) — để router không phải chứa
-    logic nghiệp vụ. Mục tiêu dinh dưỡng tính bằng NutritionCalculator
-    (deterministic) từ hồ sơ; ngân sách/số bữa mặc định lấy từ hồ sơ nếu API
-    không truyền."""
-
     DEFAULT_DAYS = 7  # MVP mặc định 7 ngày (HC-04)
 
     def __init__(
