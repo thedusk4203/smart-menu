@@ -1,4 +1,3 @@
-# File: backend/app/modules/meal_planning/schemas.py
 from __future__ import annotations
 
 from datetime import date
@@ -33,9 +32,6 @@ class MealPlanResponse(BaseModel):
 
 
 class GenerateMealPlanRequest(BaseModel):
-    """Body cho POST /api/meal-plans/generate. days/meals_per_day/budget_limit
-    có thể bỏ trống — khi đó lấy mặc định từ hồ sơ người dùng (xem
-    BuildPlanRequestUseCase)."""
     user_id: int
     days: int | None = None
     meals_per_day: int | None = None
@@ -44,8 +40,6 @@ class GenerateMealPlanRequest(BaseModel):
 
 
 class GeneratedMealPlanResponse(BaseModel):
-    """Thực đơn vừa sinh (CHƯA lưu — id=None). Client gọi POST /api/meal-plans
-    để lưu nếu muốn giữ lại."""
     user_id: int
     name: str
     start_date: date | None
