@@ -1,37 +1,23 @@
-# File: backend/app/modules/nutrition/domain.py
-# Domain objects for the nutrition module.
-# Pure Python — no framework dependencies (no FastAPI, SQLModel, etc.).
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, Sequence
 
-# Import shared enums (used by profiles and other modules too)
+# Nhập các enum được chia sẻ (được sử dụng bởi các cấu hình và các module khác)
 from app.shared.enums import ActivityLevel, FitnessGoal, Gender  # noqa: F401
 
-
-# ---------------------------------------------------------------------------
 # Warning codes
-# ---------------------------------------------------------------------------
 
 class NutritionWarningCode(str, Enum):
-    """Structured warning codes for extreme nutrition values.
 
-    Using codes instead of free-text makes it easy for the frontend
-    to localize, style, and programmatically handle warnings.
-    """
     BMI_UNDERWEIGHT = "BMI_UNDERWEIGHT"
     BMI_OBESE = "BMI_OBESE"
     LOW_CALORIE_TARGET = "LOW_CALORIE_TARGET"
     HIGH_CALORIE_TARGET = "HIGH_CALORIE_TARGET"
     INFEASIBLE_CALORIE_TARGET = "INFEASIBLE_CALORIE_TARGET"
 
-
-# ---------------------------------------------------------------------------
 # Value Objects
-# ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class MacroRatio:
@@ -60,27 +46,13 @@ MACRO_PRESETS: Dict[FitnessGoal, MacroRatio] = {
 
 @dataclass(frozen=True)
 class NutritionWarning:
-    """A single structured warning with code and human-readable message."""
     code: NutritionWarningCode
     message: str
 
 
 @dataclass(frozen=True)
 class NutritionTarget:
-    """Calculated daily nutrition target for a user profile.
 
-    Rounding rules:
-    - bmr, tdee: 1 decimal place
-    - target_calories: integer (round to whole number)
-    - daily_protein_g, daily_fat_g, daily_carb_g: 1 decimal place
-    - bmi: 1 decimal place
-
-    Warnings use NutritionWarningCode for structured processing.
-    warnings is a tuple for true immutability (list would allow .append()).
-
-    is_feasible is False when target_calories falls below the safe minimum,
-    in which case macros are zeroed out and planner should not proceed.
-    """
     bmr: float
     tdee: float
     target_calories: int
