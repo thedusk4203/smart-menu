@@ -1,6 +1,3 @@
-# File: backend/app/modules/nutrition/schemas.py
-# Pydantic DTOs for nutrition module input/output.
-
 from __future__ import annotations
 
 from typing import List
@@ -18,16 +15,9 @@ from app.modules.nutrition.constants import (
 from app.modules.nutrition.domain import NutritionWarningCode
 from app.shared.enums import ActivityLevel, FitnessGoal, Gender
 
-
-# ---------------------------------------------------------------------------
 # Input
-# ---------------------------------------------------------------------------
 
 class NutritionProfileInput(BaseModel):
-    """Input DTO for calculating a user's daily nutrition target.
-
-    Values come from the user's profile (user_profiles table).
-    """
     gender: Gender = Field(
         ...,
         description="Biological sex: 'male' or 'female'.",
@@ -75,23 +65,14 @@ class NutritionProfileInput(BaseModel):
     }
 
 
-# ---------------------------------------------------------------------------
-# Warning DTO
-# ---------------------------------------------------------------------------
-
 class NutritionWarningResponse(BaseModel):
-    """A single structured warning with code and human-readable message."""
+
     code: NutritionWarningCode = Field(
         ..., description="Machine-readable warning code."
     )
     message: str = Field(
         ..., description="Human-readable warning message in Vietnamese."
     )
-
-
-# ---------------------------------------------------------------------------
-# Output
-# ---------------------------------------------------------------------------
 
 class NutritionTargetResponse(BaseModel):
     """Output DTO representing the calculated daily nutrition target."""
