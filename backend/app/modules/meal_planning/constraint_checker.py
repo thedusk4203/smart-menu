@@ -1,18 +1,8 @@
-# File: backend/app/modules/meal_planning/constraint_checker.py
-#
-# Kiểm tra RÀNG BUỘC CỨNG (hard constraints) cho thuật toán sinh thực đơn
-# (SRS §5.4). Đây là tầng "đảm bảo tính đúng đắn" — mọi thực đơn trước khi
-# tới người dùng PHẢI qua validate_plan() (theo nguyên tắc trong CLAUDE.md:
-# mọi quyết định feasibility là deterministic, không do LLM).
-#
-# Hàm tách làm hai nhóm:
-#   - candidate_is_eligible : lọc từng MealCandidate trước khi ghép (HC-02/03/06/07)
-#   - validate_plan         : kiểm tra toàn bộ thực đơn sau khi ghép (HC-01/04/05)
 from __future__ import annotations
 
 from app.modules.meal_planning.domain import MealCandidate, PlanRequest, ValidationResult
 
-# Thứ tự slot bữa ăn theo số bữa/ngày. MVP hỗ trợ 2 hoặc 3 bữa.
+# Thứ tự slot bữa ăn theo số bữa/ngày. hỗ trợ 2 hoặc 3 bữa.
 _SLOTS_BY_MEALS_PER_DAY: dict[int, list[str]] = {
     2: ["breakfast", "dinner"],
     3: ["breakfast", "lunch", "dinner"],
@@ -25,10 +15,7 @@ def slots_for(meals_per_day: int) -> list[str]:
     Mặc định 3 bữa nếu giá trị không nằm trong bảng (an toàn cho MVP)."""
     return _SLOTS_BY_MEALS_PER_DAY.get(meals_per_day, _SLOTS_BY_MEALS_PER_DAY[3])
 
-
-# ---------------------------------------------------------------------------
 # HC theo từng candidate (dùng khi lọc trước lúc ghép)
-# ---------------------------------------------------------------------------
 
 def has_excluded_ingredient(candidate: MealCandidate, excluded: set[int]) -> bool:
     """HC-02 (dị ứng) + HC-03 (thực phẩm loại trừ): True nếu món chứa bất kỳ
@@ -65,10 +52,7 @@ def candidate_is_eligible(
         and not has_excluded_ingredient(candidate, excluded)
     )
 
-
-# ---------------------------------------------------------------------------
 # Validate toàn bộ thực đơn (sau khi planner đã ghép xong)
-# ---------------------------------------------------------------------------
 
 def validate_plan(
     days: list[list[MealCandidate]],
