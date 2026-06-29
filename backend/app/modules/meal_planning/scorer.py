@@ -1,13 +1,3 @@
-# File: backend/app/modules/meal_planning/scorer.py
-#
-# Chấm điểm RÀNG BUỘC MỀM (soft constraints) cho thuật toán sinh thực đơn
-# (SRS §5.5). Scorer KHÔNG loại món (đó là việc của constraint_checker) — nó
-# chỉ xếp hạng các candidate đã hợp lệ để planner chọn món "tốt nhất" cho
-# từng slot.
-#
-# Điểm tổng = tổng có trọng số của 8 tiêu chí SC-01..SC-08. Mỗi tiêu chí được
-# chuẩn hoá về [0, 1] (càng cao càng tốt) trước khi nhân trọng số, nên việc
-# tinh chỉnh trọng số là độc lập và dễ test.
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
@@ -48,8 +38,6 @@ _FAT_CARB_TOLERANCE = 0.20
 
 
 def _closeness(actual: float, target: float) -> float:
-    """Điểm gần mục tiêu trong [0, 1]: 1 khi khớp hệt, giảm tuyến tính theo
-    sai số tương đối. target <= 0 coi như không ràng buộc -> điểm trung tính."""
     if target <= 0:
         return 0.5
     return max(0.0, 1.0 - abs(actual - target) / target)
@@ -131,16 +119,6 @@ def score_candidate(
     max_cost: float,
     weights: ScoringWeights = DEFAULT_WEIGHTS,
 ) -> float:
-    """Điểm soft-constraint tổng hợp của một candidate cho slot hiện tại.
-
-    Tham số ngữ cảnh:
-      - usage_count        : số lần mỗi meal_id đã được dùng (cho SC-04)
-      - day_ingredient_ids : nguyên liệu đã dùng trong ngày hiện tại (SC-07)
-      - max_cost           : chi phí món đắt nhất trong pool (chuẩn hoá SC-06)
-      - weights            : bộ trọng số (mặc định DEFAULT_WEIGHTS) — review D-06
-
-    Mục tiêu dinh dưỡng/ngày được chia đều cho số bữa để so ở mức từng món.
-    """
     mpd = max(request.meals_per_day, 1)
     per_meal_cal = request.target_calories / mpd
     per_meal_protein = request.target_protein_g / mpd
