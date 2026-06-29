@@ -1,12 +1,3 @@
-# File: backend/app/modules/meal_planning/candidate_repository.py
-#
-# Adapter (Infrastructure) hiện thực MealCandidateProviderPort: tải danh sách
-# MealCandidate cho planner. Theo "Database read pattern" trong CLAUDE.md —
-# đọc tổng hợp qua view v_meals_full (đã tự tính dinh dưỡng + chi phí từ
-# nguyên liệu), kèm meal_ingredients để lấy ingredient_ids của từng món.
-#
-# Việc loại trừ nguyên liệu (dị ứng + không ăn) được đẩy xuống SQL (NOT EXISTS)
-# để giảm số candidate trả về; constraint_checker vẫn kiểm tra lại (HC-02/03).
 from __future__ import annotations
 
 from sqlalchemy import text
@@ -26,8 +17,7 @@ class SqlMealCandidateProvider(MealCandidateProviderPort):
         self._session = session
 
     def load_candidates(self, excluded_ingredient_ids: list[int]) -> list[MealCandidate]:
-        # 1) Lấy tổng hợp dinh dưỡng + chi phí + tags từ view; loại các món có
-        #    chứa nguyên liệu bị loại trừ ngay ở tầng SQL.
+        # 1) Lấy tổng hợp dinh dưỡng + chi phí + tags từ view; loại các món có chứa nguyên liệu bị loại trừ ngay ở tầng SQL.
         sql = """
             SELECT v.id, v.name, v.meal_type, v.total_calories, v.total_protein_g,
                    v.total_carbs_g, v.total_fat_g, v.estimated_cost, v.tags
@@ -65,8 +55,7 @@ class SqlMealCandidateProvider(MealCandidateProviderPort):
         for ir in ing_rows:
             ingredients_by_meal.setdefault(ir.meal_id, []).append(ir.ingredient_id)
 
-        # 3) Dựng MealCandidate. Lưu ý: view dùng cột total_carbs_g, domain dùng
-        #    total_carb_g — ánh xạ tại đây.
+        # 3) Dựng MealCandidate. Lưu ý: view dùng cột total_carbs_g, domain dùng total_carb_g — ánh xạ tại đây.
         return [
             MealCandidate(
                 meal_id=r.id,
