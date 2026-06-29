@@ -1,13 +1,3 @@
-# File: backend/app/modules/nutrition/calculator.py
-# Pure nutrition calculator — stateless, no DB or framework dependencies.
-# Uses Mifflin-St Jeor equation for BMR.
-#
-# Rounding rules:
-#   BMR, TDEE          → 1 decimal place
-#   target_calories    → integer (round to whole number)
-#   protein/fat/carb   → 1 decimal place
-#   BMI                → 1 decimal place
-
 from __future__ import annotations
 
 from typing import List, Tuple
@@ -60,11 +50,6 @@ class NutritionCalculator:
         weight_kg: float,
         height_cm: float,
     ) -> None:
-        """Validate profile inputs are within acceptable ranges.
-
-        Raises:
-            InvalidProfileDataError: If any value is outside its valid range.
-        """
         if not (AGE_MIN <= age <= AGE_MAX):
             raise InvalidProfileDataError("age", age, AGE_MIN, AGE_MAX)
         if not (WEIGHT_MIN_KG <= weight_kg <= WEIGHT_MAX_KG):
@@ -72,10 +57,7 @@ class NutritionCalculator:
         if not (HEIGHT_MIN_CM <= height_cm <= HEIGHT_MAX_CM):
             raise InvalidProfileDataError("height_cm", height_cm, HEIGHT_MIN_CM, HEIGHT_MAX_CM)
 
-    # ------------------------------------------------------------------
     # Core calculations
-    # ------------------------------------------------------------------
-
     @staticmethod
     def calculate_bmi(weight_kg: float, height_cm: float) -> float:
         """Calculate Body Mass Index.
@@ -167,17 +149,7 @@ class NutritionCalculator:
         tdee: float,
         target_calories: int,
     ) -> List[NutritionWarning]:
-        """Generate structured safety warnings for extreme values.
 
-        Checks:
-        - BMI < 18.5 → BMI_UNDERWEIGHT
-        - BMI > 30   → BMI_OBESE
-        - target_calories < 1200 → LOW_CALORIE_TARGET
-        - target_calories > 4000 → HIGH_CALORIE_TARGET
-
-        Note: INFEASIBLE_CALORIE_TARGET is handled separately in the
-        orchestrator, not here.
-        """
         warnings: List[NutritionWarning] = []
 
         if bmi < BMI_UNDERWEIGHT:
@@ -215,9 +187,7 @@ class NutritionCalculator:
 
         return warnings
 
-    # ------------------------------------------------------------------
     # Orchestrator
-    # ------------------------------------------------------------------
 
     @staticmethod
     def calculate_nutrition_target(
@@ -228,20 +198,7 @@ class NutritionCalculator:
         activity_level: ActivityLevel,
         fitness_goal: FitnessGoal,
     ) -> NutritionTarget:
-        """Calculate the full daily nutrition target from user profile data.
 
-        Pipeline: validate → BMI → BMR → TDEE → adjust → feasibility check →
-                  macros (if feasible) → warnings.
-
-        If target_calories < MINIMUM_SAFE_CALORIES (800 kcal), the result
-        is marked infeasible: macros are zeroed out, is_feasible=False,
-        and an INFEASIBLE_CALORIE_TARGET warning is added.
-
-        Raises:
-            InvalidProfileDataError: If input values are out of range.
-            InvalidEnumValueError: If gender is not a recognized value.
-            NutritionCalculationError: If an unexpected error occurs.
-        """
         try:
             NutritionCalculator.validate_inputs(age, weight_kg, height_cm)
 
