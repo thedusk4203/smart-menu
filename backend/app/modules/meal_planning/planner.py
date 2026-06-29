@@ -1,16 +1,3 @@
-# File: backend/app/modules/meal_planning/planner.py
-#
-# HEURISTIC PLANNER — sinh thực đơn tự động theo pipeline 9 bước (SRS §5.3).
-#
-# Thiết kế: planner là HÀM THUẦN (deterministic, không I/O). Nó nhận sẵn
-# danh sách MealCandidate (do use case tải qua MealCandidateProviderPort) nên
-# rất dễ test bằng dữ liệu giả — đúng tinh thần "deterministic, testable"
-# trong CLAUDE.md / docs/architecture.md.
-#
-# Chiến lược ghép: greedy theo từng (ngày, slot) — với mỗi slot, chọn món có
-# điểm soft-constraint cao nhất trong số candidate hợp lệ mà CÒN nằm trong
-# ngân sách còn lại. Cập nhật usage_count (đa dạng), nguyên liệu trong ngày
-# (tái sử dụng) và ngân sách sau mỗi lần chọn.
 from __future__ import annotations
 
 from dataclasses import asdict
@@ -47,22 +34,10 @@ class HeuristicPlanner(MealPlannerPort):
         *,
         start_date: date | None = None,
     ) -> MealPlanEntity | ValidationResult:
-        """Pipeline 9 bước (SRS §5.3).
-
-        Trả về:
-          - MealPlanEntity   : nếu ghép được thực đơn qua validate hard-constraint
-          - ValidationResult : status="infeasible" kèm lý do nếu không thể lập
-
-        start_date dùng để gắn nhãn ngày trong plan_data; nếu None thì ngày để
-        trống (None) — phần lưu trữ (Bình) sẽ tự gán khi người dùng lưu.
-        """
         slots = constraint_checker.slots_for(request.meals_per_day)
 
-        # Dựng set loại trừ MỘT lần (review D-07) — tái dùng cho mọi candidate × slot.
         excluded = set(request.excluded_ingredient_ids)
 
-        # --- Bước 4 (một phần): gom candidate hợp lệ theo từng loại slot ---
-        # Lọc HC-02/03/06/07 ngay; HC-01 (ngân sách) xét động khi ghép.
         by_slot: dict[str, list[MealCandidate]] = {slot: [] for slot in slots}
         for slot in by_slot:
             by_slot[slot] = [
@@ -85,9 +60,6 @@ class HeuristicPlanner(MealPlannerPort):
         # max_cost để chuẩn hoá điểm "tiết kiệm" (SC-06) — trên toàn pool hợp lệ.
         max_cost = max(c.estimated_cost for pool in by_slot.values() for c in pool)
 
-        # --- Bước 6 + 7: ghép món, theo dõi ngân sách/lặp/nguyên liệu ---
-        # budget_limit=None -> không giới hạn: dùng +inf để mọi món luôn "đủ rẻ"
-        # mà không phải rải if đặc biệt khắp vòng lặp (review D-01).
         usage_count: dict[int, int] = {}
         remaining_budget = (
             request.budget_limit if request.budget_limit is not None else float("inf")
@@ -124,7 +96,7 @@ class HeuristicPlanner(MealPlannerPort):
 
             days.append(day_meals)
 
-        # --- Bước 8: validate toàn bộ thực đơn theo hard constraints ---
+        #validate toàn bộ thực đơn theo hard constraints ---
         validation = constraint_checker.validate_plan(days, request)
         if not validation.is_feasible:
             return validation
@@ -133,9 +105,6 @@ class HeuristicPlanner(MealPlannerPort):
         warnings = self._collect_warnings(days, request)
         return self._build_entity(days, request, start_date, warnings)
 
-    # ------------------------------------------------------------------
-    # Chọn món cho một slot (greedy theo điểm, lọc theo ngân sách còn lại)
-    # ------------------------------------------------------------------
     def _pick_for_slot(
         self,
         *,
@@ -163,9 +132,7 @@ class HeuristicPlanner(MealPlannerPort):
             ),
         )
 
-    # ------------------------------------------------------------------
-    # Cảnh báo mềm (không phải hard violation) — gắn vào plan_data.warnings
-    # ------------------------------------------------------------------
+
     def _collect_warnings(
         self, days: list[list[MealCandidate]], request: PlanRequest
     ) -> list[str]:
@@ -181,9 +148,7 @@ class HeuristicPlanner(MealPlannerPort):
                     )
         return warnings
 
-    # ------------------------------------------------------------------
-    # Dựng entity lưu trữ từ kết quả ghép
-    # ------------------------------------------------------------------
+
     def _build_entity(
         self,
         days: list[list[MealCandidate]],
