@@ -21,7 +21,7 @@ export default function Register() {
       toast.success("Tạo tài khoản thành công! Hoàn thiện hồ sơ nhé 🎉", {
         style: { borderRadius: "12px", background: "#10b981", color: "#fff", fontWeight: "bold" },
       });
-      navigate("/");
+      navigate("/login");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Đăng ký thất bại");
     } finally {
