@@ -1,46 +1,44 @@
-# File: backend/app/modules/nutrition/schemas.py
-# Pydantic DTOs for nutrition module input/output.
-
 from __future__ import annotations
 
 from typing import List
 
 from pydantic import BaseModel, Field
 
+from app.modules.nutrition.constants import (
+    AGE_MAX,
+    AGE_MIN,
+    HEIGHT_MAX_CM,
+    HEIGHT_MIN_CM,
+    WEIGHT_MAX_KG,
+    WEIGHT_MIN_KG,
+)
 from app.modules.nutrition.domain import NutritionWarningCode
 from app.shared.enums import ActivityLevel, FitnessGoal, Gender
 
-
-# ---------------------------------------------------------------------------
 # Input
-# ---------------------------------------------------------------------------
 
 class NutritionProfileInput(BaseModel):
-    """Input DTO for calculating a user's daily nutrition target.
-
-    Values come from the user's profile (user_profiles table).
-    """
     gender: Gender = Field(
         ...,
         description="Biological sex: 'male' or 'female'.",
     )
     age: int = Field(
         ...,
-        ge=15,
-        le=100,
-        description="Age in years (15–100).",
+        ge=AGE_MIN,
+        le=AGE_MAX,
+        description=f"Age in years ({AGE_MIN}–{AGE_MAX}).",
     )
     weight_kg: float = Field(
         ...,
-        ge=30.0,
-        le=300.0,
-        description="Body weight in kilograms (30–300).",
+        ge=WEIGHT_MIN_KG,
+        le=WEIGHT_MAX_KG,
+        description=f"Body weight in kilograms ({WEIGHT_MIN_KG:g}–{WEIGHT_MAX_KG:g}).",
     )
     height_cm: float = Field(
         ...,
-        ge=100.0,
-        le=250.0,
-        description="Height in centimeters (100–250).",
+        ge=HEIGHT_MIN_CM,
+        le=HEIGHT_MAX_CM,
+        description=f"Height in centimeters ({HEIGHT_MIN_CM:g}–{HEIGHT_MAX_CM:g}).",
     )
     activity_level: ActivityLevel = Field(
         ...,
@@ -48,7 +46,7 @@ class NutritionProfileInput(BaseModel):
     )
     fitness_goal: FitnessGoal = Field(
         ...,
-        description="Fitness objective: maintain, lose_weight, or gain_muscle.",
+        description="Fitness objective: maintain, lose_weight, gain_muscle, or gain_weight.",
     )
 
     model_config = {
@@ -67,23 +65,14 @@ class NutritionProfileInput(BaseModel):
     }
 
 
-# ---------------------------------------------------------------------------
-# Warning DTO
-# ---------------------------------------------------------------------------
-
 class NutritionWarningResponse(BaseModel):
-    """A single structured warning with code and human-readable message."""
+
     code: NutritionWarningCode = Field(
         ..., description="Machine-readable warning code."
     )
     message: str = Field(
         ..., description="Human-readable warning message in Vietnamese."
     )
-
-
-# ---------------------------------------------------------------------------
-# Output
-# ---------------------------------------------------------------------------
 
 class NutritionTargetResponse(BaseModel):
     """Output DTO representing the calculated daily nutrition target."""

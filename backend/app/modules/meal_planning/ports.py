@@ -1,13 +1,14 @@
-# File: backend/app/modules/meal_planning/ports.py
-#
-# NOTE: chỉ định nghĩa port cho phần lưu trữ (storage). Port cho phần sinh
-# thực đơn tự động (ví dụ MealCandidateProviderPort) sẽ do Đức bổ sung khi
-# triển khai planner/scorer/constraint_checker.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import date
 
-from app.modules.meal_planning.domain import MealPlanEntity
+from app.modules.meal_planning.domain import (
+    MealCandidate,
+    MealPlanEntity,
+    PlanRequest,
+    ValidationResult,
+)
 
 
 class MealPlanRepositoryPort(ABC):
@@ -22,3 +23,21 @@ class MealPlanRepositoryPort(ABC):
 
     @abstractmethod
     def delete(self, plan_id: int) -> None: ...
+
+
+class MealCandidateProviderPort(ABC):
+
+    @abstractmethod
+    def load_candidates(self, excluded_ingredient_ids: list[int]) -> list[MealCandidate]: ...
+
+
+class MealPlannerPort(ABC):
+    
+    @abstractmethod
+    def generate(
+        self,
+        request: PlanRequest,
+        candidates: list[MealCandidate],
+        *,
+        start_date: date | None = None,
+    ) -> MealPlanEntity | ValidationResult: ...

@@ -122,6 +122,11 @@ class TestAdjustCalories:
         assert result == 2300
         assert isinstance(result, int)
 
+    def test_gain_weight(self):
+        result = NutritionCalculator.adjust_calories(2000.0, FitnessGoal.GAIN_WEIGHT)
+        assert result == 2200
+        assert isinstance(result, int)
+
     def test_never_negative(self):
         result = NutritionCalculator.adjust_calories(300.0, FitnessGoal.LOSE_WEIGHT)
         assert result >= 0
@@ -157,6 +162,13 @@ class TestCalculateMacros:
         assert protein == 201.2
         assert fat == 51.1
         assert carb == 258.8
+
+    def test_gain_weight_macros(self):
+        ratio = MACRO_PRESETS[FitnessGoal.GAIN_WEIGHT]
+        protein, fat, carb = NutritionCalculator.calculate_macros(2200, ratio)
+        assert protein == 137.5
+        assert fat == 61.1
+        assert carb == 275.0
 
     def test_rounding_1_decimal(self):
         ratio = MACRO_PRESETS[FitnessGoal.MAINTAIN]

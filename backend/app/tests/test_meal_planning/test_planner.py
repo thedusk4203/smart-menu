@@ -1,0 +1,135 @@
+# File: backend/app/tests/test_meal_planning/test_planner.py
+# Unit test cho HeuristicPlanner (pipeline sinh thực đơn, SRS §5.3).
+
+from datetime import date
+
+from app.modules.meal_planning.domain import MealPlanEntity, ValidationResult
+from app.modules.meal_planning.planner import HeuristicPlanner
+from app.tests.test_meal_planning.factories import make_candidate, make_request
+
+PLAN_DAY_KEYS = {"day", "date", "meals", "day_calories", "day_cost"}
+MEAL_KEYS = {"meal_id", "name", "meal_type", "calories", "protein_g", "fat_g", "carb_g", "cost"}
+
+
+def _basic_pool(cost=10000.0):
+    return [
+        make_candidate(1, meal_type="breakfast", cost=cost),
+        make_candidate(2, meal_type="dinner", cost=cost),
+    ]
+
+
+class TestGenerateFeasible:
+    def test_returns_meal_plan_entity(self):
+        req = make_request(days=1, meals_per_day=2, budget_limit=100000.0)
+        result = HeuristicPlanner().generate(req, _basic_pool())
+        assert isinstance(result, MealPlanEntity)
+
+    def test_plan_data_structure(self):
+        """D-10: cấu trúc plan_data đúng schema PlannedDay/PlannedMeal."""
+        req = make_request(days=1, meals_per_day=2, budget_limit=100000.0)
+        result = HeuristicPlanner().generate(req, _basic_pool())
+        assert result.plan_data["meals_per_day"] == 2
+        assert "warnings" in result.plan_data
+        days = result.plan_data["days"]
+        assert len(days) == 1
+        assert set(days[0]) == PLAN_DAY_KEYS
+        assert len(days[0]["meals"]) == 2
+        assert set(days[0]["meals"][0]) == MEAL_KEYS
+
+    def test_slots_in_order(self):
+        req = make_request(days=1, meals_per_day=2, budget_limit=100000.0)
+        result = HeuristicPlanner().generate(req, _basic_pool())
+        meals = result.plan_data["days"][0]["meals"]
+        assert meals[0]["meal_type"] == "breakfast"
+        assert meals[1]["meal_type"] == "dinner"
+
+    def test_totals_aggregated(self):
+        req = make_request(days=1, meals_per_day=2, budget_limit=100000.0)
+        result = HeuristicPlanner().generate(req, _basic_pool(cost=10000.0))
+        assert result.total_cost == 20000
+        # 2 món * 400 kcal mặc định.
+        assert result.total_calories == 800
+
+
+class TestStartDate:
+    def test_dates_populated(self):
+        req = make_request(days=2, meals_per_day=2, budget_limit=200000.0)
+        pool = [
+            make_candidate(1, meal_type="breakfast", cost=10000.0),
+            make_candidate(2, meal_type="dinner", cost=10000.0),
+        ]
+        result = HeuristicPlanner().generate(req, pool, start_date=date(2026, 6, 24))
+        assert result.start_date == date(2026, 6, 24)
+        assert result.end_date == date(2026, 6, 25)
+        assert result.plan_data["days"][0]["date"] == "2026-06-24"
+        assert result.plan_data["days"][1]["date"] == "2026-06-25"
+
+    def test_no_start_date_leaves_none(self):
+        req = make_request(days=1, meals_per_day=2, budget_limit=100000.0)
+        result = HeuristicPlanner().generate(req, _basic_pool())
+        assert result.start_date is None
+        assert result.end_date is None
+        assert result.plan_data["days"][0]["date"] is None
+
+
+class TestExclusions:
+    def test_excluded_only_option_is_infeasible(self):
+        # Bữa sáng duy nhất chứa nguyên liệu bị loại -> không còn món hợp lệ.
+        pool = [
+            make_candidate(1, meal_type="breakfast", ingredient_ids=[7]),
+            make_candidate(2, meal_type="dinner", ingredient_ids=[3]),
+        ]
+        req = make_request(days=1, meals_per_day=2, excluded=[7], budget_limit=100000.0)
+        result = HeuristicPlanner().generate(req, pool)
+        assert isinstance(result, ValidationResult)
+        assert result.is_feasible is False
+        assert any("breakfast" in r for r in result.infeasible_reasons)
+
+    def test_excluded_avoided_when_alternative_exists(self):
+        pool = [
+            make_candidate(1, meal_type="breakfast", ingredient_ids=[7]),   # bị loại
+            make_candidate(2, meal_type="breakfast", ingredient_ids=[3]),   # hợp lệ
+            make_candidate(3, meal_type="dinner", ingredient_ids=[4]),
+        ]
+        req = make_request(days=1, meals_per_day=2, excluded=[7], budget_limit=100000.0)
+        result = HeuristicPlanner().generate(req, pool)
+        assert isinstance(result, MealPlanEntity)
+        breakfast = result.plan_data["days"][0]["meals"][0]
+        assert breakfast["meal_id"] == 2
+
+
+class TestBudget:
+    def test_unlimited_budget_allows_expensive_meals(self):
+        """D-01 regression: budget_limit=None -> sinh được thực đơn dù món rất đắt."""
+        pool = [
+            make_candidate(1, meal_type="breakfast", cost=9_000_000.0),
+            make_candidate(2, meal_type="dinner", cost=9_000_000.0),
+        ]
+        req = make_request(days=1, meals_per_day=2, budget_limit=None)
+        result = HeuristicPlanner().generate(req, pool)
+        assert isinstance(result, MealPlanEntity)
+        assert result.total_cost == 18_000_000
+
+    def test_budget_too_low_is_infeasible(self):
+        pool = _basic_pool(cost=50000.0)
+        req = make_request(days=1, meals_per_day=2, budget_limit=1000.0)
+        result = HeuristicPlanner().generate(req, pool)
+        assert isinstance(result, ValidationResult)
+        assert result.is_feasible is False
+        assert any("ngân sách" in r.lower() for r in result.infeasible_reasons)
+
+
+class TestVariety:
+    def test_alternates_repeated_meals_across_days(self):
+        # 2 bữa sáng tương đương + 1 bữa tối: planner nên đổi món sáng sang ngày 2.
+        pool = [
+            make_candidate(1, meal_type="breakfast", cost=10000.0),
+            make_candidate(2, meal_type="breakfast", cost=10000.0),
+            make_candidate(3, meal_type="dinner", cost=10000.0),
+        ]
+        req = make_request(days=2, meals_per_day=2, budget_limit=200000.0)
+        result = HeuristicPlanner().generate(req, pool)
+        assert isinstance(result, MealPlanEntity)
+        b_day1 = result.plan_data["days"][0]["meals"][0]["meal_id"]
+        b_day2 = result.plan_data["days"][1]["meals"][0]["meal_id"]
+        assert b_day1 != b_day2

@@ -109,9 +109,13 @@ def get_deactivate_meal_use_case(s: Session = Depends(get_session)) -> Deactivat
 
 
 # ── meal_planning ─────────────────────────────────────────────────────────
+# NOTE: phần sinh thực đơn tự động (Generate/BuildPlanRequest + candidate provider)
+# là code của Đức, merge từ main. Giữ nguyên, không xoá.
+from app.modules.meal_planning.candidate_repository import SqlMealCandidateProvider
 from app.modules.meal_planning.repository import SqlMealPlanRepository
 from app.modules.meal_planning.use_cases import (
-    DeleteMealPlanUseCase, GetMealPlanUseCase, ListMealPlansUseCase, SaveMealPlanUseCase,
+    BuildPlanRequestUseCase, DeleteMealPlanUseCase, GenerateMealPlanUseCase, GetMealPlanUseCase,
+    ListMealPlansUseCase, SaveMealPlanUseCase,
 )
 
 
@@ -126,3 +130,9 @@ def get_get_meal_plan_use_case(s: Session = Depends(get_session)) -> GetMealPlan
 
 def get_delete_meal_plan_use_case(s: Session = Depends(get_session)) -> DeleteMealPlanUseCase:
     return DeleteMealPlanUseCase(SqlMealPlanRepository(s))
+
+def get_generate_meal_plan_use_case(s: Session = Depends(get_session)) -> GenerateMealPlanUseCase:
+    return GenerateMealPlanUseCase(SqlMealCandidateProvider(s))
+
+def get_build_plan_request_use_case(s: Session = Depends(get_session)) -> BuildPlanRequestUseCase:
+    return BuildPlanRequestUseCase(SqlUserProfileRepository(s), SqlExclusionRepository(s))
