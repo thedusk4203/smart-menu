@@ -40,4 +40,5 @@ class MealPlannerPort(ABC):
         candidates: list[MealCandidate],
         *,
         start_date: date | None = None,
+        seed: int | None = None,
     ) -> MealPlanEntity | ValidationResult: ...

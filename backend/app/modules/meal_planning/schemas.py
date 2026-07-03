@@ -37,6 +37,9 @@ class GenerateMealPlanRequest(BaseModel):
     meals_per_day: int | None = None
     budget_limit: float | None = None
     preferred_tags: list[str] | None = None
+    # seed cho "tạo lại thực đơn khác" (FR-PLAN-05): None = chọn tối ưu deterministic;
+    # có giá trị = xáo trộn có kiểm soát để ra phương án khác. Client gửi số ngẫu nhiên.
+    seed: int | None = None
 
 
 class GeneratedMealPlanResponse(BaseModel):

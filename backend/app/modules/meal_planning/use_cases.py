@@ -67,10 +67,15 @@ class GenerateMealPlanUseCase:
         self._planner = planner or HeuristicPlanner()
 
     def execute(
-        self, request: PlanRequest, *, start_date: date | None = None
+        self,
+        request: PlanRequest,
+        *,
+        start_date: date | None = None,
+        seed: int | None = None,
     ) -> MealPlanEntity | ValidationResult:
+        # seed truyền xuống planner để hỗ trợ "tạo lại thực đơn khác" (FR-PLAN-05).
         candidates = self._candidates.load_candidates(request.excluded_ingredient_ids)
-        return self._planner.generate(request, candidates, start_date=start_date)
+        return self._planner.generate(request, candidates, start_date=start_date, seed=seed)
 
 
 class BuildPlanRequestUseCase:

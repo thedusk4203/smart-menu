@@ -136,3 +136,12 @@ def get_generate_meal_plan_use_case(s: Session = Depends(get_session)) -> Genera
 
 def get_build_plan_request_use_case(s: Session = Depends(get_session)) -> BuildPlanRequestUseCase:
     return BuildPlanRequestUseCase(SqlUserProfileRepository(s), SqlExclusionRepository(s))
+
+
+# ── nutrition ─────────────────────────────────────────────────────────────
+# NutritionCalculator là hàm thuần (stateless), không cần Session/DB.
+from app.modules.nutrition.use_cases import CalculateNutritionTargetUseCase
+
+
+def get_calculate_nutrition_target_use_case() -> CalculateNutritionTargetUseCase:
+    return CalculateNutritionTargetUseCase()

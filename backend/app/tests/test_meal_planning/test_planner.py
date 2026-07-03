@@ -133,3 +133,39 @@ class TestVariety:
         b_day1 = result.plan_data["days"][0]["meals"][0]["meal_id"]
         b_day2 = result.plan_data["days"][1]["meals"][0]["meal_id"]
         assert b_day1 != b_day2
+
+
+class TestRegenerateSeed:
+    """FR-PLAN-05: 'tạo lại thực đơn' — seed cho phép ra phương án khác nhau
+    nhưng vẫn tái lập được, và không seed thì vẫn deterministic như cũ."""
+
+    def _pool(self):
+        # Nhiều lựa chọn tương đương cho mỗi bữa -> có 'top-K' để xáo trộn.
+        return [
+            make_candidate(1, meal_type="breakfast", cost=10000.0),
+            make_candidate(2, meal_type="breakfast", cost=10000.0),
+            make_candidate(3, meal_type="breakfast", cost=10000.0),
+            make_candidate(4, meal_type="dinner", cost=10000.0),
+            make_candidate(5, meal_type="dinner", cost=10000.0),
+            make_candidate(6, meal_type="dinner", cost=10000.0),
+        ]
+
+    def test_same_seed_is_reproducible(self):
+        req = make_request(days=1, meals_per_day=2, budget_limit=100000.0)
+        a = HeuristicPlanner().generate(req, self._pool(), seed=42)
+        b = HeuristicPlanner().generate(req, self._pool(), seed=42)
+        assert a.plan_data == b.plan_data
+
+    def test_different_seeds_can_produce_different_plans(self):
+        req = make_request(days=1, meals_per_day=2, budget_limit=100000.0)
+        breakfast_picks = set()
+        for s in range(10):
+            result = HeuristicPlanner().generate(req, self._pool(), seed=s)
+            breakfast_picks.add(result.plan_data["days"][0]["meals"][0]["meal_id"])
+        assert len(breakfast_picks) > 1
+
+    def test_no_seed_stays_deterministic(self):
+        req = make_request(days=1, meals_per_day=2, budget_limit=100000.0)
+        a = HeuristicPlanner().generate(req, self._pool())
+        b = HeuristicPlanner().generate(req, self._pool())
+        assert a.plan_data == b.plan_data

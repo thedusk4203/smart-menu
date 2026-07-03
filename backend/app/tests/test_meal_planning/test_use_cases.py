@@ -76,8 +76,8 @@ class _RecordingPlanner(MealPlannerPort):
         self._result = result
         self.calls = []
 
-    def generate(self, request, candidates, *, start_date=None):
-        self.calls.append((request, candidates, start_date))
+    def generate(self, request, candidates, *, start_date=None, seed=None):
+        self.calls.append((request, candidates, start_date, seed))
         return self._result
 
 
