@@ -66,3 +66,22 @@ class DeleteUserUseCase:
         if self._repo.get_by_id(user_id) is None:
             raise UserNotFoundError(user_id)
         self._repo.delete(user_id)
+
+class LoginUseCase:
+    """Xác thực email/password, trả về JWT access token."""
+    def __init__(self, repo: UserRepositoryPort) -> None:
+        self._repo = repo
+
+    def execute(self, email: str, password: str) -> str:
+        from app.core.security import create_access_token, verify_password
+        from app.core.exceptions import AppException
+
+        class _AuthError(AppException):
+            status_code = 401
+
+        user = self._repo.get_by_email(email)
+        if user is None or not verify_password(password, user.hashed_password):
+            raise _AuthError("Email hoặc mật khẩu không đúng")
+        if not user.is_active:
+            raise _AuthError("Tài khoản đã bị khoá")
+        return create_access_token(user.id, user.role.value)

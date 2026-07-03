@@ -1,8 +1,8 @@
-# File: backend/app/main.py
+﻿# File: backend/app/main.py
 # Application entrypoint.
 #
-# NOTE: schema CSDL do data/init_db.sql (hoặc Alembic migrations) quản lý —
-# KHÔNG gọi SQLModel.metadata.create_all() ở đây.
+# NOTE: schema CSDL do data/init_db.sql (hoáº·c Alembic migrations) quáº£n lÃ½ â€”
+# KHÃ”NG gá»i SQLModel.metadata.create_all() á»Ÿ Ä‘Ã¢y.
 from __future__ import annotations
 
 from fastapi import FastAPI, Request
@@ -14,13 +14,13 @@ from app.core.exceptions import AppException
 
 app = FastAPI(
     title="Smart Menu API",
-    description="API backend cho ứng dụng lập thực đơn theo ngân sách & dinh dưỡng",
+    description="API backend cho á»©ng dá»¥ng láº­p thá»±c Ä‘Æ¡n theo ngÃ¢n sÃ¡ch & dinh dÆ°á»¡ng",
     version="0.1.0",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # demo; siết lại theo domain frontend khi deploy
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -29,9 +29,9 @@ app.add_middleware(
 
 @app.exception_handler(AppException)
 def handle_app_exception(request: Request, exc: AppException) -> JSONResponse:
-    """Map mọi domain exception (NotFoundError/ConflictError/...) sang HTTP
-    response. Use case/domain layer không phụ thuộc FastAPI — chỉ có điểm
-    này mới biết tới HTTP."""
+    """Map má»i domain exception (NotFoundError/ConflictError/...) sang HTTP
+    response. Use case/domain layer khÃ´ng phá»¥ thuá»™c FastAPI â€” chá»‰ cÃ³ Ä‘iá»ƒm
+    nÃ y má»›i biáº¿t tá»›i HTTP."""
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
@@ -41,3 +41,6 @@ app.include_router(api_router)
 @app.get("/health", tags=["system"])
 def health_check():
     return {"status": "ok"}
+
+
+
