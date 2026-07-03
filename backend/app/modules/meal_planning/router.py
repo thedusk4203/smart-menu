@@ -55,7 +55,7 @@ def generate_plan(
         budget_limit=data.budget_limit,
         preferred_tags=data.preferred_tags,
     )
-    result = generate.execute(request)
+    result = generate.execute(request, seed=data.seed)
 
     if isinstance(result, ValidationResult):
         # Gộp lý do bất khả thi + vi phạm cứng để client hiển thị.
