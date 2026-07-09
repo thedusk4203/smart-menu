@@ -73,6 +73,20 @@ CREATE TYPE exclusion_reason AS ENUM (
     'dislike'              -- Không thích / không ăn (ràng buộc cứng theo yêu cầu user)
 );
 
+-- [MỚI Phase A] Phân loại nội tại của món con (dish) + vai trò trong một mâm cơm
+CREATE TYPE dish_type AS ENUM (
+    'staple',              -- Tinh bột (cơm, gạo lứt...)
+    'savory',              -- Món mặn (thịt/cá/đậu kho, xào...)
+    'soup',                -- Canh
+    'vegetable_side',      -- Rau/món phụ
+    'side',                -- Món phụ khác
+    'breakfast'            -- Món ăn sáng gọn
+);
+
+CREATE TYPE dish_role AS ENUM (
+    'staple', 'savory', 'soup', 'vegetable_side', 'side', 'breakfast'
+);
+
 
 -- ============================================================
 -- PHẦN 2: HÀM TỰ ĐỘNG CẬP NHẬT updated_at
@@ -230,6 +244,9 @@ CREATE TABLE meals (
     instructions    TEXT,
     servings        INTEGER         NOT NULL DEFAULT 1 CHECK (servings > 0),
     tags            JSONB           NOT NULL DEFAULT '[]'::jsonb,   -- ["chay","ít dầu",...]
+    -- Các món con trong một bữa/combo. Với lunch/dinner kiểu Việt thường là
+    -- ["Cơm", "Món mặn", "Rau/Canh"], còn breakfast có thể chỉ 1-2 phần.
+    components      JSONB           NOT NULL DEFAULT '[]'::jsonb,
     is_active       BOOLEAN         NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
@@ -261,6 +278,66 @@ COMMENT ON TABLE meal_ingredients IS 'Định lượng nguyên liệu trong mỗ
 
 -- [MỚI] tra ngược "nguyên liệu này nằm trong những món nào"
 CREATE INDEX idx_meal_ingredients_ingredient ON meal_ingredients (ingredient_id);
+
+
+-- ============================================================
+-- [MỚI Phase A] dishes / dish_ingredients / meal_sets / meal_set_dishes
+-- Mô hình chuẩn hoá: bữa chính = meal_set gồm nhiều dish; dinh dưỡng/giá tính
+-- từ dish_ingredients rồi cộng lên meal_set. Song song với meals cũ (Phase B mới bỏ).
+-- ============================================================
+CREATE TABLE dishes (
+    id              SERIAL          PRIMARY KEY,
+    name            VARCHAR(255)    NOT NULL UNIQUE,
+    dish_type       dish_type       NOT NULL,
+    cooking_method  cooking_method,
+    description     TEXT,
+    tags            JSONB           NOT NULL DEFAULT '[]'::jsonb,
+    is_active       BOOLEAN         NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+COMMENT ON TABLE dishes IS 'Món con (đơn vị nấu): cơm, món mặn, canh, rau...; nguyên liệu ở dish_ingredients';
+
+CREATE TRIGGER trg_dishes_updated_at
+    BEFORE UPDATE ON dishes
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE dish_ingredients (
+    id              SERIAL          PRIMARY KEY,
+    dish_id         INTEGER         NOT NULL REFERENCES dishes(id) ON DELETE CASCADE,
+    ingredient_id   INTEGER         NOT NULL REFERENCES ingredients(id) ON DELETE RESTRICT,
+    quantity        NUMERIC(10,2)   NOT NULL CHECK (quantity > 0),
+    unit            VARCHAR(20)     NOT NULL DEFAULT 'g',
+    UNIQUE (dish_id, ingredient_id)
+);
+CREATE INDEX idx_dish_ingredients_ingredient ON dish_ingredients (ingredient_id);
+
+CREATE TABLE meal_sets (
+    id              SERIAL          PRIMARY KEY,
+    name            VARCHAR(255)    NOT NULL UNIQUE,
+    meal_type       meal_type       NOT NULL,
+    description     TEXT,
+    tags            JSONB           NOT NULL DEFAULT '[]'::jsonb,
+    is_active       BOOLEAN         NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+COMMENT ON TABLE meal_sets IS 'Mâm cơm/bữa: breakfast=1 dish; lunch/dinner nhiều dish theo role';
+
+CREATE TRIGGER trg_meal_sets_updated_at
+    BEFORE UPDATE ON meal_sets
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE meal_set_dishes (
+    id              SERIAL          PRIMARY KEY,
+    meal_set_id     INTEGER         NOT NULL REFERENCES meal_sets(id) ON DELETE CASCADE,
+    dish_id         INTEGER         NOT NULL REFERENCES dishes(id) ON DELETE RESTRICT,
+    role            dish_role       NOT NULL,
+    sort_order      INTEGER         NOT NULL DEFAULT 0,
+    UNIQUE (meal_set_id, dish_id)
+);
+CREATE INDEX idx_meal_set_dishes_set ON meal_set_dishes (meal_set_id);
+CREATE INDEX idx_meal_set_dishes_dish ON meal_set_dishes (dish_id);
 
 
 -- ============================================================
@@ -355,6 +432,7 @@ SELECT
     m.cooking_method,
     m.servings,
     m.tags,
+    m.components,
     m.is_active,
     COALESCE(SUM(mi.quantity * i.grams_per_unit * nf.calories  / 100.0), 0) AS total_calories,
     COALESCE(SUM(mi.quantity * i.grams_per_unit * nf.protein_g / 100.0), 0) AS total_protein_g,
@@ -374,6 +452,84 @@ LEFT JOIN LATERAL (
 ) lp ON TRUE
 GROUP BY m.id;
 COMMENT ON VIEW v_meals_full IS 'Món ăn kèm tổng dinh dưỡng (quy về gram) và chi phí ước tính từ giá mới nhất';
+
+-- [MỚI Phase A] v_dishes_full: tổng dinh dưỡng & chi phí từng dish (từ dish_ingredients)
+CREATE VIEW v_dishes_full AS
+SELECT
+    d.id, d.name, d.dish_type, d.cooking_method, d.tags, d.is_active,
+    COALESCE(SUM(di.quantity * i.grams_per_unit * nf.calories  / 100.0), 0) AS total_calories,
+    COALESCE(SUM(di.quantity * i.grams_per_unit * nf.protein_g / 100.0), 0) AS total_protein_g,
+    COALESCE(SUM(di.quantity * i.grams_per_unit * nf.carbs_g   / 100.0), 0) AS total_carbs_g,
+    COALESCE(SUM(di.quantity * i.grams_per_unit * nf.fat_g     / 100.0), 0) AS total_fat_g,
+    COALESCE(SUM(di.quantity * lp.price_per_default_unit), 0)               AS estimated_cost,
+    COUNT(di.id)                                                           AS ingredient_count
+FROM dishes d
+LEFT JOIN dish_ingredients di ON di.dish_id = d.id
+LEFT JOIN ingredients     i  ON i.id = di.ingredient_id
+LEFT JOIN nutrition_facts nf ON nf.ingredient_id = di.ingredient_id
+LEFT JOIN LATERAL (
+    SELECT price_per_default_unit FROM price_snapshots ps
+    WHERE ps.ingredient_id = di.ingredient_id ORDER BY ps.recorded_at DESC LIMIT 1
+) lp ON TRUE
+GROUP BY d.id;
+COMMENT ON VIEW v_dishes_full IS 'Món con + tổng dinh dưỡng/chi phí tính từ dish_ingredients';
+
+-- [MỚI Phase A] v_meal_sets_full: cộng dish trong mâm cơm. TÁCH CTE để tránh nhân đôi:
+--   totals (grain = ingredient) tách khỏi agg (grain = dish, dựng JSON dishes/components).
+CREATE VIEW v_meal_sets_full AS
+WITH totals AS (
+    SELECT
+        ms.id AS meal_set_id,
+        COALESCE(SUM(di.quantity * i.grams_per_unit * nf.calories  / 100.0), 0) AS total_calories,
+        COALESCE(SUM(di.quantity * i.grams_per_unit * nf.protein_g / 100.0), 0) AS total_protein_g,
+        COALESCE(SUM(di.quantity * i.grams_per_unit * nf.carbs_g   / 100.0), 0) AS total_carbs_g,
+        COALESCE(SUM(di.quantity * i.grams_per_unit * nf.fat_g     / 100.0), 0) AS total_fat_g,
+        COALESCE(SUM(di.quantity * lp.price_per_default_unit), 0)               AS estimated_cost
+    FROM meal_sets ms
+    LEFT JOIN meal_set_dishes msd ON msd.meal_set_id = ms.id
+    LEFT JOIN dish_ingredients di ON di.dish_id = msd.dish_id
+    LEFT JOIN ingredients     i  ON i.id = di.ingredient_id
+    LEFT JOIN nutrition_facts nf ON nf.ingredient_id = di.ingredient_id
+    LEFT JOIN LATERAL (
+        SELECT price_per_default_unit FROM price_snapshots ps
+        WHERE ps.ingredient_id = di.ingredient_id ORDER BY ps.recorded_at DESC LIMIT 1
+    ) lp ON TRUE
+    GROUP BY ms.id
+),
+agg AS (
+    SELECT
+        msd.meal_set_id,
+        jsonb_agg(jsonb_build_object(
+            'dish_id', d.id, 'role', msd.role, 'name', d.name, 'sort_order', msd.sort_order
+        ) ORDER BY msd.sort_order) AS dishes,
+        jsonb_agg(d.name ORDER BY msd.sort_order) AS components,
+        COUNT(*)              AS dish_count,
+        bool_and(d.is_active) AS all_dishes_active
+    FROM meal_set_dishes msd
+    JOIN dishes d ON d.id = msd.dish_id
+    GROUP BY msd.meal_set_id
+)
+SELECT
+    ms.id, ms.name, ms.meal_type, ms.tags, ms.is_active,
+    t.total_calories, t.total_protein_g, t.total_carbs_g, t.total_fat_g, t.estimated_cost,
+    COALESCE(a.dishes, '[]'::jsonb)     AS dishes,
+    COALESCE(a.components, '[]'::jsonb) AS components,
+    COALESCE(a.dish_count, 0)           AS dish_count,
+    COALESCE(a.all_dishes_active, TRUE) AS all_dishes_active
+FROM meal_sets ms
+LEFT JOIN totals t ON t.meal_set_id = ms.id
+LEFT JOIN agg    a ON a.meal_set_id = ms.id;
+COMMENT ON VIEW v_meal_sets_full IS 'Mâm cơm: tổng dinh dưỡng/chi phí (grain ingredient) + dishes JSON (grain dish), tách CTE tránh nhân đôi';
+
+-- [MỚI Phase A] v_meal_candidates: view planner đọc (không cần biết dish/meal_set)
+CREATE VIEW v_meal_candidates AS
+SELECT
+    id, name, meal_type,
+    total_calories, total_protein_g, total_carbs_g, total_fat_g, estimated_cost,
+    tags, dishes, components
+FROM v_meal_sets_full
+WHERE is_active = TRUE AND all_dishes_active = TRUE;
+COMMENT ON VIEW v_meal_candidates IS 'View planner đọc: mâm cơm active + mọi dish active';
 
 -- v_meal_plan_summary: tóm tắt thực đơn kèm email người tạo
 CREATE VIEW v_meal_plan_summary AS
@@ -408,44 +564,577 @@ INSERT INTO user_profiles (user_id, full_name, gender, age, height_cm, weight_kg
 VALUES
 (2, 'Người dùng Demo', 'male', 22, 170.0, 65.0, 'moderate', 'gain_muscle', 3, 2400, 80000);
 
--- Vài nguyên liệu mẫu (seed đầy đủ 20 nguyên liệu/10 món sẽ bổ sung ở bước sau).
--- grams_per_unit: g->1, ml dầu->0.92, quả trứng->55
+-- Seed demo đủ rộng cho planner: ~40 nguyên liệu, 24 món (8 sáng / 8 trưa / 8 tối).
+-- Số liệu dinh dưỡng và giá là ước lượng hợp lý cho demo; không dùng như dữ liệu y tế/chợ chính thức.
+-- grams_per_unit: g->1, ml dầu->~0.92, ml sữa->~1.03, quả trứng->55, hộp sữa chua->100.
 INSERT INTO ingredients (name, food_group, default_unit, grams_per_unit) VALUES
-('Ức gà',        'protein',   'g',   1),
-('Gạo trắng',    'grain',     'g',   1),
-('Cải ngọt',     'vegetable', 'g',   1),
-('Trứng gà',     'protein',   'quả', 55),
-('Dầu ăn',       'fat',       'ml',  0.92);
+('Ức gà',              'protein',   'g',   1),
+('Đùi gà',             'protein',   'g',   1),
+('Thịt heo nạc',       'protein',   'g',   1),
+('Thịt bò',            'protein',   'g',   1),
+('Cá thu',             'protein',   'g',   1),
+('Cá rô phi',          'protein',   'g',   1),
+('Tôm',                'protein',   'g',   1),
+('Trứng gà',           'protein',   'quả', 55),
+('Đậu phụ',            'protein',   'g',   1),
+('Đậu đen',            'protein',   'g',   1),
+('Gạo trắng',          'grain',     'g',   1),
+('Gạo lứt',            'grain',     'g',   1),
+('Bún tươi',           'grain',     'g',   1),
+('Mì gạo',             'grain',     'g',   1),
+('Yến mạch',           'grain',     'g',   1),
+('Khoai lang',         'grain',     'g',   1),
+('Bánh mì',            'grain',     'g',   1),
+('Nui',                'grain',     'g',   1),
+('Cải ngọt',           'vegetable', 'g',   1),
+('Rau muống',          'vegetable', 'g',   1),
+('Bông cải xanh',      'vegetable', 'g',   1),
+('Cà rốt',             'vegetable', 'g',   1),
+('Bí đỏ',              'vegetable', 'g',   1),
+('Cà chua',            'vegetable', 'g',   1),
+('Dưa leo',            'vegetable', 'g',   1),
+('Xà lách',            'vegetable', 'g',   1),
+('Nấm rơm',            'vegetable', 'g',   1),
+('Hành lá',            'vegetable', 'g',   1),
+('Dầu ăn',             'fat',       'ml',  0.92),
+('Dầu olive',          'fat',       'ml',  0.91),
+('Sữa tươi',           'dairy',     'ml',  1.03),
+('Sữa chua',           'dairy',     'hộp', 100),
+('Chuối',              'fruit',     'g',   1),
+('Táo',                'fruit',     'g',   1),
+('Cam',                'fruit',     'g',   1),
+('Đậu phộng',          'fat',       'g',   1),
+('Nước mắm',           'other',     'ml',  1.2),
+('Muối',               'other',     'g',   1),
+('Đường',              'other',     'g',   1),
+('Tỏi',                'other',     'g',   1),
+('Gừng',               'other',     'g',   1),
+('Cua đồng',           'protein',   'g',   1),
+('Rau đay',            'vegetable', 'g',   1),
+('Thịt ba chỉ',        'protein',   'g',   1),
+('Nước dừa',           'other',     'ml',  1),
+('Mồng tơi',           'vegetable', 'g',   1),
+('Mướp',               'vegetable', 'g',   1);
 
-INSERT INTO nutrition_facts (ingredient_id, calories, protein_g, carbs_g, fat_g, fiber_g) VALUES
-(1, 165, 31.0, 0.0,  3.6, 0.0),   -- Ức gà
-(2, 130, 2.7,  28.0, 0.3, 0.4),   -- Gạo trắng (đã nấu)
-(3, 13,  1.5,  2.2,  0.2, 1.2),   -- Cải ngọt
-(4, 155, 13.0, 1.1,  11.0,0.0),   -- Trứng gà
-(5, 884, 0.0,  0.0,  100.0,0.0);  -- Dầu ăn
+INSERT INTO nutrition_facts (ingredient_id, calories, protein_g, carbs_g, fat_g, fiber_g)
+SELECT i.id, v.calories, v.protein_g, v.carbs_g, v.fat_g, v.fiber_g
+FROM (VALUES
+('Ức gà',         165, 31.0,  0.0,   3.6,  0.0),
+('Đùi gà',        209, 26.0,  0.0,  10.9,  0.0),
+('Thịt heo nạc',  143, 21.0,  0.0,   5.0,  0.0),
+('Thịt bò',       250, 26.0,  0.0,  15.0,  0.0),
+('Cá thu',        205, 19.0,  0.0,  13.9,  0.0),
+('Cá rô phi',     128, 26.0,  0.0,   2.7,  0.0),
+('Tôm',            99, 24.0,  0.2,   0.3,  0.0),
+('Trứng gà',      155, 13.0,  1.1,  11.0,  0.0),
+('Đậu phụ',        76,  8.0,  1.9,   4.8,  0.3),
+('Đậu đen',       132,  8.9, 23.7,   0.5,  8.7),
+('Gạo trắng',     130,  2.7, 28.0,   0.3,  0.4),
+('Gạo lứt',       111,  2.6, 23.0,   0.9,  1.8),
+('Bún tươi',      110,  1.7, 25.7,   0.2,  0.5),
+('Mì gạo',        109,  1.8, 24.9,   0.2,  0.9),
+('Yến mạch',      389, 16.9, 66.3,   6.9, 10.6),
+('Khoai lang',     86,  1.6, 20.1,   0.1,  3.0),
+('Bánh mì',       265,  9.0, 49.0,   3.2,  2.7),
+('Nui',           157,  5.8, 30.9,   0.9,  1.8),
+('Cải ngọt',       13,  1.5,  2.2,   0.2,  1.2),
+('Rau muống',      19,  2.6,  3.1,   0.2,  2.1),
+('Bông cải xanh',  34,  2.8,  6.6,   0.4,  2.6),
+('Cà rốt',         41,  0.9,  9.6,   0.2,  2.8),
+('Bí đỏ',          26,  1.0,  6.5,   0.1,  0.5),
+('Cà chua',        18,  0.9,  3.9,   0.2,  1.2),
+('Dưa leo',        15,  0.7,  3.6,   0.1,  0.5),
+('Xà lách',        15,  1.4,  2.9,   0.2,  1.3),
+('Nấm rơm',        22,  3.1,  3.3,   0.3,  1.0),
+('Hành lá',        32,  1.8,  7.3,   0.2,  2.6),
+('Dầu ăn',        884,  0.0,  0.0, 100.0,  0.0),
+('Dầu olive',     884,  0.0,  0.0, 100.0,  0.0),
+('Sữa tươi',       61,  3.2,  4.8,   3.3,  0.0),
+('Sữa chua',       59,  3.5,  4.7,   3.3,  0.0),
+('Chuối',          89,  1.1, 22.8,   0.3,  2.6),
+('Táo',            52,  0.3, 13.8,   0.2,  2.4),
+('Cam',            47,  0.9, 11.8,   0.1,  2.4),
+('Đậu phộng',     567, 25.8, 16.1,  49.2,  8.5),
+('Nước mắm',       35,  5.0,  3.6,   0.0,  0.0),
+('Muối',            0,  0.0,  0.0,   0.0,  0.0),
+('Đường',         387,  0.0,100.0,   0.0,  0.0),
+('Tỏi',           149,  6.4, 33.1,   0.5,  2.1),
+('Gừng',           80,  1.8, 17.8,   0.8,  2.0),
+('Cua đồng',       87, 12.3,  2.0,   3.3,  0.0),
+('Rau đay',        34,  4.6,  5.8,   0.3,  1.5),
+('Thịt ba chỉ',   518,  9.3,  0.0,  53.0,  0.0),
+('Nước dừa',       19,  0.7,  3.7,   0.2,  1.1),
+('Mồng tơi',       19,  1.8,  3.4,   0.3,  2.1),
+('Mướp',           20,  1.2,  4.4,   0.2,  1.1)
+) AS v(name, calories, protein_g, carbs_g, fat_g, fiber_g)
+JOIN ingredients i ON i.name = v.name;
 
--- price_per_default_unit: gà 90000/kg=90đ/g; gạo 22000/kg=22đ/g; cải 15000/kg=15đ/g;
---                          trứng 35000/chục=3500đ/quả; dầu 45000/lít=45đ/ml
-INSERT INTO price_snapshots (ingredient_id, price, unit, price_per_default_unit, source) VALUES
-(1, 90000, 'kg',   90,   'Chợ Nam Định'),
-(2, 22000, 'kg',   22,   'Siêu thị'),
-(3, 15000, 'kg',   15,   'Chợ Nam Định'),
-(4, 35000, 'chục', 3500, 'Siêu thị'),
-(5, 45000, 'lít',  45,   'Siêu thị');
+INSERT INTO price_snapshots (ingredient_id, price, unit, price_per_default_unit, source)
+SELECT i.id, v.price, v.unit, v.price_per_default_unit, v.source
+FROM (VALUES
+('Ức gà',          90000, 'kg',    90,   'Chợ Nam Định'),
+('Đùi gà',         65000, 'kg',    65,   'Chợ Nam Định'),
+('Thịt heo nạc',  110000, 'kg',   110,   'Chợ Nam Định'),
+('Thịt bò',       220000, 'kg',   220,   'Siêu thị'),
+('Cá thu',        150000, 'kg',   150,   'Chợ Nam Định'),
+('Cá rô phi',      60000, 'kg',    60,   'Chợ Nam Định'),
+('Tôm',           180000, 'kg',   180,   'Chợ Nam Định'),
+('Trứng gà',       35000, 'chục',3500,   'Siêu thị'),
+('Đậu phụ',        30000, 'kg',    30,   'Chợ Nam Định'),
+('Đậu đen',        45000, 'kg',    45,   'Siêu thị'),
+('Gạo trắng',      22000, 'kg',    22,   'Siêu thị'),
+('Gạo lứt',        35000, 'kg',    35,   'Siêu thị'),
+('Bún tươi',       18000, 'kg',    18,   'Chợ Nam Định'),
+('Mì gạo',         30000, 'kg',    30,   'Siêu thị'),
+('Yến mạch',       90000, 'kg',    90,   'Siêu thị'),
+('Khoai lang',     25000, 'kg',    25,   'Chợ Nam Định'),
+('Bánh mì',        25000, 'kg',    25,   'Tiệm bánh'),
+('Nui',            50000, 'kg',    50,   'Siêu thị'),
+('Cải ngọt',       15000, 'kg',    15,   'Chợ Nam Định'),
+('Rau muống',      12000, 'kg',    12,   'Chợ Nam Định'),
+('Bông cải xanh',  45000, 'kg',    45,   'Siêu thị'),
+('Cà rốt',         25000, 'kg',    25,   'Chợ Nam Định'),
+('Bí đỏ',          18000, 'kg',    18,   'Chợ Nam Định'),
+('Cà chua',        22000, 'kg',    22,   'Chợ Nam Định'),
+('Dưa leo',        15000, 'kg',    15,   'Chợ Nam Định'),
+('Xà lách',        30000, 'kg',    30,   'Siêu thị'),
+('Nấm rơm',        70000, 'kg',    70,   'Chợ Nam Định'),
+('Hành lá',        40000, 'kg',    40,   'Chợ Nam Định'),
+('Dầu ăn',         45000, 'lít',   45,   'Siêu thị'),
+('Dầu olive',     180000, 'lít',  180,   'Siêu thị'),
+('Sữa tươi',       35000, 'lít',   35,   'Siêu thị'),
+('Sữa chua',       30000, '4 hộp',7500,  'Siêu thị'),
+('Chuối',          25000, 'kg',    25,   'Chợ Nam Định'),
+('Táo',            60000, 'kg',    60,   'Siêu thị'),
+('Cam',            35000, 'kg',    35,   'Chợ Nam Định'),
+('Đậu phộng',      70000, 'kg',    70,   'Chợ Nam Định'),
+('Nước mắm',       60000, 'lít',   60,   'Siêu thị'),
+('Muối',           10000, 'kg',    10,   'Siêu thị'),
+('Đường',          25000, 'kg',    25,   'Siêu thị'),
+('Tỏi',            60000, 'kg',    60,   'Chợ Nam Định'),
+('Gừng',           50000, 'kg',    50,   'Chợ Nam Định'),
+('Cua đồng',      120000, 'kg',   120,   'Chợ Nam Định'),
+('Rau đay',        12000, 'kg',    12,   'Chợ Nam Định'),
+('Thịt ba chỉ',   130000, 'kg',   130,   'Chợ Nam Định'),
+('Nước dừa',       15000, 'lít',   15,   'Chợ Nam Định'),
+('Mồng tơi',       12000, 'kg',    12,   'Chợ Nam Định'),
+('Mướp',           15000, 'kg',    15,   'Chợ Nam Định')
+) AS v(name, price, unit, price_per_default_unit, source)
+JOIN ingredients i ON i.name = v.name;
 
-INSERT INTO meals (name, meal_type, cooking_method, description, servings, tags) VALUES
-('Cơm ức gà luộc rau', 'lunch', 'boil', 'Ức gà luộc ăn kèm cơm và cải ngọt', 1, '["healthy","ít dầu","tăng cơ"]'::jsonb),
-('Trứng chiên',        'breakfast', 'stir_fry', 'Trứng gà chiên dầu', 1, '["nhanh","rẻ"]'::jsonb);
+INSERT INTO meals (name, meal_type, cooking_method, description, servings, tags, components) VALUES
+('Trứng chiên bánh mì',        'breakfast', 'stir_fry', 'Bữa sáng gọn gồm trứng chiên, bánh mì và dưa leo', 1, '["nhanh","rẻ","no lâu"]'::jsonb, '["Trứng chiên","Bánh mì","Dưa leo"]'::jsonb),
+('Cháo yến mạch chuối',        'breakfast', 'boil',     'Yến mạch nấu sữa, chuối và đậu phộng', 1, '["healthy","no lâu"]'::jsonb, '["Cháo yến mạch sữa","Chuối","Đậu phộng"]'::jsonb),
+('Bún trứng rau cải',          'breakfast', 'boil',     'Bún tươi ăn cùng trứng và cải ngọt', 1, '["nhanh","rẻ","nhiều rau"]'::jsonb, '["Bún tươi","Trứng luộc","Rau cải"]'::jsonb),
+('Bánh mì trứng dưa leo',      'breakfast', 'boil',     'Bánh mì kẹp trứng luộc, dưa leo và xà lách', 1, '["nhanh","rẻ"]'::jsonb, '["Bánh mì","Trứng luộc","Dưa leo","Xà lách"]'::jsonb),
+('Sữa chua yến mạch táo',      'breakfast', NULL,       'Sữa chua ăn cùng yến mạch và táo', 1, '["healthy","nhanh"]'::jsonb, '["Sữa chua","Yến mạch","Táo"]'::jsonb),
+('Khoai lang trứng luộc',      'breakfast', 'boil',     'Khoai lang, trứng luộc và cam', 1, '["healthy","no lâu","rẻ"]'::jsonb, '["Khoai lang","Trứng luộc","Cam"]'::jsonb),
+('Nui xào trứng',              'breakfast', 'stir_fry', 'Nui xào trứng, cà rốt và hành lá', 1, '["nhanh","rẻ"]'::jsonb, '["Nui xào trứng","Cà rốt","Hành lá"]'::jsonb),
+('Cơm gạo lứt trứng',          'breakfast', 'stir_fry', 'Cơm gạo lứt ăn cùng trứng và cải ngọt', 1, '["healthy","no lâu"]'::jsonb, '["Cơm gạo lứt","Trứng xào","Cải ngọt"]'::jsonb),
+('Bữa trưa gà luộc canh cải',  'lunch',     'boil',     'Mâm cơm trưa gồm cơm trắng, ức gà luộc, canh cải ngọt và nước mắm', 1, '["healthy","ít dầu","tăng cơ","giàu đạm"]'::jsonb, '["Cơm trắng","Ức gà luộc","Canh cải ngọt","Nước mắm"]'::jsonb),
+('Bữa trưa gà xào bông cải',   'lunch',     'stir_fry', 'Mâm cơm trưa gồm cơm trắng, gà xào bông cải và cà rốt', 1, '["nhiều rau","giàu đạm"]'::jsonb, '["Cơm trắng","Gà xào bông cải","Cà rốt"]'::jsonb),
+('Bữa trưa thịt nạc cà rốt',   'lunch',     'stir_fry', 'Mâm cơm trưa gồm cơm trắng, thịt nạc xào cà rốt và cà chua', 1, '["rẻ","no lâu"]'::jsonb, '["Cơm trắng","Thịt nạc xào cà rốt","Cà chua"]'::jsonb),
+('Bữa trưa bún cá rau cải',    'lunch',     'boil',     'Bữa trưa nhẹ gồm bún cá rô phi, rau cải và hành lá', 1, '["healthy","ít dầu","giàu đạm"]'::jsonb, '["Bún cá rô phi","Rau cải","Hành lá"]'::jsonb),
+('Bữa trưa bò xào rau muống',  'lunch',     'stir_fry', 'Mâm cơm trưa gồm cơm trắng, bò xào rau muống và tỏi', 1, '["giàu đạm","no lâu"]'::jsonb, '["Cơm trắng","Bò xào rau muống","Tỏi"]'::jsonb),
+('Bữa trưa đậu phụ sốt cà',    'lunch',     'braise',   'Mâm cơm trưa gồm cơm trắng, đậu phụ sốt cà chua và hành lá', 1, '["rẻ","healthy","nhiều rau"]'::jsonb, '["Cơm trắng","Đậu phụ sốt cà chua","Hành lá"]'::jsonb),
+('Bữa trưa tôm bí đỏ',         'lunch',     'stir_fry', 'Mâm cơm trưa gồm cơm trắng, tôm xào bí đỏ và hành lá', 1, '["giàu đạm","nhiều rau"]'::jsonb, '["Cơm trắng","Tôm xào bí đỏ","Hành lá"]'::jsonb),
+('Bữa trưa cá thu cà chua',    'lunch',     'braise',   'Mâm cơm trưa gồm cơm trắng, cá thu kho cà chua và xà lách', 1, '["giàu đạm","no lâu"]'::jsonb, '["Cơm trắng","Cá thu kho cà chua","Xà lách"]'::jsonb),
+('Bữa tối cá rô phi gạo lứt',  'dinner',    'steam',    'Mâm cơm tối gồm cơm gạo lứt, cá rô phi hấp và bông cải xanh', 1, '["healthy","ít dầu","giàu đạm"]'::jsonb, '["Cơm gạo lứt","Cá rô phi hấp","Bông cải xanh"]'::jsonb),
+('Bữa tối canh bí thịt nạc',   'dinner',    'soup',     'Mâm cơm tối gồm cơm trắng, canh bí đỏ thịt nạc và hành lá', 1, '["rẻ","nhiều rau","no lâu"]'::jsonb, '["Cơm trắng","Canh bí đỏ thịt nạc","Hành lá"]'::jsonb),
+('Bữa tối đậu phụ nấm rau',    'dinner',    'stir_fry', 'Mâm cơm tối gồm cơm gạo lứt, đậu phụ xào nấm và rau muống', 1, '["healthy","nhiều rau","rẻ"]'::jsonb, '["Cơm gạo lứt","Đậu phụ xào nấm","Rau muống"]'::jsonb),
+('Bữa tối tôm bông cải',       'dinner',    'stir_fry', 'Mâm cơm tối gồm cơm trắng, tôm xào bông cải và tỏi', 1, '["giàu đạm","nhiều rau"]'::jsonb, '["Cơm trắng","Tôm xào bông cải","Tỏi"]'::jsonb),
+('Bữa tối gà kho gừng',        'dinner',    'braise',   'Mâm cơm tối gồm cơm trắng, gà kho gừng và cà rốt', 1, '["no lâu","giàu đạm"]'::jsonb, '["Cơm trắng","Gà kho gừng","Cà rốt"]'::jsonb),
+('Bữa tối bò rau cải',         'dinner',    'stir_fry', 'Mâm cơm tối gồm cơm trắng, bò xào cà rốt và cải ngọt', 1, '["giàu đạm","nhiều rau"]'::jsonb, '["Cơm trắng","Bò xào cà rốt","Cải ngọt"]'::jsonb),
+('Bữa tối cá thu kho cà',      'dinner',    'braise',   'Mâm cơm tối gồm cơm trắng, cá thu kho cà chua và hành lá', 1, '["giàu đạm","no lâu"]'::jsonb, '["Cơm trắng","Cá thu kho cà chua","Hành lá"]'::jsonb),
+('Bữa tối đậu đen trứng rau',  'dinner',    'boil',     'Mâm cơm tối gồm cơm gạo lứt, đậu đen, trứng và rau sống', 1, '["healthy","rẻ","no lâu"]'::jsonb, '["Cơm gạo lứt","Đậu đen","Trứng luộc","Rau sống"]'::jsonb);
 
-INSERT INTO meal_ingredients (meal_id, ingredient_id, quantity, unit) VALUES
-(1, 1, 150, 'g'),
-(1, 2, 200, 'g'),
-(1, 3, 100, 'g'),
-(2, 4, 2,   'quả'),
-(2, 5, 10,  'ml');
+INSERT INTO meal_ingredients (meal_id, ingredient_id, quantity, unit)
+SELECT m.id, i.id, v.quantity, v.unit
+FROM (VALUES
+('Trứng chiên bánh mì',         'Trứng gà',       2,   'quả'),
+('Trứng chiên bánh mì',         'Bánh mì',       80,   'g'),
+('Trứng chiên bánh mì',         'Dưa leo',       50,   'g'),
+('Trứng chiên bánh mì',         'Dầu ăn',         5,   'ml'),
+('Trứng chiên bánh mì',         'Hành lá',        5,   'g'),
+('Cháo yến mạch chuối',         'Yến mạch',      60,   'g'),
+('Cháo yến mạch chuối',         'Sữa tươi',     200,   'ml'),
+('Cháo yến mạch chuối',         'Chuối',        100,   'g'),
+('Cháo yến mạch chuối',         'Đậu phộng',     10,   'g'),
+('Bún trứng rau cải',           'Bún tươi',     180,   'g'),
+('Bún trứng rau cải',           'Trứng gà',       1,   'quả'),
+('Bún trứng rau cải',           'Cải ngọt',      80,   'g'),
+('Bún trứng rau cải',           'Hành lá',        5,   'g'),
+('Bún trứng rau cải',           'Nước mắm',       5,   'ml'),
+('Bánh mì trứng dưa leo',       'Bánh mì',      100,   'g'),
+('Bánh mì trứng dưa leo',       'Trứng gà',       1,   'quả'),
+('Bánh mì trứng dưa leo',       'Dưa leo',       70,   'g'),
+('Bánh mì trứng dưa leo',       'Xà lách',       30,   'g'),
+('Sữa chua yến mạch táo',       'Sữa chua',       1,   'hộp'),
+('Sữa chua yến mạch táo',       'Yến mạch',      40,   'g'),
+('Sữa chua yến mạch táo',       'Táo',          120,   'g'),
+('Khoai lang trứng luộc',       'Khoai lang',   220,   'g'),
+('Khoai lang trứng luộc',       'Trứng gà',       2,   'quả'),
+('Khoai lang trứng luộc',       'Cam',          100,   'g'),
+('Nui xào trứng',               'Nui',          150,   'g'),
+('Nui xào trứng',               'Trứng gà',       1,   'quả'),
+('Nui xào trứng',               'Cà rốt',        50,   'g'),
+('Nui xào trứng',               'Dầu ăn',         5,   'ml'),
+('Nui xào trứng',               'Hành lá',        5,   'g'),
+('Cơm gạo lứt trứng',           'Gạo lứt',      180,   'g'),
+('Cơm gạo lứt trứng',           'Trứng gà',       1,   'quả'),
+('Cơm gạo lứt trứng',           'Cải ngọt',      70,   'g'),
+('Cơm gạo lứt trứng',           'Dầu ăn',         4,   'ml'),
+('Bữa trưa gà luộc canh cải',   'Ức gà',        150,   'g'),
+('Bữa trưa gà luộc canh cải',   'Gạo trắng',    200,   'g'),
+('Bữa trưa gà luộc canh cải',   'Cải ngọt',     120,   'g'),
+('Bữa trưa gà luộc canh cải',   'Nước mắm',       8,   'ml'),
+('Bữa trưa gà xào bông cải',    'Đùi gà',       140,   'g'),
+('Bữa trưa gà xào bông cải',    'Gạo trắng',    180,   'g'),
+('Bữa trưa gà xào bông cải',    'Bông cải xanh',120,   'g'),
+('Bữa trưa gà xào bông cải',    'Cà rốt',        50,   'g'),
+('Bữa trưa gà xào bông cải',    'Dầu ăn',         8,   'ml'),
+('Bữa trưa gà xào bông cải',    'Tỏi',            5,   'g'),
+('Bữa trưa thịt nạc cà rốt',    'Thịt heo nạc', 130,   'g'),
+('Bữa trưa thịt nạc cà rốt',    'Gạo trắng',    200,   'g'),
+('Bữa trưa thịt nạc cà rốt',    'Cà rốt',       100,   'g'),
+('Bữa trưa thịt nạc cà rốt',    'Cà chua',       60,   'g'),
+('Bữa trưa thịt nạc cà rốt',    'Dầu ăn',         6,   'ml'),
+('Bữa trưa bún cá rau cải',     'Cá rô phi',    150,   'g'),
+('Bữa trưa bún cá rau cải',     'Bún tươi',     200,   'g'),
+('Bữa trưa bún cá rau cải',     'Cải ngọt',     100,   'g'),
+('Bữa trưa bún cá rau cải',     'Hành lá',        5,   'g'),
+('Bữa trưa bún cá rau cải',     'Nước mắm',       8,   'ml'),
+('Bữa trưa bò xào rau muống',   'Thịt bò',      120,   'g'),
+('Bữa trưa bò xào rau muống',   'Gạo trắng',    200,   'g'),
+('Bữa trưa bò xào rau muống',   'Rau muống',    120,   'g'),
+('Bữa trưa bò xào rau muống',   'Dầu ăn',         8,   'ml'),
+('Bữa trưa bò xào rau muống',   'Tỏi',            5,   'g'),
+('Bữa trưa đậu phụ sốt cà',     'Đậu phụ',      180,   'g'),
+('Bữa trưa đậu phụ sốt cà',     'Gạo trắng',    200,   'g'),
+('Bữa trưa đậu phụ sốt cà',     'Cà chua',      120,   'g'),
+('Bữa trưa đậu phụ sốt cà',     'Hành lá',        8,   'g'),
+('Bữa trưa đậu phụ sốt cà',     'Dầu ăn',         6,   'ml'),
+('Bữa trưa tôm bí đỏ',          'Tôm',          140,   'g'),
+('Bữa trưa tôm bí đỏ',          'Gạo trắng',    190,   'g'),
+('Bữa trưa tôm bí đỏ',          'Bí đỏ',        150,   'g'),
+('Bữa trưa tôm bí đỏ',          'Hành lá',        5,   'g'),
+('Bữa trưa tôm bí đỏ',          'Dầu ăn',         5,   'ml'),
+('Bữa trưa cá thu cà chua',     'Cá thu',       130,   'g'),
+('Bữa trưa cá thu cà chua',     'Gạo trắng',    190,   'g'),
+('Bữa trưa cá thu cà chua',     'Cà chua',      120,   'g'),
+('Bữa trưa cá thu cà chua',     'Xà lách',       50,   'g'),
+('Bữa trưa cá thu cà chua',     'Dầu ăn',         5,   'ml'),
+('Bữa tối cá rô phi gạo lứt',   'Cá rô phi',    150,   'g'),
+('Bữa tối cá rô phi gạo lứt',   'Gạo lứt',      190,   'g'),
+('Bữa tối cá rô phi gạo lứt',   'Bông cải xanh',100,   'g'),
+('Bữa tối cá rô phi gạo lứt',   'Dầu olive',      5,   'ml'),
+('Bữa tối canh bí thịt nạc',    'Thịt heo nạc', 120,   'g'),
+('Bữa tối canh bí thịt nạc',    'Bí đỏ',        180,   'g'),
+('Bữa tối canh bí thịt nạc',    'Gạo trắng',    180,   'g'),
+('Bữa tối canh bí thịt nạc',    'Hành lá',        5,   'g'),
+('Bữa tối canh bí thịt nạc',    'Nước mắm',       8,   'ml'),
+('Bữa tối đậu phụ nấm rau',     'Đậu phụ',      180,   'g'),
+('Bữa tối đậu phụ nấm rau',     'Nấm rơm',      120,   'g'),
+('Bữa tối đậu phụ nấm rau',     'Rau muống',    100,   'g'),
+('Bữa tối đậu phụ nấm rau',     'Gạo lứt',      170,   'g'),
+('Bữa tối đậu phụ nấm rau',     'Dầu ăn',         6,   'ml'),
+('Bữa tối đậu phụ nấm rau',     'Tỏi',            5,   'g'),
+('Bữa tối tôm bông cải',        'Tôm',          130,   'g'),
+('Bữa tối tôm bông cải',        'Bông cải xanh',130,   'g'),
+('Bữa tối tôm bông cải',        'Gạo trắng',    180,   'g'),
+('Bữa tối tôm bông cải',        'Dầu olive',      5,   'ml'),
+('Bữa tối tôm bông cải',        'Tỏi',            5,   'g'),
+('Bữa tối gà kho gừng',         'Đùi gà',       150,   'g'),
+('Bữa tối gà kho gừng',         'Gạo trắng',    190,   'g'),
+('Bữa tối gà kho gừng',         'Cà rốt',        80,   'g'),
+('Bữa tối gà kho gừng',         'Nước mắm',      10,   'ml'),
+('Bữa tối gà kho gừng',         'Đường',          5,   'g'),
+('Bữa tối gà kho gừng',         'Tỏi',            5,   'g'),
+('Bữa tối gà kho gừng',         'Gừng',           8,   'g'),
+('Bữa tối bò rau cải',          'Thịt bò',      120,   'g'),
+('Bữa tối bò rau cải',          'Cà rốt',       100,   'g'),
+('Bữa tối bò rau cải',          'Cải ngọt',     100,   'g'),
+('Bữa tối bò rau cải',          'Gạo trắng',    180,   'g'),
+('Bữa tối bò rau cải',          'Dầu ăn',         6,   'ml'),
+('Bữa tối bò rau cải',          'Tỏi',            5,   'g'),
+('Bữa tối cá thu kho cà',       'Cá thu',       130,   'g'),
+('Bữa tối cá thu kho cà',       'Cà chua',      140,   'g'),
+('Bữa tối cá thu kho cà',       'Gạo trắng',    180,   'g'),
+('Bữa tối cá thu kho cà',       'Hành lá',        5,   'g'),
+('Bữa tối cá thu kho cà',       'Nước mắm',       8,   'ml'),
+('Bữa tối cá thu kho cà',       'Đường',          4,   'g'),
+('Bữa tối đậu đen trứng rau',   'Đậu đen',      120,   'g'),
+('Bữa tối đậu đen trứng rau',   'Trứng gà',       1,   'quả'),
+('Bữa tối đậu đen trứng rau',   'Gạo lứt',      160,   'g'),
+('Bữa tối đậu đen trứng rau',   'Xà lách',       60,   'g'),
+('Bữa tối đậu đen trứng rau',   'Cà chua',       60,   'g')
+) AS v(meal_name, ingredient_name, quantity, unit)
+JOIN meals m ON m.name = v.meal_name
+JOIN ingredients i ON i.name = v.ingredient_name;
 
--- Ví dụ minh hoạ ràng buộc loại trừ: user demo không ăn dầu (ưu tiên ít dầu)
-INSERT INTO user_excluded_ingredients (user_id, ingredient_id, reason) VALUES
-(2, 5, 'dislike');
+-- Ví dụ minh hoạ ràng buộc loại trừ: user demo không ăn đậu phộng.
+-- Chỉ loại một món sáng, không làm mất nghiệm lunch/dinner của planner.
+INSERT INTO user_excluded_ingredients (user_id, ingredient_id, reason)
+SELECT 2, id, 'dislike'
+FROM ingredients
+WHERE name = 'Đậu phộng';
+
+
+-- ============================================================
+-- [MỚI Phase A] SEED dishes + dish_ingredients + meal_sets + meal_set_dishes
+-- ============================================================
+INSERT INTO dishes (name, dish_type, cooking_method, description, tags) VALUES
+('Cơm trắng',            'staple',         'boil',     'Cơm gạo trắng', '["cơ bản"]'::jsonb),
+('Cơm gạo lứt',          'staple',         'boil',     'Cơm gạo lứt', '["healthy"]'::jsonb),
+('Thịt kho tàu',         'savory',         'braise',   'Thịt ba chỉ kho trứng nước dừa', '["giàu đạm","đậm đà"]'::jsonb),
+('Cá thu kho cà chua',   'savory',         'braise',   'Cá thu kho cà chua', '["giàu đạm"]'::jsonb),
+('Gà kho gừng',          'savory',         'braise',   'Đùi gà kho gừng', '["giàu đạm"]'::jsonb),
+('Đậu phụ sốt cà chua',  'savory',         'braise',   'Đậu phụ sốt cà chua', '["chay","rẻ"]'::jsonb),
+('Tôm rim',              'savory',         'braise',   'Tôm rim mặn ngọt', '["giàu đạm"]'::jsonb),
+('Thịt heo kho',         'savory',         'braise',   'Thịt heo nạc kho', '["giàu đạm"]'::jsonb),
+('Bò xào hành',          'savory',         'stir_fry', 'Thịt bò xào hành', '["giàu đạm"]'::jsonb),
+('Cá rô phi kho',        'savory',         'braise',   'Cá rô phi kho', '["giàu đạm","ít dầu"]'::jsonb),
+('Trứng chiên',          'savory',         'stir_fry', 'Trứng gà chiên', '["nhanh","rẻ"]'::jsonb),
+('Canh cua rau đay',     'soup',           'soup',     'Canh cua đồng rau đay mồng tơi mướp', '["mát","nhiều rau"]'::jsonb),
+('Canh bí đỏ thịt nạc',  'soup',           'soup',     'Canh bí đỏ nấu thịt nạc', '["ngọt","nhiều rau"]'::jsonb),
+('Canh cải ngọt',        'soup',           'soup',     'Canh cải ngọt', '["thanh","rẻ"]'::jsonb),
+('Canh rau muống',       'soup',           'soup',     'Canh rau muống', '["thanh","rẻ"]'::jsonb),
+('Canh mướp mồng tơi',   'soup',           'soup',     'Canh mướp nấu mồng tơi', '["mát","nhiều rau"]'::jsonb),
+('Canh bí đỏ',           'soup',           'soup',     'Canh bí đỏ', '["chay","ngọt"]'::jsonb),
+('Rau muống xào tỏi',    'vegetable_side', 'stir_fry', 'Rau muống xào tỏi', '["nhiều rau"]'::jsonb),
+('Cải ngọt luộc',        'vegetable_side', 'boil',     'Cải ngọt luộc', '["ít dầu","thanh"]'::jsonb),
+('Bông cải xào',         'vegetable_side', 'stir_fry', 'Bông cải xanh xào tỏi', '["nhiều rau"]'::jsonb),
+('Cà rốt xào',           'vegetable_side', 'stir_fry', 'Cà rốt xào', '["nhiều rau"]'::jsonb),
+('Rau đay luộc',         'vegetable_side', 'boil',     'Rau đay luộc', '["ít dầu","thanh"]'::jsonb),
+('Mồng tơi xào tỏi',     'vegetable_side', 'stir_fry', 'Mồng tơi xào tỏi', '["nhiều rau"]'::jsonb),
+('Xà lách trộn',         'vegetable_side', NULL,       'Xà lách trộn cà chua dưa leo', '["tươi"]'::jsonb),
+('Bí đỏ hấp',            'vegetable_side', 'steam',    'Bí đỏ hấp', '["chay","ngọt"]'::jsonb),
+('Trứng chiên bánh mì',  'breakfast',      'stir_fry', 'Trứng chiên ăn cùng bánh mì và dưa leo', '["nhanh","rẻ"]'::jsonb),
+('Cháo yến mạch chuối',  'breakfast',      'boil',     'Yến mạch nấu sữa, chuối và đậu phộng', '["healthy"]'::jsonb),
+('Bún trứng rau cải',    'breakfast',      'boil',     'Bún tươi ăn cùng trứng và cải ngọt', '["nhanh","nhiều rau"]'::jsonb),
+('Bánh mì trứng dưa leo','breakfast',      'boil',     'Bánh mì kẹp trứng luộc, dưa leo, xà lách', '["nhanh","rẻ"]'::jsonb),
+('Sữa chua yến mạch táo','breakfast',      NULL,       'Sữa chua ăn cùng yến mạch và táo', '["healthy","nhanh"]'::jsonb),
+('Khoai lang trứng luộc','breakfast',      'boil',     'Khoai lang, trứng luộc và cam', '["healthy","no lâu"]'::jsonb),
+('Nui xào trứng',        'breakfast',      'stir_fry', 'Nui xào trứng, cà rốt và hành lá', '["nhanh","rẻ"]'::jsonb),
+('Cơm gạo lứt trứng',    'breakfast',      'stir_fry', 'Cơm gạo lứt ăn cùng trứng và cải ngọt', '["healthy"]'::jsonb);
+
+INSERT INTO dish_ingredients (dish_id, ingredient_id, quantity, unit)
+SELECT d.id, i.id, v.quantity, v.unit
+FROM (VALUES
+('Cơm trắng',            'Gạo trắng',     200, 'g'),
+('Cơm gạo lứt',          'Gạo lứt',       180, 'g'),
+('Thịt kho tàu',         'Thịt ba chỉ',   120, 'g'),
+('Thịt kho tàu',         'Trứng gà',        1, 'quả'),
+('Thịt kho tàu',         'Nước dừa',      100, 'ml'),
+('Thịt kho tàu',         'Nước mắm',       10, 'ml'),
+('Thịt kho tàu',         'Đường',           8, 'g'),
+('Cá thu kho cà chua',   'Cá thu',        130, 'g'),
+('Cá thu kho cà chua',   'Cà chua',       100, 'g'),
+('Cá thu kho cà chua',   'Nước mắm',        8, 'ml'),
+('Cá thu kho cà chua',   'Đường',           4, 'g'),
+('Cá thu kho cà chua',   'Hành lá',         5, 'g'),
+('Gà kho gừng',          'Đùi gà',        150, 'g'),
+('Gà kho gừng',          'Gừng',            8, 'g'),
+('Gà kho gừng',          'Nước mắm',       10, 'ml'),
+('Gà kho gừng',          'Đường',           5, 'g'),
+('Gà kho gừng',          'Tỏi',             5, 'g'),
+('Đậu phụ sốt cà chua',  'Đậu phụ',       180, 'g'),
+('Đậu phụ sốt cà chua',  'Cà chua',       120, 'g'),
+('Đậu phụ sốt cà chua',  'Hành lá',         8, 'g'),
+('Đậu phụ sốt cà chua',  'Dầu ăn',          6, 'ml'),
+('Tôm rim',              'Tôm',           130, 'g'),
+('Tôm rim',              'Tỏi',             5, 'g'),
+('Tôm rim',              'Nước mắm',        6, 'ml'),
+('Tôm rim',              'Đường',           4, 'g'),
+('Thịt heo kho',         'Thịt heo nạc',  130, 'g'),
+('Thịt heo kho',         'Nước mắm',        8, 'ml'),
+('Thịt heo kho',         'Đường',           5, 'g'),
+('Thịt heo kho',         'Hành lá',         5, 'g'),
+('Bò xào hành',          'Thịt bò',       120, 'g'),
+('Bò xào hành',          'Hành lá',        10, 'g'),
+('Bò xào hành',          'Tỏi',             5, 'g'),
+('Bò xào hành',          'Dầu ăn',          6, 'ml'),
+('Cá rô phi kho',        'Cá rô phi',     150, 'g'),
+('Cá rô phi kho',        'Nước mắm',        8, 'ml'),
+('Cá rô phi kho',        'Đường',           4, 'g'),
+('Cá rô phi kho',        'Hành lá',         5, 'g'),
+('Trứng chiên',          'Trứng gà',        2, 'quả'),
+('Trứng chiên',          'Dầu ăn',          5, 'ml'),
+('Trứng chiên',          'Hành lá',         5, 'g'),
+('Canh cua rau đay',     'Cua đồng',      100, 'g'),
+('Canh cua rau đay',     'Rau đay',        80, 'g'),
+('Canh cua rau đay',     'Mồng tơi',       40, 'g'),
+('Canh cua rau đay',     'Mướp',           60, 'g'),
+('Canh bí đỏ thịt nạc',  'Thịt heo nạc',   60, 'g'),
+('Canh bí đỏ thịt nạc',  'Bí đỏ',         150, 'g'),
+('Canh bí đỏ thịt nạc',  'Hành lá',         5, 'g'),
+('Canh cải ngọt',        'Cải ngọt',      100, 'g'),
+('Canh cải ngọt',        'Nước mắm',        5, 'ml'),
+('Canh cải ngọt',        'Hành lá',         5, 'g'),
+('Canh rau muống',       'Rau muống',     100, 'g'),
+('Canh rau muống',       'Tỏi',             3, 'g'),
+('Canh mướp mồng tơi',   'Mướp',          100, 'g'),
+('Canh mướp mồng tơi',   'Mồng tơi',       60, 'g'),
+('Canh bí đỏ',           'Bí đỏ',         150, 'g'),
+('Canh bí đỏ',           'Hành lá',         5, 'g'),
+('Rau muống xào tỏi',    'Rau muống',     120, 'g'),
+('Rau muống xào tỏi',    'Tỏi',             5, 'g'),
+('Rau muống xào tỏi',    'Dầu ăn',          6, 'ml'),
+('Cải ngọt luộc',        'Cải ngọt',      120, 'g'),
+('Bông cải xào',         'Bông cải xanh', 120, 'g'),
+('Bông cải xào',         'Tỏi',             5, 'g'),
+('Bông cải xào',         'Dầu ăn',          6, 'ml'),
+('Cà rốt xào',           'Cà rốt',        100, 'g'),
+('Cà rốt xào',           'Dầu ăn',          5, 'ml'),
+('Rau đay luộc',         'Rau đay',       100, 'g'),
+('Mồng tơi xào tỏi',     'Mồng tơi',      120, 'g'),
+('Mồng tơi xào tỏi',     'Tỏi',             5, 'g'),
+('Mồng tơi xào tỏi',     'Dầu ăn',          6, 'ml'),
+('Xà lách trộn',         'Xà lách',        80, 'g'),
+('Xà lách trộn',         'Cà chua',        50, 'g'),
+('Xà lách trộn',         'Dưa leo',        50, 'g'),
+('Bí đỏ hấp',            'Bí đỏ',         150, 'g'),
+('Trứng chiên bánh mì',  'Trứng gà',        2, 'quả'),
+('Trứng chiên bánh mì',  'Bánh mì',        80, 'g'),
+('Trứng chiên bánh mì',  'Dưa leo',        50, 'g'),
+('Trứng chiên bánh mì',  'Dầu ăn',          5, 'ml'),
+('Trứng chiên bánh mì',  'Hành lá',         5, 'g'),
+('Cháo yến mạch chuối',  'Yến mạch',       60, 'g'),
+('Cháo yến mạch chuối',  'Sữa tươi',      200, 'ml'),
+('Cháo yến mạch chuối',  'Chuối',         100, 'g'),
+('Cháo yến mạch chuối',  'Đậu phộng',      10, 'g'),
+('Bún trứng rau cải',    'Bún tươi',      180, 'g'),
+('Bún trứng rau cải',    'Trứng gà',        1, 'quả'),
+('Bún trứng rau cải',    'Cải ngọt',       80, 'g'),
+('Bún trứng rau cải',    'Hành lá',         5, 'g'),
+('Bún trứng rau cải',    'Nước mắm',        5, 'ml'),
+('Bánh mì trứng dưa leo','Bánh mì',       100, 'g'),
+('Bánh mì trứng dưa leo','Trứng gà',        1, 'quả'),
+('Bánh mì trứng dưa leo','Dưa leo',        70, 'g'),
+('Bánh mì trứng dưa leo','Xà lách',        30, 'g'),
+('Sữa chua yến mạch táo','Sữa chua',        1, 'hộp'),
+('Sữa chua yến mạch táo','Yến mạch',       40, 'g'),
+('Sữa chua yến mạch táo','Táo',           120, 'g'),
+('Khoai lang trứng luộc','Khoai lang',    220, 'g'),
+('Khoai lang trứng luộc','Trứng gà',        2, 'quả'),
+('Khoai lang trứng luộc','Cam',           100, 'g'),
+('Nui xào trứng',        'Nui',           150, 'g'),
+('Nui xào trứng',        'Trứng gà',        1, 'quả'),
+('Nui xào trứng',        'Cà rốt',         50, 'g'),
+('Nui xào trứng',        'Dầu ăn',          5, 'ml'),
+('Nui xào trứng',        'Hành lá',         5, 'g'),
+('Cơm gạo lứt trứng',    'Gạo lứt',       180, 'g'),
+('Cơm gạo lứt trứng',    'Trứng gà',        1, 'quả'),
+('Cơm gạo lứt trứng',    'Cải ngọt',       70, 'g'),
+('Cơm gạo lứt trứng',    'Dầu ăn',          4, 'ml')
+) AS v(dish_name, ingredient_name, quantity, unit)
+JOIN dishes d ON d.name = v.dish_name
+JOIN ingredients i ON i.name = v.ingredient_name;
+
+INSERT INTO meal_sets (name, meal_type, description, tags) VALUES
+('Mâm trưa thịt kho canh cua',    'lunch',  'Cơm, thịt kho tàu, canh cua rau đay, rau muống xào', '["đầy đủ"]'::jsonb),
+('Mâm trưa cá kho canh bí',       'lunch',  'Cơm, cá thu kho, canh bí đỏ thịt nạc, cải ngọt luộc', '["đầy đủ"]'::jsonb),
+('Mâm trưa gà kho canh cải',      'lunch',  'Cơm, gà kho gừng, canh cải ngọt, bông cải xào', '["đầy đủ"]'::jsonb),
+('Mâm trưa đậu phụ canh mướp',    'lunch',  'Cơm, đậu phụ sốt cà, canh mướp mồng tơi, cà rốt xào', '["chay","đầy đủ"]'::jsonb),
+('Mâm trưa tôm rim canh rau',     'lunch',  'Cơm, tôm rim, canh rau muống, rau đay luộc', '["đầy đủ"]'::jsonb),
+('Mâm trưa heo kho canh bí',      'lunch',  'Cơm gạo lứt, thịt heo kho, canh bí đỏ, mồng tơi xào', '["đầy đủ"]'::jsonb),
+('Mâm trưa bò xào canh cua',      'lunch',  'Cơm, bò xào hành, canh cua rau đay, xà lách trộn', '["đầy đủ"]'::jsonb),
+('Mâm trưa cá rô phi canh cải',   'lunch',  'Cơm gạo lứt, cá rô phi kho, canh cải ngọt, bí đỏ hấp', '["đầy đủ"]'::jsonb),
+('Mâm tối heo kho canh cua',      'dinner', 'Cơm, thịt heo kho, canh cua rau đay, bông cải xào', '["đầy đủ"]'::jsonb),
+('Mâm tối cá kho canh mướp',      'dinner', 'Cơm gạo lứt, cá thu kho, canh mướp mồng tơi, rau muống xào', '["đầy đủ"]'::jsonb),
+('Mâm tối gà kho canh bí',        'dinner', 'Cơm, gà kho gừng, canh bí đỏ, cải ngọt luộc', '["đầy đủ"]'::jsonb),
+('Mâm tối đậu phụ canh rau',      'dinner', 'Cơm, đậu phụ sốt cà, canh rau muống, cà rốt xào', '["chay","đầy đủ"]'::jsonb),
+('Mâm tối tôm rim canh bí',       'dinner', 'Cơm gạo lứt, tôm rim, canh bí đỏ thịt nạc, mồng tơi xào', '["đầy đủ"]'::jsonb),
+('Mâm tối bò xào canh cải',       'dinner', 'Cơm, bò xào hành, canh cải ngọt, rau đay luộc', '["đầy đủ"]'::jsonb),
+('Mâm tối cá rô phi canh cua',    'dinner', 'Cơm, cá rô phi kho, canh cua rau đay, xà lách trộn', '["đầy đủ"]'::jsonb),
+('Mâm tối trứng chiên canh mướp', 'dinner', 'Cơm, trứng chiên, canh mướp mồng tơi, bí đỏ hấp', '["rẻ","đầy đủ"]'::jsonb),
+('Sáng trứng chiên bánh mì',      'breakfast', 'Trứng chiên bánh mì', '["nhanh"]'::jsonb),
+('Sáng cháo yến mạch chuối',      'breakfast', 'Cháo yến mạch chuối', '["healthy"]'::jsonb),
+('Sáng bún trứng rau cải',        'breakfast', 'Bún trứng rau cải', '["nhanh"]'::jsonb),
+('Sáng bánh mì trứng',            'breakfast', 'Bánh mì trứng dưa leo', '["nhanh"]'::jsonb),
+('Sáng sữa chua yến mạch',        'breakfast', 'Sữa chua yến mạch táo', '["healthy"]'::jsonb),
+('Sáng khoai lang trứng',         'breakfast', 'Khoai lang trứng luộc', '["healthy"]'::jsonb),
+('Sáng nui xào trứng',            'breakfast', 'Nui xào trứng', '["nhanh"]'::jsonb),
+('Sáng cơm gạo lứt trứng',        'breakfast', 'Cơm gạo lứt trứng', '["healthy"]'::jsonb);
+
+INSERT INTO meal_set_dishes (meal_set_id, dish_id, role, sort_order)
+SELECT ms.id, d.id, v.role::dish_role, v.sort_order
+FROM (VALUES
+('Mâm trưa thịt kho canh cua',    'Cơm trắng',            'staple',         1),
+('Mâm trưa thịt kho canh cua',    'Thịt kho tàu',         'savory',         2),
+('Mâm trưa thịt kho canh cua',    'Canh cua rau đay',     'soup',           3),
+('Mâm trưa thịt kho canh cua',    'Rau muống xào tỏi',    'vegetable_side', 4),
+('Mâm trưa cá kho canh bí',       'Cơm trắng',            'staple',         1),
+('Mâm trưa cá kho canh bí',       'Cá thu kho cà chua',   'savory',         2),
+('Mâm trưa cá kho canh bí',       'Canh bí đỏ thịt nạc',  'soup',           3),
+('Mâm trưa cá kho canh bí',       'Cải ngọt luộc',        'vegetable_side', 4),
+('Mâm trưa gà kho canh cải',      'Cơm trắng',            'staple',         1),
+('Mâm trưa gà kho canh cải',      'Gà kho gừng',          'savory',         2),
+('Mâm trưa gà kho canh cải',      'Canh cải ngọt',        'soup',           3),
+('Mâm trưa gà kho canh cải',      'Bông cải xào',         'vegetable_side', 4),
+('Mâm trưa đậu phụ canh mướp',    'Cơm trắng',            'staple',         1),
+('Mâm trưa đậu phụ canh mướp',    'Đậu phụ sốt cà chua',  'savory',         2),
+('Mâm trưa đậu phụ canh mướp',    'Canh mướp mồng tơi',   'soup',           3),
+('Mâm trưa đậu phụ canh mướp',    'Cà rốt xào',           'vegetable_side', 4),
+('Mâm trưa tôm rim canh rau',     'Cơm trắng',            'staple',         1),
+('Mâm trưa tôm rim canh rau',     'Tôm rim',              'savory',         2),
+('Mâm trưa tôm rim canh rau',     'Canh rau muống',       'soup',           3),
+('Mâm trưa tôm rim canh rau',     'Rau đay luộc',         'vegetable_side', 4),
+('Mâm trưa heo kho canh bí',      'Cơm gạo lứt',          'staple',         1),
+('Mâm trưa heo kho canh bí',      'Thịt heo kho',         'savory',         2),
+('Mâm trưa heo kho canh bí',      'Canh bí đỏ',           'soup',           3),
+('Mâm trưa heo kho canh bí',      'Mồng tơi xào tỏi',     'vegetable_side', 4),
+('Mâm trưa bò xào canh cua',      'Cơm trắng',            'staple',         1),
+('Mâm trưa bò xào canh cua',      'Bò xào hành',          'savory',         2),
+('Mâm trưa bò xào canh cua',      'Canh cua rau đay',     'soup',           3),
+('Mâm trưa bò xào canh cua',      'Xà lách trộn',         'vegetable_side', 4),
+('Mâm trưa cá rô phi canh cải',   'Cơm gạo lứt',          'staple',         1),
+('Mâm trưa cá rô phi canh cải',   'Cá rô phi kho',        'savory',         2),
+('Mâm trưa cá rô phi canh cải',   'Canh cải ngọt',        'soup',           3),
+('Mâm trưa cá rô phi canh cải',   'Bí đỏ hấp',            'vegetable_side', 4),
+('Mâm tối heo kho canh cua',      'Cơm trắng',            'staple',         1),
+('Mâm tối heo kho canh cua',      'Thịt heo kho',         'savory',         2),
+('Mâm tối heo kho canh cua',      'Canh cua rau đay',     'soup',           3),
+('Mâm tối heo kho canh cua',      'Bông cải xào',         'vegetable_side', 4),
+('Mâm tối cá kho canh mướp',      'Cơm gạo lứt',          'staple',         1),
+('Mâm tối cá kho canh mướp',      'Cá thu kho cà chua',   'savory',         2),
+('Mâm tối cá kho canh mướp',      'Canh mướp mồng tơi',   'soup',           3),
+('Mâm tối cá kho canh mướp',      'Rau muống xào tỏi',    'vegetable_side', 4),
+('Mâm tối gà kho canh bí',        'Cơm trắng',            'staple',         1),
+('Mâm tối gà kho canh bí',        'Gà kho gừng',          'savory',         2),
+('Mâm tối gà kho canh bí',        'Canh bí đỏ',           'soup',           3),
+('Mâm tối gà kho canh bí',        'Cải ngọt luộc',        'vegetable_side', 4),
+('Mâm tối đậu phụ canh rau',      'Cơm trắng',            'staple',         1),
+('Mâm tối đậu phụ canh rau',      'Đậu phụ sốt cà chua',  'savory',         2),
+('Mâm tối đậu phụ canh rau',      'Canh rau muống',       'soup',           3),
+('Mâm tối đậu phụ canh rau',      'Cà rốt xào',           'vegetable_side', 4),
+('Mâm tối tôm rim canh bí',       'Cơm gạo lứt',          'staple',         1),
+('Mâm tối tôm rim canh bí',       'Tôm rim',              'savory',         2),
+('Mâm tối tôm rim canh bí',       'Canh bí đỏ thịt nạc',  'soup',           3),
+('Mâm tối tôm rim canh bí',       'Mồng tơi xào tỏi',     'vegetable_side', 4),
+('Mâm tối bò xào canh cải',       'Cơm trắng',            'staple',         1),
+('Mâm tối bò xào canh cải',       'Bò xào hành',          'savory',         2),
+('Mâm tối bò xào canh cải',       'Canh cải ngọt',        'soup',           3),
+('Mâm tối bò xào canh cải',       'Rau đay luộc',         'vegetable_side', 4),
+('Mâm tối cá rô phi canh cua',    'Cơm trắng',            'staple',         1),
+('Mâm tối cá rô phi canh cua',    'Cá rô phi kho',        'savory',         2),
+('Mâm tối cá rô phi canh cua',    'Canh cua rau đay',     'soup',           3),
+('Mâm tối cá rô phi canh cua',    'Xà lách trộn',         'vegetable_side', 4),
+('Mâm tối trứng chiên canh mướp', 'Cơm trắng',            'staple',         1),
+('Mâm tối trứng chiên canh mướp', 'Trứng chiên',          'savory',         2),
+('Mâm tối trứng chiên canh mướp', 'Canh mướp mồng tơi',   'soup',           3),
+('Mâm tối trứng chiên canh mướp', 'Bí đỏ hấp',            'vegetable_side', 4),
+('Sáng trứng chiên bánh mì',      'Trứng chiên bánh mì',  'breakfast',      1),
+('Sáng cháo yến mạch chuối',      'Cháo yến mạch chuối',  'breakfast',      1),
+('Sáng bún trứng rau cải',        'Bún trứng rau cải',    'breakfast',      1),
+('Sáng bánh mì trứng',            'Bánh mì trứng dưa leo','breakfast',      1),
+('Sáng sữa chua yến mạch',        'Sữa chua yến mạch táo','breakfast',      1),
+('Sáng khoai lang trứng',         'Khoai lang trứng luộc','breakfast',      1),
+('Sáng nui xào trứng',            'Nui xào trứng',        'breakfast',      1),
+('Sáng cơm gạo lứt trứng',        'Cơm gạo lứt trứng',    'breakfast',      1)
+) AS v(meal_set_name, dish_name, role, sort_order)
+JOIN meal_sets ms ON ms.name = v.meal_set_name
+JOIN dishes d ON d.name = v.dish_name;
+
 
 COMMIT;

@@ -11,7 +11,7 @@ from app.tests.test_meal_planning.factories import make_candidate, make_request
 
 class TestSlotsFor:
     def test_two_meals(self):
-        assert cc.slots_for(2) == ["breakfast", "dinner"]
+        assert cc.slots_for(2) == ["lunch", "dinner"]
 
     def test_three_meals(self):
         assert cc.slots_for(3) == ["breakfast", "lunch", "dinner"]
@@ -83,7 +83,7 @@ class TestCandidateIsEligible:
 class TestValidatePlan:
     def _valid_two_meal_day(self):
         return [
-            make_candidate(1, meal_type="breakfast", cost=10000.0),
+            make_candidate(1, meal_type="lunch", cost=10000.0),
             make_candidate(2, meal_type="dinner", cost=10000.0),
         ]
 
@@ -101,7 +101,7 @@ class TestValidatePlan:
 
     def test_wrong_meals_per_day_hc05(self):
         req = make_request(days=1, meals_per_day=2, budget_limit=100000.0)
-        one_meal_day = [make_candidate(1, meal_type="breakfast")]
+        one_meal_day = [make_candidate(1, meal_type="lunch")]
         result = cc.validate_plan([one_meal_day], req)
         assert result.status == "infeasible"
         assert any("HC-05" in v for v in result.hard_violations)
@@ -117,7 +117,7 @@ class TestValidatePlan:
         bao giờ vi phạm HC-01 dù chi phí lớn."""
         req = make_request(days=1, meals_per_day=2, budget_limit=None)
         expensive = [
-            make_candidate(1, meal_type="breakfast", cost=9_000_000.0),
+            make_candidate(1, meal_type="lunch", cost=9_000_000.0),
             make_candidate(2, meal_type="dinner", cost=9_000_000.0),
         ]
         result = cc.validate_plan([expensive], req)
@@ -127,7 +127,7 @@ class TestValidatePlan:
     def test_excluded_ingredient_in_plan_hc02(self):
         req = make_request(days=1, meals_per_day=2, budget_limit=100000.0, excluded=[7])
         day = [
-            make_candidate(1, meal_type="breakfast", ingredient_ids=[7]),
+            make_candidate(1, meal_type="lunch", ingredient_ids=[7]),
             make_candidate(2, meal_type="dinner", ingredient_ids=[3]),
         ]
         result = cc.validate_plan([day], req)
@@ -136,7 +136,7 @@ class TestValidatePlan:
 
     def test_wrong_slot_order_hc06(self):
         req = make_request(days=1, meals_per_day=2, budget_limit=100000.0)
-        # slot 0 cần breakfast nhưng đặt dinner.
+        # slot 0 cần lunch nhưng đặt dinner.
         day = [
             make_candidate(1, meal_type="dinner", cost=10000.0),
             make_candidate(2, meal_type="dinner", cost=10000.0),

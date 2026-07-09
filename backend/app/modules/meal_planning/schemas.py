@@ -5,15 +5,26 @@ from datetime import date
 from pydantic import BaseModel
 
 
+class SavedMealSlot(BaseModel):
+    """Một lựa chọn của client cho một slot: chỉ tên slot + id mâm cơm.
+    Backend KHÔNG tin dinh dưỡng/giá client gửi — reload theo id để recompute."""
+    slot: str
+    meal_set_id: int
+
+
+class SavedPlanDay(BaseModel):
+    day: int
+    meals: list[SavedMealSlot]
+
+
 class MealPlanCreate(BaseModel):
-    user_id: int
+    """Hợp đồng lưu thực đơn (Gate 0): client chỉ gửi tên + ngày bắt đầu +
+    các id mâm cơm theo ngày/slot. Backend tự tính totals/plan_data từ nguồn
+    đúng; không nhận user_id/total_cost/total_calories/plan_data từ client."""
     name: str = "Thực đơn tuần"
     start_date: date
-    end_date: date | None = None
     budget_limit: float | None = None
-    total_cost: float = 0
-    total_calories: float = 0
-    plan_data: dict = {}
+    days: list[SavedPlanDay]
 
 
 class MealPlanResponse(BaseModel):
@@ -32,7 +43,6 @@ class MealPlanResponse(BaseModel):
 
 
 class GenerateMealPlanRequest(BaseModel):
-    user_id: int
     days: int | None = None
     meals_per_day: int | None = None
     budget_limit: float | None = None

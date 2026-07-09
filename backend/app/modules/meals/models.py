@@ -25,6 +25,7 @@ class MealModel(SQLModel, table=True):
     instructions: str | None = None
     servings: int = 1
     tags: list = Field(default_factory=list, sa_column=Column(JSONB, nullable=False))
+    components: list = Field(default_factory=list, sa_column=Column(JSONB, nullable=False))
     is_active: bool = True
 
 

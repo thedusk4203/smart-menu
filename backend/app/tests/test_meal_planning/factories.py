@@ -19,6 +19,8 @@ def make_candidate(
     cost: float = 20000.0,
     ingredient_ids: list[int] | None = None,
     tags: list[str] | None = None,
+    components: list[str] | None = None,
+    dishes: list[dict] | None = None,
 ) -> MealCandidate:
     return MealCandidate(
         meal_id=meal_id,
@@ -31,6 +33,8 @@ def make_candidate(
         estimated_cost=cost,
         ingredient_ids=list(ingredient_ids or []),
         tags=list(tags or []),
+        components=list(components or []),
+        dishes=list(dishes or []),
     )
 
 

@@ -12,34 +12,12 @@ from app.modules.nutrition.schemas import (
 
 
 class CalculateNutritionTargetUseCase:
-    """Calculate a user's daily nutrition target from their profile data.
-
-    This is the primary entry point for other modules (e.g. profiles,
-    meal_planning) to obtain nutrition targets.
-
-    Usage:
-        use_case = CalculateNutritionTargetUseCase()
-        result = use_case.execute(profile_input)
-    """
 
     def __init__(self) -> None:
         self._calculator = NutritionCalculator()
 
     def execute(self, profile_input: NutritionProfileInput) -> NutritionTargetResponse:
-        """Execute the nutrition target calculation.
 
-        Args:
-            profile_input: Validated profile data from the user.
-
-        Returns:
-            NutritionTargetResponse with target calories, macros, BMI,
-            feasibility flag, and warnings.
-
-        Raises:
-            InvalidProfileDataError: If profile values are out of valid range.
-            InvalidEnumValueError: If gender is not a recognized value.
-            NutritionCalculationError: If an unexpected error occurs.
-        """
         target = self._calculator.calculate_nutrition_target(
             gender=profile_input.gender,
             age=profile_input.age,

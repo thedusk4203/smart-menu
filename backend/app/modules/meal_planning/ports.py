@@ -30,6 +30,9 @@ class MealCandidateProviderPort(ABC):
     @abstractmethod
     def load_candidates(self, excluded_ingredient_ids: list[int]) -> list[MealCandidate]: ...
 
+    @abstractmethod
+    def load_by_ids(self, meal_set_ids: list[int]) -> dict[int, MealCandidate]: ...
+
 
 class MealPlannerPort(ABC):
     

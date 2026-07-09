@@ -24,18 +24,20 @@ class MealEntity:
     instructions: str | None = None
     servings: int = 1
     tags: list = field(default_factory=list)
+    components: list[str] = field(default_factory=list)
     is_active: bool = True
 
 
 @dataclass(frozen=True)
 class MealFullEntity:
-    """Món ăn kèm tổng dinh dưỡng + chi phí ước tính — đọc qua view v_meals_full."""
+    """Bữa/món kèm tổng dinh dưỡng + chi phí ước tính — đọc qua view v_meals_full."""
     id: int
     name: str
     meal_type: str
     cooking_method: str | None
     servings: int
     tags: list
+    components: list[str]
     is_active: bool
     total_calories: float
     total_protein_g: float

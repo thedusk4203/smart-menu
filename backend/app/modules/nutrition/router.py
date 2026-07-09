@@ -1,7 +1,4 @@
-# File: backend/app/modules/nutrition/router.py
-# HTTP surface cho module nutrition. Trước đây module này đã tính toán đầy đủ
-# (NutritionCalculator) nhưng CHƯA có router nên frontend không gọi được —
-# đây là phần bổ sung để lộ nhu cầu dinh dưỡng ra API.
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
