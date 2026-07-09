@@ -1,11 +1,19 @@
 from __future__ import annotations
 
-from datetime import date
+from dataclasses import asdict
+from datetime import date, timedelta
 
-from app.modules.meal_planning.domain import MealPlanEntity, PlanRequest, ValidationResult
+from app.modules.meal_planning.domain import (
+    MealPlanEntity,
+    PlannedDay,
+    PlannedMeal,
+    PlanRequest,
+    ValidationResult,
+)
 from app.modules.meal_planning.exceptions import (
     IncompleteProfileError,
     InfeasibleNutritionError,
+    InvalidMealSelectionError,
     MealPlanNotFoundError,
 )
 from app.modules.meal_planning.planner import HeuristicPlanner
@@ -14,17 +22,92 @@ from app.modules.meal_planning.ports import (
     MealPlannerPort,
     MealPlanRepositoryPort,
 )
+from app.modules.meal_planning.schemas import MealPlanCreate
 from app.modules.nutrition.calculator import NutritionCalculator
 from app.modules.profiles.exceptions import ProfileNotFoundError
 from app.modules.profiles.ports import ExclusionRepositoryPort, UserProfileRepositoryPort
 
 
 class SaveMealPlanUseCase:
-    def __init__(self, repo: MealPlanRepositoryPort) -> None:
-        self._repo = repo
+    """Lưu thực đơn từ lựa chọn của client (id mâm cơm theo ngày/slot). Reload
+    dữ liệu mâm cơm từ nguồn đúng (v_meal_candidates) rồi RECOMPUTE totals +
+    plan_data — không tin total_cost/total_calories/plan_data client gửi."""
 
-    def execute(self, plan: MealPlanEntity) -> MealPlanEntity:
-        return self._repo.create(plan)
+    def __init__(
+        self,
+        repo: MealPlanRepositoryPort,
+        candidate_provider: MealCandidateProviderPort,
+    ) -> None:
+        self._repo = repo
+        self._candidates = candidate_provider
+
+    def execute(self, data: MealPlanCreate, *, user_id: int) -> MealPlanEntity:
+        ids = [m.meal_set_id for d in data.days for m in d.meals]
+        if not ids:
+            raise InvalidMealSelectionError("thực đơn không có bữa nào")
+
+        by_id = self._candidates.load_by_ids(ids)
+        missing = sorted({i for i in ids if i not in by_id})
+        if missing:
+            raise InvalidMealSelectionError(
+                f"mâm cơm không tồn tại hoặc không khả dụng: {missing}"
+            )
+
+        plan_days: list[dict] = []
+        total_cost = 0.0
+        total_calories = 0.0
+        max_meals = 0
+        for d in data.days:
+            day_meals: list[PlannedMeal] = []
+            day_cost = 0.0
+            day_cal = 0.0
+            for m in d.meals:
+                c = by_id[m.meal_set_id]
+                if c.meal_type != m.slot:
+                    raise InvalidMealSelectionError(
+                        f"mâm '{c.name}' là bữa '{c.meal_type}', không khớp slot '{m.slot}'"
+                    )
+                day_meals.append(PlannedMeal(
+                    meal_id=None,
+                    name=c.name,
+                    meal_type=c.meal_type,
+                    components=list(c.components),
+                    calories=round(c.total_calories, 1),
+                    protein_g=round(c.total_protein_g, 1),
+                    fat_g=round(c.total_fat_g, 1),
+                    carb_g=round(c.total_carb_g, 1),
+                    cost=round(c.estimated_cost, 0),
+                    dishes=list(c.dishes),
+                    meal_set_id=c.meal_id,
+                    candidate_type="meal_set",
+                ))
+                day_cost += c.estimated_cost
+                day_cal += c.total_calories
+            day_date = (data.start_date + timedelta(days=d.day - 1)).isoformat()
+            plan_days.append(asdict(PlannedDay(
+                day=d.day,
+                date=day_date,
+                meals=day_meals,
+                day_calories=round(day_cal, 1),
+                day_cost=round(day_cost, 0),
+            )))
+            total_cost += day_cost
+            total_calories += day_cal
+            max_meals = max(max_meals, len(day_meals))
+
+        end_date = data.start_date + timedelta(days=len(data.days) - 1)
+        entity = MealPlanEntity(
+            id=None,
+            user_id=user_id,
+            name=data.name,
+            start_date=data.start_date,
+            end_date=end_date,
+            budget_limit=data.budget_limit,
+            total_cost=round(total_cost, 0),
+            total_calories=round(total_calories, 1),
+            plan_data={"days": plan_days, "warnings": [], "meals_per_day": max_meals},
+        )
+        return self._repo.create(entity)
 
 
 class ListMealPlansUseCase:

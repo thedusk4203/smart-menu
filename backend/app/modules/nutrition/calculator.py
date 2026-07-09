@@ -40,10 +40,6 @@ class NutritionCalculator:
     All public methods are static — the class is used purely for namespace grouping.
     """
 
-    # ------------------------------------------------------------------
-    # Input validation
-    # ------------------------------------------------------------------
-
     @staticmethod
     def validate_inputs(
         age: int,

@@ -1,8 +1,9 @@
 # File: backend/app/modules/meal_planning/router.py
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.core.deps import get_current_user
 from app.dependencies import (
     get_build_plan_request_use_case,
     get_delete_meal_plan_use_case,
@@ -11,6 +12,7 @@ from app.dependencies import (
     get_list_meal_plans_use_case,
     get_save_meal_plan_use_case,
 )
+from app.modules.identity.domain import UserEntity
 from app.modules.meal_planning.domain import MealPlanEntity, ValidationResult
 from app.modules.meal_planning.schemas import (
     GeneratedMealPlanResponse,
@@ -31,10 +33,21 @@ from app.modules.meal_planning.use_cases import (
 router = APIRouter(prefix="/api/meal-plans", tags=["meal-plans"])
 
 
+def _ensure_owner(plan: MealPlanEntity, current_user: UserEntity) -> None:
+    """Chỉ chủ sở hữu hoặc admin được thao tác trên thực đơn (chống IDOR)."""
+    if plan.user_id != current_user.id and current_user.role.value != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Không có quyền với thực đơn này")
+
+
 @router.post("", response_model=MealPlanResponse, status_code=status.HTTP_201_CREATED)
-def save_plan(data: MealPlanCreate, use_case: SaveMealPlanUseCase = Depends(get_save_meal_plan_use_case)):
-    plan = MealPlanEntity(id=None, **data.model_dump())
-    return use_case.execute(plan).__dict__
+def save_plan(
+    data: MealPlanCreate,
+    current_user: UserEntity = Depends(get_current_user),
+    use_case: SaveMealPlanUseCase = Depends(get_save_meal_plan_use_case),
+):
+    """Lưu thực đơn: backend reload mâm cơm theo id và tự tính totals/plan_data;
+    KHÔNG tin total_cost/total_calories/plan_data client gửi. Gắn user từ JWT."""
+    return use_case.execute(data, user_id=current_user.id).__dict__
 
 
 @router.post(
@@ -43,13 +56,14 @@ def save_plan(data: MealPlanCreate, use_case: SaveMealPlanUseCase = Depends(get_
 )
 def generate_plan(
     data: GenerateMealPlanRequest,
+    current_user: UserEntity = Depends(get_current_user),
     build_request: BuildPlanRequestUseCase = Depends(get_build_plan_request_use_case),
     generate: GenerateMealPlanUseCase = Depends(get_generate_meal_plan_use_case),
 ):
-    """Sinh thực đơn tự động (không tự lưu). Trả thực đơn vừa sinh, hoặc
-    {status: "infeasible", reasons: [...]} nếu không thể lập."""
+    """Sinh thực đơn tự động (không tự lưu) cho người dùng hiện tại (JWT).
+    Trả thực đơn vừa sinh, hoặc {status: "infeasible", reasons: [...]}."""
     request = build_request.execute(
-        data.user_id,
+        current_user.id,
         days=data.days,
         meals_per_day=data.meals_per_day,
         budget_limit=data.budget_limit,
@@ -58,7 +72,6 @@ def generate_plan(
     result = generate.execute(request, seed=data.seed)
 
     if isinstance(result, ValidationResult):
-        # Gộp lý do bất khả thi + vi phạm cứng để client hiển thị.
         reasons = list(result.infeasible_reasons) + list(result.hard_violations)
         return InfeasiblePlanResponse(status="infeasible", reasons=reasons)
 
@@ -76,16 +89,30 @@ def generate_plan(
 
 @router.get("", response_model=list[MealPlanResponse])
 def list_plans(
-    user_id: int = Query(...), use_case: ListMealPlansUseCase = Depends(get_list_meal_plans_use_case)
+    current_user: UserEntity = Depends(get_current_user),
+    use_case: ListMealPlansUseCase = Depends(get_list_meal_plans_use_case),
 ):
-    return [p.__dict__ for p in use_case.execute(user_id)]
+    return [p.__dict__ for p in use_case.execute(current_user.id)]
 
 
 @router.get("/{plan_id}", response_model=MealPlanResponse)
-def get_plan(plan_id: int, use_case: GetMealPlanUseCase = Depends(get_get_meal_plan_use_case)):
-    return use_case.execute(plan_id).__dict__
+def get_plan(
+    plan_id: int,
+    current_user: UserEntity = Depends(get_current_user),
+    use_case: GetMealPlanUseCase = Depends(get_get_meal_plan_use_case),
+):
+    plan = use_case.execute(plan_id)  # 404 nếu không tồn tại
+    _ensure_owner(plan, current_user)
+    return plan.__dict__
 
 
 @router.delete("/{plan_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_plan(plan_id: int, use_case: DeleteMealPlanUseCase = Depends(get_delete_meal_plan_use_case)):
-    use_case.execute(plan_id)
+def delete_plan(
+    plan_id: int,
+    current_user: UserEntity = Depends(get_current_user),
+    get_use_case: GetMealPlanUseCase = Depends(get_get_meal_plan_use_case),
+    delete_use_case: DeleteMealPlanUseCase = Depends(get_delete_meal_plan_use_case),
+):
+    plan = get_use_case.execute(plan_id)  # 404 nếu không tồn tại
+    _ensure_owner(plan, current_user)
+    delete_use_case.execute(plan_id)

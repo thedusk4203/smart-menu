@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from app.modules.meal_planning.domain import MealCandidate, PlanRequest, ValidationResult
 
-# Thứ tự slot bữa ăn theo số bữa/ngày. hỗ trợ 2 hoặc 3 bữa.
+# Thứ tự slot bữa ăn theo số bữa/ngày. Văn hoá Việt: bữa sáng có thể bỏ qua,
+# còn trưa/tối là hai bữa chính.
 _SLOTS_BY_MEALS_PER_DAY: dict[int, list[str]] = {
-    2: ["breakfast", "dinner"],
+    2: ["lunch", "dinner"],
     3: ["breakfast", "lunch", "dinner"],
 }
 

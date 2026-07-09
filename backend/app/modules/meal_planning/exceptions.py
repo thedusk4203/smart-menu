@@ -10,8 +10,7 @@ class MealPlanNotFoundError(NotFoundError):
 
 class IncompleteProfileError(ValidationAppError):
     """Hồ sơ thiếu trường bắt buộc để tính mục tiêu dinh dưỡng (giới tính,
-    tuổi, chiều cao, cân nặng). Chặn sớm để không vỡ thành lỗi 500 mơ hồ ở
-    NutritionCalculator (review D-02)."""
+    tuổi, chiều cao, cân nặng). Chặn sớm."""
 
     def __init__(self, missing: list[str]) -> None:
         joined = ", ".join(missing)
@@ -24,8 +23,16 @@ class IncompleteProfileError(ValidationAppError):
 class InfeasibleNutritionError(ValidationAppError):
     """Mục tiêu dinh dưỡng tính ra không khả thi (ví dụ calo < ngưỡng an toàn).
     Không thể sinh thực đơn an toàn -> báo rõ thay vì lập thực đơn theo mục
-    tiêu vô nghĩa (review D-02)."""
+    tiêu vô nghĩa."""
 
     def __init__(self, reasons: list[str]) -> None:
         detail = "; ".join(reasons) if reasons else "mục tiêu calo quá thấp"
         super().__init__(f"Mục tiêu dinh dưỡng không khả thi: {detail}")
+
+
+class InvalidMealSelectionError(ValidationAppError):
+    """Khi LƯU thực đơn: client gửi meal_set_id không tồn tại/không active, hoặc
+    slot không khớp loại bữa của mâm cơm. Map 422 thay vì 500."""
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(f"Lựa chọn thực đơn không hợp lệ: {detail}")

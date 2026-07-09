@@ -1,0 +1,32 @@
+# Docker Compose cho DB Postgres cua Smart Menu (dung cho dev/demo).
+# Khoi dong:  docker compose up -d
+#
+# CHU Y: publish ra cong HOST 5433 (khong phai 5432) de tranh dung do voi
+# Postgres cai san tren may (cong 5432 dang bi mot Postgres khac chiem, gay loi
+# "password authentication failed"). Container van chay Postgres o cong noi bo 5432.
+# Vi vay backend phai tro toi cong 5433 -> xem backend/.env (DATABASE_URL).
+#
+# Lan dau khoi tao, Postgres tu chay moi file .sql trong /docker-entrypoint-initdb.d/
+# nen data/init_db.sql se tao schema + seed (2 tai khoan demo) mot cach tu dong.
+# Neu muon nap lai tu dau: docker compose down -v  roi  docker compose up -d
+services:
+  db:
+    image: postgres:16
+    container_name: smart-menu-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: DATN
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./data/init_db.sql:/docker-entrypoint-initdb.d/01_init_db.sql:ro
+      - smart_menu_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d DATN"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  smart_menu_pgdata:

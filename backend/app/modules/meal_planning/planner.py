@@ -196,14 +196,18 @@ class HeuristicPlanner(MealPlannerPort):
                 date=day_date,
                 meals=[
                     PlannedMeal(
-                        meal_id=m.meal_id,
+                        meal_id=None,
                         name=m.name,
                         meal_type=m.meal_type,
+                        components=list(m.components),
                         calories=round(m.total_calories, 1),
                         protein_g=round(m.total_protein_g, 1),
                         fat_g=round(m.total_fat_g, 1),
                         carb_g=round(m.total_carb_g, 1),
                         cost=round(m.estimated_cost, 0),
+                        dishes=list(m.dishes),
+                        meal_set_id=m.meal_id,
+                        candidate_type="meal_set",
                     )
                     for m in day
                 ],

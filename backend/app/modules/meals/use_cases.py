@@ -30,10 +30,10 @@ class CreateMealUseCase:
         self._repo = repo
 
     def execute(self, name, meal_type, cooking_method, description, instructions,
-                servings, tags, ingredients: list[MealIngredientEntity]) -> MealFullEntity:
+                servings, tags, components, ingredients: list[MealIngredientEntity]) -> MealFullEntity:
         meal = MealEntity(id=None, name=name, meal_type=meal_type, cooking_method=cooking_method,
                            description=description, instructions=instructions,
-                           servings=servings, tags=tags)
+                           servings=servings, tags=tags, components=components)
         created = self._repo.create(meal, ingredients)
         return self._repo.get_detail(created.id)
 

@@ -6,6 +6,7 @@ from fastapi import Depends
 from sqlmodel import Session
 
 from app.core.database import get_session
+from app.core.config import settings
 
 # ── identity ──────────────────────────────────────────────────────────────
 from app.modules.identity.repository import SqlUserRepository
@@ -120,7 +121,7 @@ from app.modules.meal_planning.use_cases import (
 
 
 def get_save_meal_plan_use_case(s: Session = Depends(get_session)) -> SaveMealPlanUseCase:
-    return SaveMealPlanUseCase(SqlMealPlanRepository(s))
+    return SaveMealPlanUseCase(SqlMealPlanRepository(s), SqlMealCandidateProvider(s))
 
 def get_list_meal_plans_use_case(s: Session = Depends(get_session)) -> ListMealPlansUseCase:
     return ListMealPlansUseCase(SqlMealPlanRepository(s))
@@ -139,9 +140,52 @@ def get_build_plan_request_use_case(s: Session = Depends(get_session)) -> BuildP
 
 
 # ── nutrition ─────────────────────────────────────────────────────────────
-# NutritionCalculator là hàm thuần (stateless), không cần Session/DB.
 from app.modules.nutrition.use_cases import CalculateNutritionTargetUseCase
 
 
 def get_calculate_nutrition_target_use_case() -> CalculateNutritionTargetUseCase:
     return CalculateNutritionTargetUseCase()
+
+
+# ── ai ────────────────────────────────────────────────────────────────────
+from app.modules.ai.client import DisabledAIClient, OpenAICompatibleAIClient
+from app.modules.ai.ports import AIClientPort
+from app.modules.ai.use_cases import (
+    ChatUseCase,
+    ExplainPlanUseCase,
+    ParseMenuRequestUseCase,
+    SuggestSwapUseCase,
+)
+
+
+def get_ai_client() -> AIClientPort:
+    if not settings.ai_enabled:
+        return DisabledAIClient()
+    return OpenAICompatibleAIClient(
+        base_url=settings.ai_base_url,
+        model=settings.ai_model,
+        api_key=settings.ai_api_key,
+        timeout_seconds=settings.ai_timeout_seconds,
+    )
+
+
+def get_ai_chat_use_case(client: AIClientPort = Depends(get_ai_client)) -> ChatUseCase:
+    return ChatUseCase(client)
+
+
+def get_ai_parse_menu_request_use_case(
+    client: AIClientPort = Depends(get_ai_client),
+) -> ParseMenuRequestUseCase:
+    return ParseMenuRequestUseCase(client)
+
+
+def get_ai_explain_plan_use_case(
+    client: AIClientPort = Depends(get_ai_client),
+) -> ExplainPlanUseCase:
+    return ExplainPlanUseCase(client)
+
+
+def get_ai_suggest_swap_use_case(
+    client: AIClientPort = Depends(get_ai_client),
+) -> SuggestSwapUseCase:
+    return SuggestSwapUseCase(client)
