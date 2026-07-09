@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import toast from "react-hot-toast";
 import { register } from "../api/authApi";
 
@@ -8,17 +9,28 @@ export default function Register() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
+    // Kiểm tra nhập liệu
     if (!fullName || !email || !password) {
       toast.error("Vui lòng điền đầy đủ thông tin");
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error("Email không hợp lệ");
+      return;
+    }
+    if (password.length < 6) {
+      toast.error("Mật khẩu phải có ít nhất 6 ký tự");
       return;
     }
     setLoading(true);
     try {
       await register(email, password, fullName);
-      toast.success("Tạo tài khoản thành công! Hoàn thiện hồ sơ nhé 🎉", {
+      toast.success("Tạo tài khoản thành công! Hãy đăng nhập nhé 🎉", {
         style: { borderRadius: "12px", background: "#10b981", color: "#fff", fontWeight: "bold" },
       });
       navigate("/login");
@@ -59,14 +71,23 @@ export default function Register() {
 
         <div className="mb-8">
           <label className="block text-gray-700 text-sm font-bold mb-2">Mật khẩu</label>
-          <input
-            type="password"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleRegister()}
-            className="w-full border-none bg-white/90 p-3 rounded-xl focus:outline-none focus:ring-4 focus:ring-green-300 transition-all shadow-inner"
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Ít nhất 6 ký tự"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleRegister()}
+              className="w-full border-none bg-white/90 p-3 pr-11 rounded-xl focus:outline-none focus:ring-4 focus:ring-green-300 transition-all shadow-inner"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
 
         <button
@@ -79,7 +100,7 @@ export default function Register() {
 
         <p className="text-center text-sm text-gray-600 mt-6">
           Đã có tài khoản?{" "}
-          <span onClick={() => navigate("/")} className="text-green-700 font-bold cursor-pointer hover:underline">
+          <span onClick={() => navigate("/login")} className="text-green-700 font-bold cursor-pointer hover:underline">
             Đăng nhập
           </span>
         </p>

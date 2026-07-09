@@ -48,3 +48,21 @@ export async function logout(): Promise<void> {
 export async function getMe(): Promise<UserInfo> {
   return apiRequest<UserInfo>("/api/auth/me");
 }
+// ── Quản lý tài khoản (admin) ─────────────────────────────────────────────
+export async function getAllUsers(): Promise<UserInfo[]> {
+  return apiRequest<UserInfo[]>("/api/users");
+}
+
+export async function deleteUser(userId: number): Promise<void> {
+  return apiRequest(`/api/users/${userId}`, { method: "DELETE" });
+}
+// Admin tạo tài khoản thủ công
+export async function createUser(email: string, password: string, role: "user" | "admin"): Promise<UserInfo> {
+  return apiRequest<UserInfo>("/api/users", {
+    method: "POST",
+    body: { email, password, role },
+  });
+}
+export async function updateUser(id: number, data: { role?: "user" | "admin"; is_active?: boolean; email?: string }): Promise<UserInfo> {
+  return apiRequest<UserInfo>(`/api/users/${id}`, { method: "PUT", body: data });
+}

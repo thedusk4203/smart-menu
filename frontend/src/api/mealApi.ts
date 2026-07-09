@@ -44,3 +44,22 @@ export async function getMeals(params?: {
 export async function getMealDetail(mealId: number): Promise<MealDetail> {
   return apiRequest<MealDetail>(`/api/meals/${mealId}`);
 }
+// ── Quản lý món ăn (admin) ────────────────────────────────────────────────
+export interface MealInput {
+  name: string;
+  meal_type: string;
+  cooking_method?: string;
+  description?: string;
+  servings?: number;
+}
+
+export async function createMeal(data: MealInput): Promise<MealSummary> {
+  return apiRequest<MealSummary>("/api/meals", { method: "POST", body: data });
+}
+
+export async function deleteMeal(id: number): Promise<void> {
+  return apiRequest(`/api/meals/${id}`, { method: "DELETE" });
+}
+export async function updateMeal(id: number, data: Partial<MealInput>): Promise<MealSummary> {
+  return apiRequest<MealSummary>(`/api/meals/${id}`, { method: "PUT", body: data });
+}

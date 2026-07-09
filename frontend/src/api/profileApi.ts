@@ -40,3 +40,32 @@ export async function updateMyProfile(data: ProfileUpdate): Promise<Profile> {
     body: data,
   });
 }
+// ── Nguyên liệu loại trừ (dị ứng / không ăn) ──────────────────────────────
+export interface Exclusion {
+  id: number;
+  ingredient_id: number;
+  reason: "allergy" | "dislike";
+}
+
+// Xem danh sách nguyên liệu loại trừ của bản thân
+export async function getMyExclusions(): Promise<Exclusion[]> {
+  return apiRequest<Exclusion[]>("/api/profiles/me/exclusions");
+}
+
+// Thêm một nguyên liệu loại trừ
+export async function addMyExclusion(
+  ingredientId: number,
+  reason: "allergy" | "dislike"
+): Promise<Exclusion> {
+  return apiRequest<Exclusion>("/api/profiles/me/exclusions", {
+    method: "POST",
+    body: { ingredient_id: ingredientId, reason },
+  });
+}
+
+// Bỏ một nguyên liệu khỏi danh sách loại trừ
+export async function removeMyExclusion(ingredientId: number): Promise<void> {
+  return apiRequest(`/api/profiles/me/exclusions/${ingredientId}`, {
+    method: "DELETE",
+  });
+}

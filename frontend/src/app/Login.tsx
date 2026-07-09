@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { login } from "../api/authApi";
 import toast from "react-hot-toast";
 
@@ -7,18 +8,25 @@ export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
+    // Kiểm tra nhập liệu
     if (!email || !password) {
       toast.error("Vui lòng nhập email và mật khẩu");
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error("Email không hợp lệ");
       return;
     }
     setLoading(true);
     try {
       await login(email, password);
       toast.success("Đăng nhập thành công!");
-      navigate("/create-menu");
+      navigate("/profile");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Đăng nhập thất bại");
     } finally {
@@ -44,14 +52,23 @@ export default function Login() {
 
         <div className="mb-8">
           <label className="block text-gray-700 text-sm font-bold mb-2">Mật khẩu</label>
-          <input
-            type="password"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-            className="w-full border-none bg-white/90 p-3 rounded-xl focus:outline-none focus:ring-4 focus:ring-green-300 transition-all shadow-inner"
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              className="w-full border-none bg-white/90 p-3 pr-11 rounded-xl focus:outline-none focus:ring-4 focus:ring-green-300 transition-all shadow-inner"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
 
         <button

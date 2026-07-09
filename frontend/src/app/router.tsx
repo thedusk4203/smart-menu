@@ -13,7 +13,11 @@ import MenuResult from "./MenuResult";
 import ShoppingList from "./ShoppingList";
 import FoodDetail from "./FoodDetail";
 import MenuHistory from "./MenuHistory";
-
+import IngredientList from "./IngredientList";
+import AdminUsers from "./AdminUsers";
+import AdminIngredients from "./AdminIngredients";
+import AdminMeals from "./AdminMeals";
+import AdminDashboard from "./AdminDashboard";
 export const router = createBrowserRouter([
   // Trang giới thiệu — ai cũng xem được, không menu
   { path: "/", element: <Welcome /> },
@@ -37,6 +41,12 @@ export const router = createBrowserRouter([
       { path: "/menu-result", element: <MenuResult /> },
       { path: "/shopping-list", element: <ShoppingList /> },
       { path: "/food-detail", element: <FoodDetail /> },
+      { path: "/food-detail", element: <FoodDetail /> },
+      { path: "/ingredients", element: <IngredientList /> },
+      { path: "/admin/users", element: <AdminUsers /> },
+      { path: "/admin/ingredients", element: <AdminIngredients /> },
+      { path: "/admin/meals", element: <AdminMeals /> },
+      { path: "/admin/dashboard", element: <AdminDashboard /> },
     ],
   },
 ]);

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { Flame, Utensils, DollarSign, ArrowLeft, Beef } from "lucide-react";
 import toast from "react-hot-toast";
 import { getMeals, getMealDetail } from "../api/mealApi";
@@ -12,6 +13,7 @@ const mealTypeLabel: Record<string, string> = {
 };
 
 export default function FoodDetail() {
+  const location = useLocation();
   const [meals, setMeals] = useState<MealSummary[]>([]);
   const [selected, setSelected] = useState<MealDetail | null>(null);
   const [loadingList, setLoadingList] = useState(true);
@@ -24,7 +26,14 @@ export default function FoodDetail() {
       .catch(() => toast.error("Không tải được danh sách món ăn"))
       .finally(() => setLoadingList(false));
   }, []);
-
+ // Nếu được điều hướng từ Thực Đơn sang kèm mealId → tự mở chi tiết món đó
+  useEffect(() => {
+    const state = location.state as { mealId?: number } | null;
+    if (state?.mealId) {
+      openDetail(state.mealId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
   // Bấm vào 1 món → tải chi tiết
   const openDetail = async (mealId: number) => {
     setLoadingDetail(true);
