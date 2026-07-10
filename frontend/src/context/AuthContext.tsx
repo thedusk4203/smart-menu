@@ -8,7 +8,7 @@ import type { RegisterInput, User } from "../types";
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -46,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     saveToken(access_token);
     const me = await authApi.getMe();
     setUser(me);
+    return me;
   }, []);
 
   const register = useCallback(async (input: RegisterInput) => {

@@ -9,7 +9,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session
 
 from app.core.database import get_session
-from app.core.deps import get_current_user, require_admin
+from app.core.deps import get_current_user, require_super_admin
 from app.dependencies import (
     get_create_empty_profile_use_case,
     get_create_user_use_case,
@@ -80,7 +80,7 @@ def list_users(
     limit: int = Query(100, le=500),
     offset: int = 0,
     use_case: ListUsersUseCase = Depends(get_list_users_use_case),
-    _: UserEntity = Depends(require_admin),
+    _: UserEntity = Depends(require_super_admin),
 ):
     return [u.__dict__ for u in use_case.execute(limit, offset)]
 
@@ -101,7 +101,7 @@ def create_user(
     data: UserCreate,
     use_case: CreateUserUseCase = Depends(get_create_user_use_case),
     profile_use_case: CreateEmptyProfileUseCase = Depends(get_create_empty_profile_use_case),
-    _: UserEntity = Depends(require_admin),
+    _: UserEntity = Depends(require_super_admin),
 ):
     user = use_case.execute(data.email, data.password, data.role)
     profile_use_case.execute(user.id, data.full_name)
@@ -113,7 +113,7 @@ def update_user(
     user_id: int,
     data: UserUpdate,
     use_case: UpdateUserUseCase = Depends(get_update_user_use_case),
-    _: UserEntity = Depends(require_admin),
+    _: UserEntity = Depends(require_super_admin),
 ):
     return use_case.execute(user_id, **data.model_dump(exclude_unset=True)).__dict__
 
@@ -122,6 +122,6 @@ def update_user(
 def delete_user(
     user_id: int,
     use_case: DeleteUserUseCase = Depends(get_delete_user_use_case),
-    _: UserEntity = Depends(require_admin),
+    _: UserEntity = Depends(require_super_admin),
 ):
     use_case.execute(user_id)

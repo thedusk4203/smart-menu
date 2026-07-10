@@ -16,6 +16,7 @@ dependencies = [
     "bcrypt<4.1",  # passlib 1.7.4 không đọc được bcrypt.__about__ ở bcrypt>=4.1 (lỗi đã biết)
     "python-dotenv>=1.0.0",
     "python-multipart>=0.0.32",
+    "openpyxl>=3.1.5",
 ]
 
 [project.optional-dependencies]

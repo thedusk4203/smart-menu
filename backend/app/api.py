@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.modules.ai.router import router as ai_router
+from app.modules.admin.router import router as admin_router
 from app.modules.identity.router import auth_router, router as users_router
 from app.modules.ingredients.router import router as ingredients_router
 from app.modules.meal_planning.router import router as meal_planning_router
@@ -21,3 +22,4 @@ api_router.include_router(meals_router)
 api_router.include_router(meal_planning_router)
 api_router.include_router(nutrition_router)   # /api/nutrition/*
 api_router.include_router(ai_router)          # /api/ai/*
+api_router.include_router(admin_router)       # /api/admin/*

@@ -5,6 +5,8 @@ import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
 import { Button, TextField } from "../../components/ui";
 import { ApiError } from "../../lib/apiClient";
+import { isAdminRole } from "../../lib/roles";
+import type { User } from "../../types";
 
 interface LocationState {
   from?: { pathname?: string };
@@ -18,15 +20,19 @@ export function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const redirectTo = (location.state as LocationState | null)?.from?.pathname || "/dashboard";
+  const getRedirectTo = (user: User) => {
+    const from = (location.state as LocationState | null)?.from?.pathname;
+    if (isAdminRole(user.role)) return from?.startsWith("/admin") ? from : "/admin";
+    return from && !from.startsWith("/admin") ? from : "/dashboard";
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(email, password);
+      const user = await login(email, password);
       toast.success("Đăng nhập thành công!");
-      navigate(redirectTo, { replace: true });
+      navigate(getRedirectTo(user), { replace: true });
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
     } finally {

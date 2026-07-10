@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard, User, UtensilsCrossed, History, Salad, ChefHat,
-  ShoppingCart, Sparkles, Shield, LogOut, Leaf,
+  ShoppingCart, Sparkles, LogOut, Leaf,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
@@ -39,8 +39,6 @@ export function MainLayout() {
 
   if (loading || !user) return <ProtectedRoute />;
 
-  const isAdmin = user.role === "admin";
-
   const handleLogout = async () => {
     try {
       await logout();
@@ -50,10 +48,6 @@ export function MainLayout() {
       toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
     }
   };
-
-  const navItems = isAdmin
-    ? [...NAV_ITEMS, { to: "/admin/users", label: "Quản trị", icon: Shield }]
-    : NAV_ITEMS;
 
   return (
     <div className="min-h-screen bg-sand-50">
@@ -83,7 +77,7 @@ export function MainLayout() {
 
       {/* Nav ngang cho man hinh nho */}
       <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pt-4 lg:hidden">
-        {navItems.map((item) => (
+        {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -102,7 +96,7 @@ export function MainLayout() {
       <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6">
         <aside className="hidden w-56 shrink-0 lg:block">
           <nav className="sticky top-20 space-y-1">
-            {navItems.map((item) => (
+            {NAV_ITEMS.map((item) => (
               <NavLink key={item.to} to={item.to} className={({ isActive }) => linkClass(isActive)}>
                 <item.icon className="h-5 w-5 shrink-0" />
                 {item.label}

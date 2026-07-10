@@ -28,9 +28,11 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     if (token) headers["Authorization"] = `Bearer ${token}`;
   }
 
-  let payload: string | undefined;
+  let payload: BodyInit | undefined;
   if (body !== undefined) {
-    if (form) {
+    if (body instanceof FormData) {
+      payload = body;
+    } else if (form) {
       headers["Content-Type"] = "application/x-www-form-urlencoded";
       payload = new URLSearchParams(body as Record<string, string>).toString();
     } else {
@@ -68,6 +70,26 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return data as T;
 }
 
+async function requestBlob(path: string): Promise<Blob> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, { headers });
+  } catch {
+    throw new ApiError(0, "Khong ket noi duoc may chu. Kiem tra backend co dang chay khong.");
+  }
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    if (res.status === 401) clearToken();
+    throw new ApiError(res.status, typeof data?.detail === "string" ? data.detail : `Loi ${res.status}`);
+  }
+  return res.blob();
+}
+
 export function qs(params: Record<string, unknown>): string {
   const sp = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
@@ -83,5 +105,7 @@ export const api = {
   post: <T>(path: string, body?: unknown, opts?: Omit<RequestOptions, "method" | "body">) =>
     request<T>(path, { method: "POST", body, ...opts }),
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: "PUT", body }),
+  patch: <T>(path: string, body?: unknown) => request<T>(path, { method: "PATCH", body }),
   del: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  getBlob: (path: string) => requestBlob(path),
 };

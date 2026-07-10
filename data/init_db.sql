@@ -24,7 +24,7 @@ CREATE SCHEMA public;
 -- PHẦN 1: KIỂU DỮ LIỆU ENUM
 -- ============================================================
 
-CREATE TYPE user_role AS ENUM ('user', 'admin');
+CREATE TYPE user_role AS ENUM ('user', 'data_editor', 'admin', 'super_admin');
 
 
 CREATE TYPE gender AS ENUM ('male', 'female');
@@ -156,6 +156,7 @@ CREATE TRIGGER trg_user_profiles_updated_at
 -- ============================================================
 CREATE TABLE ingredients (
     id              SERIAL          PRIMARY KEY,
+    code            VARCHAR(64)     UNIQUE,
     name            VARCHAR(255)    NOT NULL UNIQUE,
     food_group      food_group      NOT NULL,
     default_unit    VARCHAR(20)     NOT NULL DEFAULT 'g',   -- đơn vị chuẩn dùng trong công thức (g, ml, quả...)
@@ -287,10 +288,12 @@ CREATE INDEX idx_meal_ingredients_ingredient ON meal_ingredients (ingredient_id)
 -- ============================================================
 CREATE TABLE dishes (
     id              SERIAL          PRIMARY KEY,
+    code            VARCHAR(64)     UNIQUE,
     name            VARCHAR(255)    NOT NULL UNIQUE,
     dish_type       dish_type       NOT NULL,
     cooking_method  cooking_method,
     description     TEXT,
+    instructions    TEXT,
     tags            JSONB           NOT NULL DEFAULT '[]'::jsonb,
     is_active       BOOLEAN         NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
@@ -338,6 +341,41 @@ CREATE TABLE meal_set_dishes (
 );
 CREATE INDEX idx_meal_set_dishes_set ON meal_set_dishes (meal_set_id);
 CREATE INDEX idx_meal_set_dishes_dish ON meal_set_dishes (dish_id);
+
+
+-- ============================================================
+-- BẢNG QUẢN TRỊ: audit log + import có preview/commit
+-- ============================================================
+CREATE TABLE audit_logs (
+    id              BIGSERIAL       PRIMARY KEY,
+    actor_user_id   INTEGER         NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    action          VARCHAR(50)     NOT NULL,
+    entity_type     VARCHAR(50)     NOT NULL,
+    entity_id       INTEGER,
+    before_data     JSONB,
+    after_data      JSONB,
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_audit_logs_created_at ON audit_logs (created_at DESC);
+CREATE INDEX idx_audit_logs_entity ON audit_logs (entity_type, entity_id);
+
+CREATE TABLE import_jobs (
+    id              BIGSERIAL       PRIMARY KEY,
+    entity_type     VARCHAR(30)     NOT NULL,
+    filename        VARCHAR(255)    NOT NULL,
+    status          VARCHAR(30)     NOT NULL,
+    payload         JSONB           NOT NULL DEFAULT '[]'::jsonb,
+    errors          JSONB           NOT NULL DEFAULT '[]'::jsonb,
+    warnings        JSONB           NOT NULL DEFAULT '[]'::jsonb,
+    conflicts       JSONB           NOT NULL DEFAULT '[]'::jsonb,
+    total_rows      INTEGER         NOT NULL DEFAULT 0,
+    valid_rows      INTEGER         NOT NULL DEFAULT 0,
+    error_count     INTEGER         NOT NULL DEFAULT 0,
+    created_by      INTEGER         NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    completed_at    TIMESTAMPTZ
+);
+CREATE INDEX idx_import_jobs_created_at ON import_jobs (created_at DESC);
 
 
 -- ============================================================

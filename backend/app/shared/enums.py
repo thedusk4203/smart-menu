@@ -57,7 +57,9 @@ _GOAL_ADJUSTMENTS: Dict[FitnessGoal, float] = {
 class UserRole(str, Enum):
     """Vai trò tài khoản."""
     USER = "user"
+    DATA_EDITOR = "data_editor"
     ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
 
 
 class FoodGroup(str, Enum):
@@ -85,6 +87,26 @@ class CookingMethod(str, Enum):
     SOUP = "soup"
     BRAISE = "braise"
     STEAM = "steam"
+
+
+class DishType(str, Enum):
+    """Phân loại món thành phần mà planner dùng để ghép thành bữa."""
+    STAPLE = "staple"
+    SAVORY = "savory"
+    SOUP = "soup"
+    VEGETABLE_SIDE = "vegetable_side"
+    SIDE = "side"
+    BREAKFAST = "breakfast"
+
+
+class DishRole(str, Enum):
+    """Vai trò của món thành phần trong một meal set."""
+    STAPLE = "staple"
+    SAVORY = "savory"
+    SOUP = "soup"
+    VEGETABLE_SIDE = "vegetable_side"
+    SIDE = "side"
+    BREAKFAST = "breakfast"
 
 
 class ExclusionReason(str, Enum):
