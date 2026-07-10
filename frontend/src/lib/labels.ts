@@ -1,6 +1,6 @@
 // Nhan tieng Viet cho cac enum + tien ich mau sac.
 import type {
-  ActivityLevel, CookingMethod, DishRole, ExclusionReason, FitnessGoal,
+  ActivityLevel, CookingMethod, DishRole, DishType, ExclusionReason, FitnessGoal,
   FoodGroup, Gender, MealType, UserRole,
 } from "../types";
 
@@ -26,6 +26,8 @@ export const GOAL_LABELS: Record<FitnessGoal, string> = {
 export const ROLE_LABELS: Record<UserRole, string> = {
   user: "Người dùng",
   admin: "Quản trị",
+  data_editor: "Biên tập dữ liệu",
+  super_admin: "Quản trị hệ thống",
 };
 
 export const FOOD_GROUP_LABELS: Record<FoodGroup, string> = {
@@ -52,6 +54,15 @@ export const DISH_ROLE_LABELS: Record<DishRole, string> = {
   vegetable_side: "Rau/Món phụ",
   side: "Món phụ",
   breakfast: "Bữa sáng",
+};
+
+export const DISH_TYPE_LABELS: Record<DishType, string> = {
+  staple: "Tinh bột",
+  savory: "Món mặn",
+  soup: "Canh",
+  vegetable_side: "Rau/Món phụ",
+  side: "Món phụ",
+  breakfast: "Món sáng",
 };
 
 export const COOKING_METHOD_LABELS: Record<CookingMethod, string> = {

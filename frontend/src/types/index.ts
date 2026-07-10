@@ -4,11 +4,13 @@
 export type Gender = "male" | "female";
 export type ActivityLevel = "sedentary" | "light" | "moderate" | "active";
 export type FitnessGoal = "maintain" | "lose_weight" | "gain_muscle" | "gain_weight";
-export type UserRole = "user" | "admin";
+export type UserRole = "user" | "data_editor" | "admin" | "super_admin";
 export type FoodGroup =
   | "protein" | "vegetable" | "grain" | "dairy" | "fat" | "fruit" | "other";
 export type MealType = "breakfast" | "lunch" | "dinner";
 export type CookingMethod = "stir_fry" | "boil" | "soup" | "braise" | "steam";
+export type DishType =
+  | "staple" | "savory" | "soup" | "vegetable_side" | "side" | "breakfast";
 export type ExclusionReason = "allergy" | "dislike";
 
 // ── Auth / User ─────────────────────────────────────────────────────────

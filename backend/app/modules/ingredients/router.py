@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, status
 
+from app.core.deps import require_data_editor
+from app.modules.identity.domain import UserEntity
+
 from app.dependencies import (
     get_create_ingredient_use_case,
     get_deactivate_ingredient_use_case,
@@ -44,6 +47,7 @@ def get_ingredient(ingredient_id: int, use_case: GetIngredientUseCase = Depends(
 def create_ingredient(
     data: IngredientCreate,
     use_case: CreateIngredientUseCase = Depends(get_create_ingredient_use_case),
+    _: UserEntity = Depends(require_data_editor),
 ):
     nutrition = NutritionFactsEntity(ingredient_id=0, **data.nutrition.model_dump())
     return use_case.execute(data.name, data.food_group, data.default_unit, data.grams_per_unit, nutrition)
@@ -53,6 +57,7 @@ def create_ingredient(
 def update_ingredient(
     ingredient_id: int, data: IngredientUpdate,
     use_case: UpdateIngredientUseCase = Depends(get_update_ingredient_use_case),
+    _: UserEntity = Depends(require_data_editor),
 ):
     return use_case.execute(ingredient_id, **data.model_dump(exclude_unset=True))
 
@@ -60,5 +65,6 @@ def update_ingredient(
 @router.delete("/{ingredient_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_ingredient(
     ingredient_id: int, use_case: DeactivateIngredientUseCase = Depends(get_deactivate_ingredient_use_case),
+    _: UserEntity = Depends(require_data_editor),
 ):
     use_case.execute(ingredient_id)
