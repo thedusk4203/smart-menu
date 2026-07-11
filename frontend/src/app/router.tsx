@@ -16,6 +16,7 @@ import { Ingredients } from "../pages/ingredients/Ingredients";
 import { Meals } from "../pages/meals/Meals";
 import { MealDetail } from "../pages/meals/MealDetail";
 import { ShoppingList } from "../pages/shopping-list/ShoppingList";
+import { PublicShoppingList } from "../pages/shopping-list/PublicShoppingList";
 import { Assistant } from "../pages/ai/Assistant";
 import { Users } from "../pages/admin/Users";
 import { AdminDashboard } from "../pages/admin/Dashboard";
@@ -24,9 +25,11 @@ import { AdminDishes } from "../pages/admin/Dishes";
 import { AdminQuality } from "../pages/admin/Quality";
 import { AdminImports } from "../pages/admin/Imports";
 import { AISettings } from "../pages/admin/AISettings";
+import { AdminTags } from "../pages/admin/Tags";
 
 export const router = createBrowserRouter([
   { path: "/", element: <Welcome /> },
+  { path: "/share/shopping-list/:token", element: <PublicShoppingList /> },
   {
     element: <AuthLayout />,
     children: [
@@ -67,6 +70,7 @@ export const router = createBrowserRouter([
           { path: "/admin/quality", element: <AdminQuality /> },
           { path: "/admin/imports", element: <AdminImports /> },
           { path: "/admin/ai", element: <AISettings /> },
+          { path: "/admin/tags", element: <AdminTags /> },
         ],
       },
     ],

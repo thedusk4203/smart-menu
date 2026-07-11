@@ -22,7 +22,7 @@ import type {
   ConversationTurn,
 } from "../../api/aiApi";
 import { ApiError } from "../../lib/apiClient";
-import { PageHeader, Spinner } from "../../components/ui";
+import { ConfirmDialog, PageHeader, Spinner } from "../../components/ui";
 
 const MAX_CONVERSATIONS = 10;
 const MAX_TURNS = 20;
@@ -175,6 +175,7 @@ export function Assistant() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [conversationLoading, setConversationLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const historyButtonRef = useRef<HTMLButtonElement>(null);
@@ -321,8 +322,7 @@ export function Assistant() {
 
   const deleteConversation = async (id: number) => {
     if (streaming) return;
-    const item = conversations.find((entry) => entry.id === id);
-    if (!window.confirm(`Xóa cuộc trò chuyện “${item?.title || "này"}”?`)) return;
+    setConfirmingDeleteId(null);
     setDeletingId(id);
     try {
       await aiApi.deleteConversation(id);
@@ -462,7 +462,7 @@ export function Assistant() {
 
   return (
     <div>
-      <PageHeader title="Trợ lý AI" description="Hỏi đáp về dinh dưỡng và gợi ý món ăn." />
+      <PageHeader title="Trợ lý Menuto" description="Hỏi đáp về dinh dưỡng và gợi ý món ăn." />
 
       <div
         className={`mb-4 flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-sm ${
@@ -489,7 +489,7 @@ export function Assistant() {
             disabled={streaming}
             onSelect={selectConversation}
             onNew={startNewConversation}
-            onDelete={deleteConversation}
+            onDelete={setConfirmingDeleteId}
           />
         </aside>
 
@@ -658,12 +658,21 @@ export function Assistant() {
                 disabled={streaming}
                 onSelect={selectConversation}
                 onNew={startNewConversation}
-                onDelete={deleteConversation}
+                onDelete={setConfirmingDeleteId}
               />
             </div>
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmingDeleteId !== null}
+        onClose={() => setConfirmingDeleteId(null)}
+        onConfirm={() => confirmingDeleteId !== null && deleteConversation(confirmingDeleteId)}
+        loading={deletingId === confirmingDeleteId}
+        title="Xóa cuộc trò chuyện"
+        message={`Xóa cuộc trò chuyện “${conversations.find((item) => item.id === confirmingDeleteId)?.title || "này"}”?`}
+        confirmLabel="Xóa"
+      />
     </div>
   );
 }

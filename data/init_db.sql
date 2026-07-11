@@ -435,7 +435,7 @@ CREATE TABLE meal_plans (
     id              SERIAL          PRIMARY KEY,
     user_id         INTEGER         NOT NULL
                                     REFERENCES users(id) ON DELETE CASCADE,
-    name            VARCHAR(255)    NOT NULL DEFAULT 'Thực đơn tuần',
+    name            VARCHAR(255)    NOT NULL DEFAULT 'Thực đơn',
     start_date      DATE            NOT NULL,
     end_date        DATE,
     budget_limit    NUMERIC(12,2)   CHECK (budget_limit IS NULL OR budget_limit >= 0),  -- ngân sách CẢ TUẦN

@@ -115,12 +115,13 @@ export function AISettings() {
     try {
       const models = await adminApi.discoverAIModels(item.id);
       if (!models.length) { toast("Provider không trả danh sách model; bạn vẫn có thể nhập model thủ công."); return; }
-      const selected = window.prompt(`Models khả dụng:\n${models.slice(0, 30).join("\n")}\n\nNhập model muốn dùng:`, item.model);
+      const selected = models.includes(item.model) ? item.model : models[0];
       if (selected && !item.is_active) {
         setEditing(item);
         setForm({ name: item.name, provider_type: item.provider_type, base_url: item.base_url,
           model: selected, api_key: "", timeout_seconds: item.timeout_seconds });
         setOpen(true);
+        toast(`Đã chọn ${selected}. Bạn có thể đổi model trong form trước khi lưu.`);
       }
     } catch (error) { toast.error(error instanceof ApiError ? error.message : "Không thể tải danh sách model."); }
     finally { setBusy(null); }

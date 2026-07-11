@@ -7,7 +7,7 @@ import { useAuth } from "../../context/AuthContext";
 import { mealApi } from "../../api/mealApi";
 import {
   PageHeader, Button, Badge, Modal, TextField, NumberField, SelectField, Textarea,
-  Spinner, EmptyState, Pagination,
+  Spinner, EmptyState, Pagination, ConfirmDialog,
 } from "../../components/ui";
 import { FilterBar } from "../../components/domain/FilterBar";
 import { IngredientPicker } from "../../components/domain/IngredientPicker";
@@ -61,6 +61,7 @@ export function Meals() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState<MealSummary | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -184,7 +185,7 @@ export function Meals() {
   };
 
   const deactivate = async (meal: MealSummary) => {
-    if (!window.confirm(`Ẩn món "${meal.name}"?`)) return;
+    setConfirming(null);
     try {
       await mealApi.remove(meal.id);
       toast.success("Đã ẩn món ăn.");
@@ -276,7 +277,7 @@ export function Meals() {
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
-                      onClick={() => deactivate(meal)}
+                      onClick={() => setConfirming(meal)}
                       className="rounded-lg p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
                       aria-label="Ẩn"
                     >
@@ -381,7 +382,7 @@ export function Meals() {
             label="Thẻ (cách nhau bằng dấu phẩy)"
             value={form.tags}
             onChange={(e) => setForm({ ...form, tags: e.target.value })}
-            placeholder="healthy, gà, ít dầu"
+            placeholder="lành mạnh, gà, ít dầu"
           />
 
           {editingId == null && (
@@ -425,6 +426,7 @@ export function Meals() {
           )}
         </form>
       </Modal>
+      <ConfirmDialog open={!!confirming} onClose={() => setConfirming(null)} onConfirm={() => confirming && deactivate(confirming)} title="Ẩn món ăn" message={confirming ? `Ẩn món “${confirming.name}”?` : ""} confirmLabel="Ẩn món" />
     </div>
   );
 }

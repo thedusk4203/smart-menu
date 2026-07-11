@@ -24,7 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/ingredients", label: "Nguyên liệu", icon: Salad },
   { to: "/meals", label: "Món ăn", icon: ChefHat },
   { to: "/shopping-list", label: "Đi chợ", icon: ShoppingCart },
-  { to: "/ai-chat", label: "Trợ lý AI", icon: Sparkles },
+  { to: "/ai-chat", label: "Trợ lý Menuto", icon: Sparkles },
 ];
 
 function linkClass(isActive: boolean): string {

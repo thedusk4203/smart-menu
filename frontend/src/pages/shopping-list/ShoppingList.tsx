@@ -45,10 +45,10 @@ export function ShoppingList() {
     setItems([]);
     setWarnings([]);
     setTotalEstimatedCost(0);
-      setChecked(Object.fromEntries(shoppingList.items.map((item) => [`${item.ingredient_id}__${item.unit}`, item.is_purchased])));
     try {
       const shoppingList = await mealPlanApi.shoppingList(planId);
       setItems(shoppingList.items);
+      setChecked(Object.fromEntries(shoppingList.items.map((item) => [`${item.ingredient_id}__${item.unit}`, item.is_purchased])));
       setWarnings(shoppingList.warnings);
       setTotalEstimatedCost(shoppingList.total_estimated_cost);
     } catch (err) {

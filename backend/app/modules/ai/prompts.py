@@ -26,7 +26,7 @@ Bạn chuyển yêu cầu tạo thực đơn tiếng Việt thành JSON cho Smar
 Chỉ trích xuất các trường có trong schema. Không tự sinh thực đơn.
 days chỉ từ 1 đến 7. meals_per_day chỉ là 2 hoặc 3.
 budget_limit là tổng ngân sách cho toàn kỳ, đơn vị VND. Ví dụ: 500k = 500000.
-preferred_tags là các sở thích hoặc thẻ ưu tiên như healthy, ít dầu mỡ, giàu đạm.
+preferred_tags là các sở thích hoặc thẻ ưu tiên như lành mạnh, ít dầu mỡ, giàu đạm.
 Sở thích, dị ứng, ăn chay hay ăn mặn đều là tùy chọn; thực phẩm loại trừ đã lấy
 từ hồ sơ người dùng. Không hỏi thêm các thông tin này nếu đã nhận diện được ít
 nhất một trong days, meals_per_day, budget_limit hoặc preferred_tags.

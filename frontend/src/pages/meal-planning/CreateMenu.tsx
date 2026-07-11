@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -10,14 +10,9 @@ import {
   PageHeader, Card, Button, SelectField, MoneyField, Textarea,
 } from "../../components/ui";
 import { ApiError } from "../../lib/apiClient";
+import { tagApi, type Tag } from "../../api/tagApi";
+import { TagPicker } from "../../components/domain/TagPicker";
 import type { GenerateParams, InfeasibleResult } from "../../types";
-
-function parseTags(text: string): string[] {
-  return text
-    .split(/[,\n]/)
-    .map((t) => t.trim())
-    .filter(Boolean);
-}
 
 export function CreateMenu() {
   const { user } = useAuth();
@@ -25,13 +20,16 @@ export function CreateMenu() {
   const [days, setDays] = useState("7");
   const [mealsPerDay, setMealsPerDay] = useState("3");
   const [budget, setBudget] = useState("");
-  const [tags, setTags] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [reasons, setReasons] = useState<InfeasibleResult["reasons"]>([]);
   const [profileHint, setProfileHint] = useState(false);
   const [naturalRequest, setNaturalRequest] = useState("");
   const [parsing, setParsing] = useState(false);
   const [clarification, setClarification] = useState("");
+  const [catalogTags, setCatalogTags] = useState<Tag[]>([]);
+
+  useEffect(() => { tagApi.active().then(setCatalogTags).catch(() => undefined); }, []);
 
   const parseNaturalRequest = async () => {
     if (!naturalRequest.trim()) return;
@@ -41,7 +39,7 @@ export function CreateMenu() {
       if (parsed.days) setDays(String(parsed.days));
       if (parsed.meals_per_day) setMealsPerDay(String(parsed.meals_per_day));
       if (parsed.budget_limit != null) setBudget(String(parsed.budget_limit));
-      if (parsed.preferred_tags.length) setTags(parsed.preferred_tags.join(", "));
+      if (parsed.preferred_tags.length) setTags(parsed.preferred_tags.filter((tag) => catalogTags.some((item) => item.name.toLocaleLowerCase("vi") === tag.toLocaleLowerCase("vi"))));
       if (parsed.needs_clarification) setClarification(parsed.clarification_question ?? "Hãy bổ sung thêm yêu cầu.");
       else toast.success("Đã điền form từ yêu cầu. Hãy kiểm tra trước khi sinh thực đơn.");
     } catch (err) { toast.error(err instanceof ApiError ? err.message : "Không thể phân tích yêu cầu."); }
@@ -59,7 +57,7 @@ export function CreateMenu() {
       days: Number(days),
       meals_per_day: Number(mealsPerDay),
       budget_limit: budget ? Number(budget) : null,
-      preferred_tags: parseTags(tags),
+      preferred_tags: tags,
     };
 
     try {
@@ -131,14 +129,7 @@ export function CreateMenu() {
               min={0}
               hint="Để trống nếu không giới hạn ngân sách"
             />
-            <Textarea
-              label="Thẻ ưu tiên (tuỳ chọn)"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder="Ví dụ: healthy, ít dầu mỡ, gà&#10;Cách nhau bằng dấu phẩy hoặc xuống dòng"
-              rows={3}
-              hint="Các món có thẻ này sẽ được ưu tiên chọn."
-            />
+            <TagPicker tags={catalogTags} selected={tags} onChange={setTags} />
             <Button type="submit" loading={loading} className="w-full">
               <Sparkles className="h-4 w-4" /> Sinh thực đơn
             </Button>

@@ -1,6 +1,8 @@
 -- Menu names, Vietnamese tag catalogue and public shopping-list sharing.
 BEGIN;
 
+ALTER TABLE meal_plans ALTER COLUMN name SET DEFAULT 'Thực đơn';
+
 UPDATE meals
 SET tags = replace(tags::text, '"healthy"', '"lành mạnh"')::jsonb
 WHERE tags::text LIKE '%"healthy"%';

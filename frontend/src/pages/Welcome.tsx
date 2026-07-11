@@ -11,7 +11,7 @@ const FEATURES = [
   { icon: UtensilsCrossed, title: "Thực đơn tự động", desc: "Sinh thực đơn nhiều ngày chỉ với vài thao tác." },
   { icon: Salad, title: "Nguyên liệu & món ăn", desc: "Kho nguyên liệu và món ăn phong phú, dễ tra cứu." },
   { icon: ShoppingCart, title: "Danh sách đi chợ", desc: "Tự gom nguyên liệu từ thực đơn, tiện in mang theo." },
-  { icon: Sparkles, title: "Trợ lý AI", desc: "Gợi ý đổi món và giải đáp dinh dưỡng (sắp ra mắt)." },
+  { icon: Sparkles, title: "Trợ lý Menuto", desc: "Gợi ý đổi món và giải đáp dinh dưỡng." },
 ];
 
 export function Welcome() {

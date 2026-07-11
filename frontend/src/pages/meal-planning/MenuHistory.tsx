@@ -5,7 +5,7 @@ import { History, Trash2, Eye, Wallet, Flame, Calendar, UtensilsCrossed } from "
 import { useAuth } from "../../context/AuthContext";
 import { mealPlanApi } from "../../api/mealPlanApi";
 import {
-  PageHeader, Card, Button, Badge, Modal, FullPageSpinner, EmptyState,
+  PageHeader, Card, Button, Badge, Modal, FullPageSpinner, EmptyState, ConfirmDialog,
 } from "../../components/ui";
 import { MealPlanView } from "../../components/domain/MealPlanView";
 import { formatVND, formatKcal, formatDate } from "../../lib/format";
@@ -18,6 +18,7 @@ export function MenuHistory() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<MealPlan | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
 
   const load = async () => {
     if (!user) return;
@@ -37,7 +38,7 @@ export function MenuHistory() {
   }, [user]);
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm("Xoá thực đơn này? Hành động không thể hoàn tác.")) return;
+    setConfirmingId(null);
     setDeletingId(id);
     try {
       await mealPlanApi.remove(id);
@@ -107,7 +108,7 @@ export function MenuHistory() {
                 <Button
                   variant="danger"
                   size="sm"
-                  onClick={() => handleDelete(plan.id)}
+                  onClick={() => setConfirmingId(plan.id)}
                   loading={deletingId === plan.id}
                 >
                   <Trash2 className="h-4 w-4" />
@@ -128,6 +129,7 @@ export function MenuHistory() {
           />
         )}
       </Modal>
+      <ConfirmDialog open={confirmingId !== null} onClose={() => setConfirmingId(null)} onConfirm={() => confirmingId !== null && handleDelete(confirmingId)} loading={deletingId === confirmingId} title="Xóa thực đơn" message="Xóa thực đơn này? Hành động không thể hoàn tác." confirmLabel="Xóa thực đơn" />
     </div>
   );
 }
