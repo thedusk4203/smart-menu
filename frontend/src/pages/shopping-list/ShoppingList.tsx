@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import { ShoppingCart, Printer, History, Share2, Copy, Link2, X } from "lucide-react";
+import { ShoppingCart, Printer, History, Share2, Copy, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { mealPlanApi } from "../../api/mealPlanApi";
 import type { ShoppingListItem } from "../../api/mealPlanApi";
@@ -111,7 +111,7 @@ export function ShoppingList() {
         description="Chọn một thực đơn đã lưu để tự động gom nguyên liệu cần mua."
         actions={
           items.length > 0 ? (
-            <div className="no-print flex gap-2"><Button variant="secondary" onClick={() => setShareLink("") || createShare()}><Share2 className="h-4 w-4" /> Chia sẻ</Button><button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-700"><Printer className="h-4 w-4" /> In danh sách</button></div>
+            <div className="no-print flex gap-2"><Button variant="secondary" onClick={createShare}><Share2 className="h-4 w-4" /> Chia sẻ</Button><button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-700"><Printer className="h-4 w-4" /> In danh sách</button></div>
           ) : undefined
         }
       />
