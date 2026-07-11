@@ -45,8 +45,7 @@ def save_plan(
     current_user: UserEntity = Depends(get_current_user),
     use_case: SaveMealPlanUseCase = Depends(get_save_meal_plan_use_case),
 ):
-    """Lưu thực đơn: backend reload mâm cơm theo id và tự tính totals/plan_data;
-    KHÔNG tin total_cost/total_calories/plan_data client gửi. Gắn user từ JWT."""
+    """Lưu dish selection bằng cách reload candidate và tự dựng snapshot V2."""
     return use_case.execute(data, user_id=current_user.id).__dict__
 
 
@@ -68,12 +67,18 @@ def generate_plan(
         meals_per_day=data.meals_per_day,
         budget_limit=data.budget_limit,
         preferred_tags=data.preferred_tags,
+        previous_plan_signature=data.previous_plan_signature,
     )
     result = generate.execute(request, seed=data.seed)
 
     if isinstance(result, ValidationResult):
-        reasons = list(result.infeasible_reasons) + list(result.hard_violations)
-        return InfeasiblePlanResponse(status="infeasible", reasons=reasons)
+        reasons = [reason.__dict__ for reason in result.infeasible_reasons]
+        reasons.extend({"code": "HARD_CONSTRAINT", "message": message, "details": {}} for message in result.hard_violations)
+        return InfeasiblePlanResponse(
+            status="infeasible",
+            reasons=reasons,
+            warnings=[warning.__dict__ for warning in result.warnings],
+        )
 
     return GeneratedMealPlanResponse(
         user_id=result.user_id,

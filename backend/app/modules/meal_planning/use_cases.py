@@ -1,24 +1,23 @@
 from __future__ import annotations
 
-from dataclasses import asdict
-from datetime import date, timedelta
+from dataclasses import replace
+from datetime import date
+from zoneinfo import ZoneInfo
+from types import SimpleNamespace
 
-from app.modules.meal_planning.domain import (
-    MealPlanEntity,
-    PlannedDay,
-    PlannedMeal,
-    PlanRequest,
-    ValidationResult,
-)
+from app.core.exceptions import ValidationAppError
+from app.modules.meal_planning import constraint_checker
+from app.modules.meal_planning.composition import slots_for
+from app.modules.meal_planning.domain import ComposedMeal, MealPlanEntity, PlanRequest, ValidationResult
 from app.modules.meal_planning.exceptions import (
     IncompleteProfileError,
     InfeasibleNutritionError,
     InvalidMealSelectionError,
     MealPlanNotFoundError,
 )
-from app.modules.meal_planning.planner import HeuristicPlanner
+from app.modules.meal_planning.planner import DishPlanner
 from app.modules.meal_planning.ports import (
-    MealCandidateProviderPort,
+    DishCandidateProviderPort,
     MealPlannerPort,
     MealPlanRepositoryPort,
 )
@@ -29,85 +28,65 @@ from app.modules.profiles.ports import ExclusionRepositoryPort, UserProfileRepos
 
 
 class SaveMealPlanUseCase:
-    """Lưu thực đơn từ lựa chọn của client (id mâm cơm theo ngày/slot). Reload
-    dữ liệu mâm cơm từ nguồn đúng (v_meal_candidates) rồi RECOMPUTE totals +
-    plan_data — không tin total_cost/total_calories/plan_data client gửi."""
+    """Lưu selection dish bằng cách reload và dựng lại snapshot V2 ở backend."""
 
     def __init__(
         self,
         repo: MealPlanRepositoryPort,
-        candidate_provider: MealCandidateProviderPort,
+        candidate_provider: DishCandidateProviderPort,
+        build_request: "BuildPlanRequestUseCase",
     ) -> None:
         self._repo = repo
         self._candidates = candidate_provider
+        self._build_request = build_request
+        self._snapshot_builder = DishPlanner()
 
     def execute(self, data: MealPlanCreate, *, user_id: int) -> MealPlanEntity:
-        ids = [m.meal_set_id for d in data.days for m in d.meals]
-        if not ids:
-            raise InvalidMealSelectionError("thực đơn không có bữa nào")
-
-        by_id = self._candidates.load_by_ids(ids)
-        missing = sorted({i for i in ids if i not in by_id})
+        first_slots = tuple(meal.slot for meal in data.days[0].meals)
+        try:
+            expected_slots = slots_for(len(first_slots))
+        except ValueError as error:
+            raise InvalidMealSelectionError(str(error)) from error
+        if first_slots != expected_slots or any(
+            tuple(meal.slot for meal in day.meals) != expected_slots for day in data.days
+        ):
+            raise InvalidMealSelectionError(
+                "slot phải theo đúng thứ tự lunch,dinner hoặc breakfast,lunch,dinner cho mọi ngày"
+            )
+        dish_ids = [dish_id for day in data.days for meal in day.meals for dish_id in meal.dish_ids]
+        by_id = self._candidates.load_by_ids(dish_ids)
+        missing = sorted({dish_id for dish_id in dish_ids if dish_id not in by_id})
         if missing:
             raise InvalidMealSelectionError(
-                f"mâm cơm không tồn tại hoặc không khả dụng: {missing}"
+                f"dish không tồn tại, không active hoặc chưa planner-ready: {missing}"
             )
-
-        plan_days: list[dict] = []
-        total_cost = 0.0
-        total_calories = 0.0
-        max_meals = 0
-        for d in data.days:
-            day_meals: list[PlannedMeal] = []
-            day_cost = 0.0
-            day_cal = 0.0
-            for m in d.meals:
-                c = by_id[m.meal_set_id]
-                if c.meal_type != m.slot:
-                    raise InvalidMealSelectionError(
-                        f"mâm '{c.name}' là bữa '{c.meal_type}', không khớp slot '{m.slot}'"
-                    )
-                day_meals.append(PlannedMeal(
-                    meal_id=None,
-                    name=c.name,
-                    meal_type=c.meal_type,
-                    components=list(c.components),
-                    calories=round(c.total_calories, 1),
-                    protein_g=round(c.total_protein_g, 1),
-                    fat_g=round(c.total_fat_g, 1),
-                    carb_g=round(c.total_carb_g, 1),
-                    cost=round(c.estimated_cost, 0),
-                    dishes=list(c.dishes),
-                    meal_set_id=c.meal_id,
-                    candidate_type="meal_set",
-                ))
-                day_cost += c.estimated_cost
-                day_cal += c.total_calories
-            day_date = (data.start_date + timedelta(days=d.day - 1)).isoformat()
-            plan_days.append(asdict(PlannedDay(
-                day=d.day,
-                date=day_date,
-                meals=day_meals,
-                day_calories=round(day_cal, 1),
-                day_cost=round(day_cost, 0),
-            )))
-            total_cost += day_cost
-            total_calories += day_cal
-            max_meals = max(max_meals, len(day_meals))
-
-        end_date = data.start_date + timedelta(days=len(data.days) - 1)
-        entity = MealPlanEntity(
-            id=None,
-            user_id=user_id,
-            name=data.name,
-            start_date=data.start_date,
-            end_date=end_date,
+        request = self._build_request.execute(
+            user_id,
+            days=len(data.days),
+            meals_per_day=len(expected_slots),
             budget_limit=data.budget_limit,
-            total_cost=round(total_cost, 0),
-            total_calories=round(total_calories, 1),
-            plan_data={"days": plan_days, "warnings": [], "meals_per_day": max_meals},
         )
-        return self._repo.create(entity)
+        composed_days = [
+            [
+                ComposedMeal(slot=selection.slot, dishes=tuple(by_id[dish_id] for dish_id in selection.dish_ids))
+                for selection in day.meals
+            ]
+            for day in data.days
+        ]
+        validation = constraint_checker.validate_plan(composed_days, request)
+        if not validation.is_feasible:
+            raise InvalidMealSelectionError("; ".join(validation.hard_violations))
+        entity = self._snapshot_builder.build_entity(
+            composed_days,
+            request,
+            data.start_date,
+            [],
+            SimpleNamespace(solver_time_ms=0, nutrition_score=0, solver_status="manual_selection"),
+        )
+        # Keep the fallback consistent for API clients that do not provide a name.
+        from datetime import datetime
+        name = data.name or f"Thực đơn {datetime.now(ZoneInfo('Asia/Ho_Chi_Minh')).strftime('%H:%M %d/%m/%Y')}"
+        return self._repo.create(replace(entity, name=name))
 
 
 class ListMealPlansUseCase:
@@ -140,14 +119,13 @@ class DeleteMealPlanUseCase:
 
 
 class GenerateMealPlanUseCase:
-   
     def __init__(
         self,
-        candidate_provider: MealCandidateProviderPort,
+        candidate_provider: DishCandidateProviderPort,
         planner: MealPlannerPort | None = None,
     ) -> None:
         self._candidates = candidate_provider
-        self._planner = planner or HeuristicPlanner()
+        self._planner = planner or DishPlanner()
 
     def execute(
         self,
@@ -156,13 +134,12 @@ class GenerateMealPlanUseCase:
         start_date: date | None = None,
         seed: int | None = None,
     ) -> MealPlanEntity | ValidationResult:
-        # seed truyền xuống planner để hỗ trợ "tạo lại thực đơn khác" (FR-PLAN-05).
         candidates = self._candidates.load_candidates(request.excluded_ingredient_ids)
         return self._planner.generate(request, candidates, start_date=start_date, seed=seed)
 
 
 class BuildPlanRequestUseCase:
-    DEFAULT_DAYS = 7  # MVP mặc định 7 ngày (HC-04)
+    DEFAULT_DAYS = 7
 
     def __init__(
         self,
@@ -180,13 +157,11 @@ class BuildPlanRequestUseCase:
         meals_per_day: int | None = None,
         budget_limit: float | None = None,
         preferred_tags: list[str] | None = None,
+        previous_plan_signature: str | None = None,
     ) -> PlanRequest:
         profile = self._profiles.get_by_user(user_id)
         if profile is None:
             raise ProfileNotFoundError(user_id)
-
-        # Hồ sơ phải đủ trường để tính dinh dưỡng — nếu thiếu, báo rõ thay vì
-        # để NutritionCalculator vỡ thành lỗi 500 mơ hồ (review D-02).
         missing = [
             label
             for label, value in (
@@ -199,8 +174,6 @@ class BuildPlanRequestUseCase:
         ]
         if missing:
             raise IncompleteProfileError(missing)
-
-        # Mục tiêu dinh dưỡng/ngày — tính deterministic từ hồ sơ.
         target = NutritionCalculator.calculate_nutrition_target(
             gender=profile.gender,
             age=profile.age,
@@ -209,28 +182,28 @@ class BuildPlanRequestUseCase:
             activity_level=profile.activity_level,
             fitness_goal=profile.goal,
         )
-
-        # Mục tiêu bất khả thi (calo < ngưỡng an toàn) -> KHÔNG sinh thực đơn
-        # theo mục tiêu vô nghĩa; báo lý do kèm cảnh báo (review D-02).
         if not target.is_feasible:
-            raise InfeasibleNutritionError([w.message for w in target.warnings])
-
-        # Loại trừ = dị ứng + không ăn (gộp toàn bộ exclusion của user).
-        excluded = [e.ingredient_id for e in self._exclusions.list_by_user(user_id)]
-
+            raise InfeasibleNutritionError([warning.message for warning in target.warnings])
         resolved_days = days or self.DEFAULT_DAYS
         resolved_mpd = meals_per_day or profile.meals_per_day
-
-        # Ngân sách: ưu tiên giá trị API truyền (đã là cả kỳ). Nếu lấy từ hồ sơ
-        # (daily_budget = ngân sách/ngày) thì quy ra cả kỳ. Không có ngân sách
-        # nào -> None = KHÔNG giới hạn (review D-01), KHÔNG phải 0 (chặn mọi món).
+        if not 1 <= resolved_days <= 7 or resolved_mpd not in (2, 3):
+            raise ValidationAppError("days phải từ 1–7 và meals_per_day phải là 2 hoặc 3")
+        if budget_limit is not None and budget_limit <= 0:
+            raise ValidationAppError("budget_limit phải lớn hơn 0")
         if budget_limit is not None:
             resolved_budget: float | None = float(budget_limit)
         elif profile.daily_budget is not None:
             resolved_budget = float(profile.daily_budget) * resolved_days
         else:
             resolved_budget = None
-
+        tags: list[str] = []
+        seen: set[str] = set()
+        for tag in preferred_tags or []:
+            normalized = " ".join(tag.split())
+            if normalized and normalized.casefold() not in seen:
+                tags.append(normalized)
+                seen.add(normalized.casefold())
+        excluded = list({exclusion.ingredient_id for exclusion in self._exclusions.list_by_user(user_id)})
         return PlanRequest(
             user_id=user_id,
             days=resolved_days,
@@ -241,5 +214,6 @@ class BuildPlanRequestUseCase:
             target_fat_g=target.daily_fat_g,
             target_carb_g=target.daily_carb_g,
             excluded_ingredient_ids=excluded,
-            preferred_tags=preferred_tags or [],
+            preferred_tags=tags,
+            previous_plan_signature=previous_plan_signature,
         )

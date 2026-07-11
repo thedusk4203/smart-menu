@@ -21,9 +21,9 @@ import { Users } from "../pages/admin/Users";
 import { AdminDashboard } from "../pages/admin/Dashboard";
 import { AdminIngredients } from "../pages/admin/Ingredients";
 import { AdminDishes } from "../pages/admin/Dishes";
-import { AdminMealSets } from "../pages/admin/MealSets";
 import { AdminQuality } from "../pages/admin/Quality";
 import { AdminImports } from "../pages/admin/Imports";
+import { AISettings } from "../pages/admin/AISettings";
 
 export const router = createBrowserRouter([
   { path: "/", element: <Welcome /> },
@@ -64,9 +64,9 @@ export const router = createBrowserRouter([
           { path: "/admin/users", element: <Users /> },
           { path: "/admin/ingredients", element: <AdminIngredients /> },
           { path: "/admin/dishes", element: <AdminDishes /> },
-          { path: "/admin/meal-sets", element: <AdminMealSets /> },
           { path: "/admin/quality", element: <AdminQuality /> },
           { path: "/admin/imports", element: <AdminImports /> },
+          { path: "/admin/ai", element: <AISettings /> },
         ],
       },
     ],

@@ -6,6 +6,7 @@ from fastapi import Depends
 from sqlmodel import Session
 
 from app.core.database import get_session
+from app.core.deps import get_current_user
 from app.core.config import settings
 
 # ── identity ──────────────────────────────────────────────────────────────
@@ -110,9 +111,7 @@ def get_deactivate_meal_use_case(s: Session = Depends(get_session)) -> Deactivat
 
 
 # ── meal_planning ─────────────────────────────────────────────────────────
-# NOTE: phần sinh thực đơn tự động (Generate/BuildPlanRequest + candidate provider)
-# là code của Đức, merge từ main. Giữ nguyên, không xoá.
-from app.modules.meal_planning.candidate_repository import SqlMealCandidateProvider
+from app.modules.meal_planning.dish_candidate_repository import SqlDishCandidateProvider
 from app.modules.meal_planning.repository import SqlMealPlanRepository
 from app.modules.meal_planning.use_cases import (
     BuildPlanRequestUseCase, DeleteMealPlanUseCase, GenerateMealPlanUseCase, GetMealPlanUseCase,
@@ -121,7 +120,11 @@ from app.modules.meal_planning.use_cases import (
 
 
 def get_save_meal_plan_use_case(s: Session = Depends(get_session)) -> SaveMealPlanUseCase:
-    return SaveMealPlanUseCase(SqlMealPlanRepository(s), SqlMealCandidateProvider(s))
+    return SaveMealPlanUseCase(
+        SqlMealPlanRepository(s),
+        SqlDishCandidateProvider(s),
+        BuildPlanRequestUseCase(SqlUserProfileRepository(s), SqlExclusionRepository(s)),
+    )
 
 def get_list_meal_plans_use_case(s: Session = Depends(get_session)) -> ListMealPlansUseCase:
     return ListMealPlansUseCase(SqlMealPlanRepository(s))
@@ -133,10 +136,29 @@ def get_delete_meal_plan_use_case(s: Session = Depends(get_session)) -> DeleteMe
     return DeleteMealPlanUseCase(SqlMealPlanRepository(s))
 
 def get_generate_meal_plan_use_case(s: Session = Depends(get_session)) -> GenerateMealPlanUseCase:
-    return GenerateMealPlanUseCase(SqlMealCandidateProvider(s))
+    return GenerateMealPlanUseCase(SqlDishCandidateProvider(s))
 
 def get_build_plan_request_use_case(s: Session = Depends(get_session)) -> BuildPlanRequestUseCase:
     return BuildPlanRequestUseCase(SqlUserProfileRepository(s), SqlExclusionRepository(s))
+
+
+# ── shopping lists ────────────────────────────────────────────────────────
+from app.modules.shopping_lists.repository import (
+    SqlLegacyDishRecipeProvider, SqlShoppingListRepository, SqlShoppingShareRepository,
+)
+from app.modules.shopping_lists.use_cases import BuildShoppingListUseCase
+
+
+def get_build_shopping_list_use_case(s: Session = Depends(get_session)) -> BuildShoppingListUseCase:
+    return BuildShoppingListUseCase(SqlLegacyDishRecipeProvider(s), SqlShoppingListRepository(s))
+
+
+def get_shopping_list_repository(s: Session = Depends(get_session)) -> SqlShoppingListRepository:
+    return SqlShoppingListRepository(s)
+
+
+def get_shopping_share_repository(s: Session = Depends(get_session)) -> SqlShoppingShareRepository:
+    return SqlShoppingShareRepository(s)
 
 
 # ── nutrition ─────────────────────────────────────────────────────────────
@@ -148,44 +170,59 @@ def get_calculate_nutrition_target_use_case() -> CalculateNutritionTargetUseCase
 
 
 # ── ai ────────────────────────────────────────────────────────────────────
-from app.modules.ai.client import DisabledAIClient, OpenAICompatibleAIClient
+from app.modules.ai.client import DisabledAIClient, LoggedAIClient, OpenAICompatibleAIClient
+from app.modules.ai.conversation_store import ConversationStore
 from app.modules.ai.ports import AIClientPort
+from app.modules.ai.provider_store import AIRequestLogStore, ProviderConfigStore
+from app.modules.identity.domain import UserEntity
 from app.modules.ai.use_cases import (
     ChatUseCase,
+    ConversationHistoryUseCase,
     ExplainPlanUseCase,
     ParseMenuRequestUseCase,
     SuggestSwapUseCase,
 )
 
 
-def get_ai_client() -> AIClientPort:
-    if not settings.ai_enabled:
+def _get_ai_client(session: Session, user: UserEntity, feature: str) -> AIClientPort:
+    config = ProviderConfigStore(session).active()
+    if config is None:
         return DisabledAIClient()
-    return OpenAICompatibleAIClient(
-        base_url=settings.ai_base_url,
-        model=settings.ai_model,
-        api_key=settings.ai_api_key,
-        timeout_seconds=settings.ai_timeout_seconds,
+    client = OpenAICompatibleAIClient(
+        base_url=config.base_url,
+        model=config.model,
+        api_key=config.api_key,
+        timeout_seconds=config.timeout_seconds,
+        structured_output_mode=config.structured_output_mode or "json_schema",
     )
+    return LoggedAIClient(client, AIRequestLogStore(session), config, user_id=user.id, feature=feature)
 
 
-def get_ai_chat_use_case(client: AIClientPort = Depends(get_ai_client)) -> ChatUseCase:
-    return ChatUseCase(client)
+def get_ai_chat_use_case(s: Session = Depends(get_session),
+                         user: UserEntity = Depends(get_current_user)) -> ChatUseCase:
+    return ChatUseCase(_get_ai_client(s, user, "chat"), ConversationStore(s))
 
 
-def get_ai_parse_menu_request_use_case(
-    client: AIClientPort = Depends(get_ai_client),
-) -> ParseMenuRequestUseCase:
-    return ParseMenuRequestUseCase(client)
+def get_ai_conversation_history_use_case(
+    s: Session = Depends(get_session),
+) -> ConversationHistoryUseCase:
+    return ConversationHistoryUseCase(ConversationStore(s))
 
 
-def get_ai_explain_plan_use_case(
-    client: AIClientPort = Depends(get_ai_client),
-) -> ExplainPlanUseCase:
-    return ExplainPlanUseCase(client)
+def get_ai_parse_menu_request_use_case(s: Session = Depends(get_session),
+                                       user: UserEntity = Depends(get_current_user)) -> ParseMenuRequestUseCase:
+    return ParseMenuRequestUseCase(_get_ai_client(s, user, "parse_menu"))
 
 
-def get_ai_suggest_swap_use_case(
-    client: AIClientPort = Depends(get_ai_client),
-) -> SuggestSwapUseCase:
-    return SuggestSwapUseCase(client)
+def get_ai_explain_plan_use_case(s: Session = Depends(get_session),
+                                 user: UserEntity = Depends(get_current_user)) -> ExplainPlanUseCase:
+    return ExplainPlanUseCase(_get_ai_client(s, user, "explain_plan"))
+
+
+def get_ai_suggest_swap_use_case(s: Session = Depends(get_session),
+                                 user: UserEntity = Depends(get_current_user)) -> SuggestSwapUseCase:
+    return SuggestSwapUseCase(
+        _get_ai_client(s, user, "suggest_swap"),
+        SqlDishCandidateProvider(s),
+        BuildPlanRequestUseCase(SqlUserProfileRepository(s), SqlExclusionRepository(s)),
+    )

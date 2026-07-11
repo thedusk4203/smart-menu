@@ -1,8 +1,8 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
-  ChefHat, ClipboardCheck, Database, FileUp, LayoutDashboard,
-  Leaf, LogOut, Salad, Settings2, Users,
+  ChefHat, ClipboardCheck, FileUp, LayoutDashboard,
+  Bot, Leaf, LogOut, Salad, Settings2, Users,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
@@ -20,9 +20,9 @@ const ADMIN_NAV: AdminNavItem[] = [
   { to: "/admin/users", label: "Người dùng", icon: Users, superOnly: true },
   { to: "/admin/ingredients", label: "Nguyên liệu", icon: Salad },
   { to: "/admin/dishes", label: "Món thành phần", icon: ChefHat },
-  { to: "/admin/meal-sets", label: "Bữa / Mâm món", icon: Database },
   { to: "/admin/quality", label: "Chất lượng dữ liệu", icon: ClipboardCheck },
   { to: "/admin/imports", label: "Lịch sử import", icon: FileUp },
+  { to: "/admin/ai", label: "AI & LLM Provider", icon: Bot, superOnly: true },
 ];
 
 function navClass(active: boolean): string {

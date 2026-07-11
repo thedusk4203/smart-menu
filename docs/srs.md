@@ -271,17 +271,24 @@ AI không được:
 - Tự thêm món hoặc nguyên liệu không có trong database.
 - Đưa ra tư vấn điều trị bệnh hoặc thay thế bác sĩ/chuyên gia dinh dưỡng.
 
-### 5.3. Luồng heuristic planning
+### 5.3. Dish-level CP-SAT planning
 
-1. Nhận request có cấu trúc từ form hoặc AI parser.
-2. Tải hồ sơ, ngân sách, số ngày, số bữa, mục tiêu, dị ứng, thực phẩm loại trừ và sở thích.
-3. Tính mục tiêu dinh dưỡng/ngày.
-4. Lọc candidate meals theo ràng buộc cứng.
-5. Chấm điểm candidate theo ràng buộc mềm.
-6. Ghép món vào từng ngày và từng slot bữa ăn.
-7. Theo dõi ngân sách còn lại, tổng dinh dưỡng, tái sử dụng nguyên liệu và số lần lặp món.
-8. Validate toàn bộ thực đơn.
-9. Trả thực đơn hợp lệ, thực đơn có cảnh báo, hoặc báo cáo bất khả thi.
+Planner không dùng `meal_sets` hoặc bảng `dynamic_meals`. `dish` là đơn vị
+quyết định nhỏ nhất và bữa được ghép trong lúc solve:
+
+1. Nhận request có cấu trúc, validate `days=1..7` và `meals_per_day ∈ {2,3}`.
+2. Tải hồ sơ, ngân sách, target, dị ứng, thực phẩm loại trừ và sở thích.
+3. Đọc `v_dish_candidates`: chỉ dish active có recipe, mọi ingredient active,
+   đủ nutrition và normalized price.
+4. Tiền kiểm pool theo role, chi phí tối thiểu và khoảng macro có thể đạt;
+   trả reason có mã/số liệu thay vì gọi solver vô ích.
+5. CP-SAT chọn toàn bộ dish cho toàn bộ ngày cùng lúc, với budget là hard
+   constraint toàn cục.
+6. Tối ưu theo tầng: nutrition/ngày → đa dạng → preference, cooking method,
+   ingredient reuse và cost.
+7. Constraint Checker độc lập kiểm tra nghiệm; chỉ nghiệm đạt mới được trả.
+8. Server tự tính metrics/warnings và snapshot V2; client không được gửi role,
+   cost hoặc nutrition để lưu.
 
 ### 5.4. Ràng buộc cứng
 
@@ -294,6 +301,8 @@ AI không được:
 | HC-05 | Số bữa | Mỗi ngày có đúng số bữa theo hồ sơ/request. |
 | HC-06 | Loại bữa | Món sáng/trưa/tối phải phù hợp slot bữa ăn. |
 | HC-07 | Dữ liệu hợp lệ | Món phải đủ dữ liệu giá và dinh dưỡng để tính toán. |
+| HC-08 | Cấu trúc bữa | Breakfast đúng 1 `breakfast`; lunch/dinner đúng 1 `staple`, 1 `savory`, 1 `vegetable_side` **hoặc** `soup`. |
+| HC-09 | Không trùng dish | Một dish không được xuất hiện hai lần trong cùng một bữa. |
 
 ### 5.5. Ràng buộc mềm
 
@@ -318,7 +327,8 @@ AI không được:
 | Độ lệch calo | So calo/ngày với target | Trong ngưỡng cấu hình |
 | Độ lệch macro | So protein/fat/carb với target | Trong ngưỡng cấu hình |
 | Đa dạng | Đếm số lần lặp món | Không vượt ngưỡng cấu hình |
-| Thời gian xử lý | Thời gian tạo thực đơn | Phù hợp trải nghiệm web với 30-50 món |
+| Thời gian xử lý | P95 generate với 7 ngày, 3 bữa, 50 dish | Dưới 500 ms sau warm-up |
+| Regenerate | So nutrition score với plan trước | Không kém quá 5% và thay ít nhất một dish nếu có nghiệm gần tương đương |
 | Khả năng giải thích | Có dữ liệu đủ để AI giải thích | Có với plan đã validate |
 
 ## 6. Yêu cầu phi chức năng
@@ -328,9 +338,9 @@ AI không được:
 | Mã | Yêu cầu |
 | --- | --- |
 | NFR-PER-01 | API đăng nhập, hồ sơ và danh sách món phản hồi trong thời gian phù hợp với ứng dụng web thông thường. |
-| NFR-PER-02 | Tạo thực đơn với 30-50 món mẫu đủ nhanh để user không phải chờ lâu. |
+| NFR-PER-02 | P95 tạo thực đơn 7 ngày, 3 bữa, 50 dish dưới 500 ms sau warm-up. |
 | NFR-PER-03 | API danh sách hỗ trợ phân trang, tìm kiếm và lọc. |
-| NFR-PER-04 | Tác vụ gọi AI có trạng thái loading hoặc streaming nếu cần. |
+| NFR-PER-04 | Trợ lý AI stream câu trả lời theo SSE; partial response chỉ hiển thị tạm thời và chỉ được lưu khi stream hoàn tất. |
 
 ### 6.2. Độ tin cậy
 
@@ -450,6 +460,8 @@ Các màn hình chính:
 - Lọc dị ứng và thực phẩm loại trừ.
 - Gộp shopping list.
 - Lưu và xem lịch sử thực đơn.
+- Tự động lưu, xem lại và tiếp tục tối đa 10 cuộc hội thoại AI cho mỗi user.
+- Mỗi cuộc hội thoại giới hạn 20 câu hỏi; retry câu gần nhất thay câu trả lời cũ.
 
 ### 9.2. Integration testing
 
@@ -458,6 +470,7 @@ Các màn hình chính:
 - Planner phối hợp Nutrition Calculator và Constraint Checker.
 - Meal plan sinh Shopping List.
 - Output AI parser đi qua schema validation.
+- Lịch sử chat lấy từ database theo ownership, không tin history do client gửi.
 
 ### 9.3. AI testing
 
@@ -466,11 +479,14 @@ Các màn hình chính:
 - JSON AI sai schema bị reject.
 - AI explanation không bịa số tiền hoặc macro.
 - Gợi ý thay thế của AI được validate lại.
+- Retry chỉ áp dụng turn cuối, không tăng số câu và giữ câu trả lời cũ nếu lần
+  retry lỗi.
 
 ### 9.4. Security testing
 
 - User chưa đăng nhập không gọi được API bảo vệ.
 - User không truy cập được dữ liệu user khác.
+- User không đọc, retry hoặc xóa conversation AI của user khác.
 - User không có role Admin không gọi được Admin API.
 - Password không lưu plain text.
 - Input sai kiểu hoặc ngoài phạm vi bị reject.

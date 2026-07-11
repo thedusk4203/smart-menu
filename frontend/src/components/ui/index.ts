@@ -1,12 +1,14 @@
 export { Button } from "./Button";
 export { TextField } from "./TextField";
 export { NumberField } from "./NumberField";
+export { MoneyField } from "./MoneyField";
 export { Textarea } from "./Textarea";
 export { SelectField } from "./SelectField";
 export type { SelectOption } from "./SelectField";
 export { Card } from "./Card";
 export { Badge } from "./Badge";
 export { Modal } from "./Modal";
+export { ConfirmDialog } from "./ConfirmDialog";
 export { Spinner, FullPageSpinner } from "./Spinner";
 export { EmptyState } from "./EmptyState";
 export { StatCard } from "./StatCard";

@@ -2,8 +2,9 @@ import { api, qs } from "../lib/apiClient";
 import type { UserRole } from "../types";
 import type {
   AdminDashboardSummary, AdminDish, AdminDishWrite, AdminIngredient,
-  AdminIngredientWrite, AdminMealSet, AdminMealSetWrite, AdminUser,
+  AdminIngredientWrite, AdminUser,
   ImportJob, ImportPreview, Page, QualityIssue,
+  AIRequestLog, LLMProvider, LLMProviderWrite,
 } from "../types/admin";
 
 export const adminApi = {
@@ -27,6 +28,8 @@ export const adminApi = {
     api.put<AdminIngredient>(`/api/admin/ingredients/${id}`, data),
   setIngredientActive: (id: number, is_active: boolean) =>
     api.patch<AdminIngredient>(`/api/admin/ingredients/${id}/active`, { is_active }),
+  exportIngredients: (format: "csv" | "xlsx", params: Record<string, unknown> = {}) =>
+    api.getDownload(`/api/admin/ingredients/export${qs({ format, ...params })}`),
 
   dishes: (params: Record<string, unknown>) =>
     api.get<Page<AdminDish>>(`/api/admin/dishes${qs(params)}`),
@@ -36,15 +39,8 @@ export const adminApi = {
     api.put<AdminDish>(`/api/admin/dishes/${id}`, data),
   setDishActive: (id: number, is_active: boolean) =>
     api.patch<AdminDish>(`/api/admin/dishes/${id}/active`, { is_active }),
-
-  mealSets: (params: Record<string, unknown>) =>
-    api.get<Page<AdminMealSet>>(`/api/admin/meal-sets${qs(params)}`),
-  mealSet: (id: number) => api.get<AdminMealSet>(`/api/admin/meal-sets/${id}`),
-  createMealSet: (data: AdminMealSetWrite) => api.post<AdminMealSet>("/api/admin/meal-sets", data),
-  updateMealSet: (id: number, data: AdminMealSetWrite) =>
-    api.put<AdminMealSet>(`/api/admin/meal-sets/${id}`, data),
-  setMealSetActive: (id: number, is_active: boolean) =>
-    api.patch<AdminMealSet>(`/api/admin/meal-sets/${id}/active`, { is_active }),
+  exportDishes: (format: "csv" | "xlsx", params: Record<string, unknown> = {}) =>
+    api.getDownload(`/api/admin/dishes/export${qs({ format, ...params })}`),
 
   quality: (params: Record<string, unknown>) =>
     api.get<Page<QualityIssue>>(`/api/admin/quality/issues${qs(params)}`),
@@ -62,4 +58,26 @@ export const adminApi = {
     ),
   importJobs: (params: Record<string, unknown> = {}) =>
     api.get<Page<ImportJob>>(`/api/admin/imports${qs(params)}`),
+
+  aiProviders: () => api.get<LLMProvider[]>("/api/admin/ai/providers"),
+  createAIProvider: (data: LLMProviderWrite) =>
+    api.post<LLMProvider>("/api/admin/ai/providers", data),
+  updateAIProvider: (id: number, data: LLMProviderWrite) =>
+    api.put<LLMProvider>(`/api/admin/ai/providers/${id}`, data),
+  cloneAIProvider: (id: number) =>
+    api.post<LLMProvider>(`/api/admin/ai/providers/${id}/clone`),
+  testAIProvider: (id: number) =>
+    api.post<{ provider: LLMProvider; models: string[] }>(`/api/admin/ai/providers/${id}/test`),
+  discoverAIModels: (id: number) =>
+    api.post<string[]>(`/api/admin/ai/providers/${id}/discover-models`),
+  activateAIProvider: (id: number) =>
+    api.post<LLMProvider>(`/api/admin/ai/providers/${id}/activate`),
+  deactivateAIProvider: (id: number) =>
+    api.post<LLMProvider>(`/api/admin/ai/providers/${id}/deactivate`),
+  deleteAIProvider: (id: number) => api.del<void>(`/api/admin/ai/providers/${id}`),
+  aiLogs: (params: Record<string, unknown> = {}) =>
+    api.get<Page<AIRequestLog>>(`/api/admin/ai/logs${qs(params)}`),
+  aiLog: (id: number) => api.get<AIRequestLog>(`/api/admin/ai/logs/${id}`),
+  purgeAILogs: (before: string) =>
+    api.post<{ deleted: number }>("/api/admin/ai/logs/purge", { before }),
 };

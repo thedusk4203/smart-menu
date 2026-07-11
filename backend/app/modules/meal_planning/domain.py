@@ -1,7 +1,123 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
+
+from app.shared.enums import CookingMethod, DishType, MealType
+
+
+@dataclass(frozen=True)
+class DishIngredientSnapshot:
+    """Nguyên liệu tại thời điểm candidate được đọc.
+
+    Snapshot này đi theo plan V2 để giá/công thức sau này không làm thay đổi lịch
+    sử hoặc shopping list của thực đơn đã lưu.
+    """
+
+    ingredient_id: int
+    name: str
+    quantity: float
+    unit: str
+    estimated_cost: float
+
+
+@dataclass(frozen=True)
+class DishCandidate:
+    """Đơn vị quyết định nhỏ nhất của Dish Planner V2."""
+
+    dish_id: int
+    name: str
+    dish_type: DishType
+    cooking_method: CookingMethod | None
+    calories: float
+    protein_g: float
+    fat_g: float
+    carb_g: float
+    estimated_cost: float
+    ingredient_ids: tuple[int, ...] = ()
+    ingredients: tuple[DishIngredientSnapshot, ...] = ()
+    tags: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ComposedMeal:
+    """Bữa được ghép động khi planner chạy; không có bảng dynamic_meals."""
+
+    slot: MealType
+    dishes: tuple[DishCandidate, ...]
+
+    @property
+    def calories(self) -> float:
+        return sum(d.calories for d in self.dishes)
+
+    @property
+    def protein_g(self) -> float:
+        return sum(d.protein_g for d in self.dishes)
+
+    @property
+    def fat_g(self) -> float:
+        return sum(d.fat_g for d in self.dishes)
+
+    @property
+    def carb_g(self) -> float:
+        return sum(d.carb_g for d in self.dishes)
+
+    @property
+    def estimated_cost(self) -> float:
+        return sum(d.estimated_cost for d in self.dishes)
+
+    @property
+    def ingredient_ids(self) -> tuple[int, ...]:
+        return tuple(i for dish in self.dishes for i in dish.ingredient_ids)
+
+
+@dataclass(frozen=True)
+class StructuredWarning:
+    code: str
+    message: str
+    details: dict[str, float | int | str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class InfeasibleReason:
+    code: str
+    message: str
+    details: dict[str, float | int | str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class PlanMetrics:
+    average_calorie_deviation_pct: float = 0.0
+    maximum_calorie_deviation_pct: float = 0.0
+    protein_shortage_pct: float = 0.0
+    repeat_counts: dict[str, int] = field(default_factory=dict)
+    solver_time_ms: int = 0
+    nutrition_score: int = 0
+
+
+@dataclass(frozen=True)
+class PlannerMetadata:
+    algorithm_version: str = "dish-cpsat-v1"
+    plan_signature: str = ""
+    solver_status: str = "unknown"
+
+
+@dataclass(frozen=True)
+class QualityPolicy:
+    calorie_deviation_weight: int = 10
+    protein_shortage_weight: int = 16
+    macro_deviation_weight: int = 3
+    savory_repeat_penalty: int = 50
+    side_repeat_penalty: int = 30
+    breakfast_repeat_penalty: int = 30
+    staple_repeat_penalty: int = 10
+    same_day_repeat_penalty: int = 70
+    consecutive_repeat_penalty: int = 80
+    preferred_tag_bonus: int = 5
+    cooking_method_repeat_penalty: int = 5
+    cost_weight: int = 1
+    regenerate_quality_slack_pct: int = 5
+    timeout_seconds: float = 0.30
 
 
 @dataclass(frozen=True)
@@ -9,82 +125,50 @@ class MealPlanEntity:
     id: int | None
     user_id: int
     name: str = "Thực đơn tuần"
-    start_date: date | None = None  # None khi vừa sinh (chưa lưu); set khi lưu
+    start_date: date | None = None
     end_date: date | None = None
     budget_limit: float | None = None
     total_cost: float = 0
     total_calories: float = 0
     plan_data: dict = field(default_factory=dict)
+    created_at: datetime | None = None
 
 
 @dataclass(frozen=True)
 class PlanRequest:
-    """Yêu cầu tạo thực đơn đã chuẩn hóa (từ form hoặc AI parser).
+    """Yêu cầu đã chuẩn hóa từ profile + form generate."""
 
-    Mục tiêu dinh dưỡng (target_*) lấy từ CalculateNutritionTargetUseCase;
-    danh sách loại trừ gộp cả dị ứng (allergy) và không ăn (dislike)."""
     user_id: int
-    days: int                            # Số ngày (MVP mặc định: 7)
-    meals_per_day: int                   # Số bữa/ngày (2 hoặc 3)
-    budget_limit: float | None           # Ngân sách cả kỳ (đồng); None = không giới hạn
-    target_calories: float               # Mục tiêu/ngày
+    days: int
+    meals_per_day: int
+    budget_limit: float | None
+    target_calories: float
     target_protein_g: float
     target_fat_g: float
     target_carb_g: float
-    excluded_ingredient_ids: list[int] = field(default_factory=list)  # Dị ứng + không ăn
+    excluded_ingredient_ids: list[int] = field(default_factory=list)
     preferred_tags: list[str] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
-class MealCandidate:
-    """Mâm cơm hợp lệ để chọn vào thực đơn — đọc tổng hợp từ v_meal_candidates
-    kèm ingredient_ids (union của mọi dish, để loại trừ + tái sử dụng).
-
-    `meal_id` = id của meal_set. `dishes` là các món con {dish_id, role, name,
-    sort_order}; `components` là tên món con dạng phẳng (tương thích cũ)."""
-    meal_id: int
-    name: str
-    meal_type: str                       # breakfast/lunch/dinner
-    total_calories: float
-    total_protein_g: float
-    total_fat_g: float
-    total_carb_g: float
-    estimated_cost: float
-    ingredient_ids: list[int] = field(default_factory=list)
-    tags: list[str] = field(default_factory=list)
-    components: list[str] = field(default_factory=list)
-    dishes: list[dict] = field(default_factory=list)
+    previous_plan_signature: str | None = None
 
 
 @dataclass(frozen=True)
 class ValidationResult:
-    """Kết quả kiểm tra ràng buộc cho toàn bộ thực đơn (SRS §5.4).
-
-    status:
-      - "valid"                : đạt mọi ràng buộc cứng, không cảnh báo
-      - "valid_with_warnings"  : đạt ràng buộc cứng nhưng có cảnh báo mềm
-      - "infeasible"           : không thể lập thực đơn hợp lệ"""
     status: str
     hard_violations: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-    infeasible_reasons: list[str] = field(default_factory=list)
+    warnings: list[StructuredWarning] = field(default_factory=list)
+    infeasible_reasons: list[InfeasibleReason] = field(default_factory=list)
 
     @property
     def is_feasible(self) -> bool:
         return self.status != "infeasible"
 
+
 @dataclass(frozen=True)
 class PlannedMeal:
-    """Một bữa (mâm cơm/meal_set) đã xếp vào một slot trong ngày.
+    """JSON-friendly representation of a dynamic composed meal."""
 
-    `dishes` = các món con {dish_id, role, name, sort_order} để UI nhóm theo vai
-    trò; `components` = tên món con dạng phẳng (tương thích cũ). Với candidate
-    meal_set: `meal_id=None`, dùng `meal_set_id`. `meal_id` giữ lại để plan cũ
-    (vốn tham chiếu meals.id) không vỡ.
-    """
-    meal_id: int | None
     name: str
-    meal_type: str          # breakfast/lunch/dinner
+    meal_type: str
     components: list[str]
     calories: float
     protein_g: float
@@ -92,15 +176,13 @@ class PlannedMeal:
     carb_g: float
     cost: float
     dishes: list[dict] = field(default_factory=list)
-    meal_set_id: int | None = None
-    candidate_type: str = "meal_set"
+    candidate_type: str = "dynamic_meal"
 
 
 @dataclass(frozen=True)
 class PlannedDay:
-    """Một ngày trong thực đơn: danh sách bữa + tổng hợp calo/chi phí ngày."""
-    day: int                # 1-based
-    date: str | None        # ISO date hoặc None nếu chưa gán ngày bắt đầu
+    day: int
+    date: str | None
     meals: list[PlannedMeal]
     day_calories: float
     day_cost: float

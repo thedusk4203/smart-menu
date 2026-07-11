@@ -6,7 +6,7 @@ import { profileApi } from "../api/profileApi";
 import { ingredientApi } from "../api/ingredientApi";
 import { nutritionApi } from "../api/nutritionApi";
 import {
-  PageHeader, Card, Button, TextField, NumberField, SelectField, FullPageSpinner, Badge, Spinner,
+  PageHeader, Card, Button, TextField, NumberField, MoneyField, SelectField, FullPageSpinner, Badge, Spinner,
 } from "../components/ui";
 import { NutritionSummary } from "../components/domain/NutritionSummary";
 import { IngredientPicker } from "../components/domain/IngredientPicker";
@@ -237,12 +237,11 @@ export function Profile() {
                     { value: "3", label: "3 bữa (sáng + trưa + tối)" },
                   ]}
                 />
-                <NumberField
+                <MoneyField
                   label="Ngân sách / ngày"
                   value={budget}
-                  onChange={(e) => setBudget(e.target.value)}
+                  onValueChange={setBudget}
                   min={0}
-                  suffix="đ"
                   hint="Để trống nếu không giới hạn"
                 />
               </div>

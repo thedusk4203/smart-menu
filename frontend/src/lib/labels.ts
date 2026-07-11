@@ -1,6 +1,6 @@
 // Nhan tieng Viet cho cac enum + tien ich mau sac.
 import type {
-  ActivityLevel, CookingMethod, DishRole, DishType, ExclusionReason, FitnessGoal,
+  ActivityLevel, CookingMethod, DishType, ExclusionReason, FitnessGoal,
   FoodGroup, Gender, MealType, UserRole,
 } from "../types";
 
@@ -44,16 +44,6 @@ export const MEAL_TYPE_LABELS: Record<MealType, string> = {
   breakfast: "Bữa sáng",
   lunch: "Bữa trưa",
   dinner: "Bữa tối",
-};
-
-// Nhãn vai trò món con trong một mâm cơm (Phase A).
-export const DISH_ROLE_LABELS: Record<DishRole, string> = {
-  staple: "Tinh bột",
-  savory: "Món mặn",
-  soup: "Canh",
-  vegetable_side: "Rau/Món phụ",
-  side: "Món phụ",
-  breakfast: "Bữa sáng",
 };
 
 export const DISH_TYPE_LABELS: Record<DishType, string> = {

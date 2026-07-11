@@ -15,9 +15,6 @@ from app.modules.admin.schemas import (
     AdminIngredientItem,
     AdminIngredientPage,
     AdminIngredientWrite,
-    AdminMealSetItem,
-    AdminMealSetPage,
-    AdminMealSetWrite,
     AdminUserCreate,
     AdminUserItem,
     AdminUserPage,
@@ -31,7 +28,7 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.use_cases import AdminService
 from app.modules.identity.domain import UserEntity
-from app.shared.enums import DishType, FoodGroup, MealType, UserRole
+from app.shared.enums import DishType, FoodGroup, UserRole
 
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -109,6 +106,26 @@ def list_ingredients(
     )
 
 
+@router.get("/ingredients/export")
+def export_ingredients(
+    format: Literal["csv", "xlsx"] = "xlsx",
+    search: str | None = None,
+    food_group: FoodGroup | None = None,
+    status_filter: Literal["active", "inactive"] | None = Query(default=None, alias="status"),
+    quality: Literal["missing_price", "missing_nutrition", "missing_conversion"] | None = None,
+    service: AdminService = Depends(get_admin_service),
+    _: UserEntity = Depends(require_data_editor),
+):
+    content, media_type, filename = service.export_ingredients(
+        format, search, food_group.value if food_group else None, status_filter, quality
+    )
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/ingredients/{ingredient_id}", response_model=AdminIngredientItem)
 def get_ingredient(
     ingredient_id: int,
@@ -162,6 +179,26 @@ def list_dishes(
     return service.list_dishes(search, dish_type.value if dish_type else None, status_filter, quality, limit, offset)
 
 
+@router.get("/dishes/export")
+def export_dishes(
+    format: Literal["csv", "xlsx"] = "xlsx",
+    search: str | None = None,
+    dish_type: DishType | None = None,
+    status_filter: Literal["active", "inactive"] | None = Query(default=None, alias="status"),
+    quality: Literal["missing_recipe", "missing_price", "missing_nutrition"] | None = None,
+    service: AdminService = Depends(get_admin_service),
+    _: UserEntity = Depends(require_data_editor),
+):
+    content, media_type, filename = service.export_dishes(
+        format, search, dish_type.value if dish_type else None, status_filter, quality
+    )
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/dishes/{dish_id}", response_model=AdminDishItem)
 def get_dish(
     dish_id: int,
@@ -200,62 +237,10 @@ def set_dish_active(
     return service.set_dish_active(dish_id, data.is_active, current_user.id)
 
 
-# ----------------------------------------------------------------------- meal sets
-@router.get("/meal-sets", response_model=AdminMealSetPage)
-def list_meal_sets(
-    search: str | None = None,
-    meal_type: MealType | None = None,
-    status_filter: Literal["active", "inactive"] | None = Query(default=None, alias="status"),
-    limit: int = Query(20, ge=1, le=100),
-    offset: int = Query(0, ge=0),
-    service: AdminService = Depends(get_admin_service),
-    _: UserEntity = Depends(require_data_editor),
-):
-    return service.list_meal_sets(search, meal_type.value if meal_type else None, status_filter, limit, offset)
-
-
-@router.get("/meal-sets/{meal_set_id}", response_model=AdminMealSetItem)
-def get_meal_set(
-    meal_set_id: int,
-    service: AdminService = Depends(get_admin_service),
-    _: UserEntity = Depends(require_data_editor),
-):
-    return service._meal_set_from_db(meal_set_id)
-
-
-@router.post("/meal-sets", response_model=AdminMealSetItem, status_code=status.HTTP_201_CREATED)
-def create_meal_set(
-    data: AdminMealSetWrite,
-    service: AdminService = Depends(get_admin_service),
-    current_user: UserEntity = Depends(require_data_editor),
-):
-    return service.save_meal_set(data, current_user.id)
-
-
-@router.put("/meal-sets/{meal_set_id}", response_model=AdminMealSetItem)
-def update_meal_set(
-    meal_set_id: int,
-    data: AdminMealSetWrite,
-    service: AdminService = Depends(get_admin_service),
-    current_user: UserEntity = Depends(require_data_editor),
-):
-    return service.save_meal_set(data, current_user.id, meal_set_id)
-
-
-@router.patch("/meal-sets/{meal_set_id}/active", response_model=AdminMealSetItem)
-def set_meal_set_active(
-    meal_set_id: int,
-    data: ActiveUpdate,
-    service: AdminService = Depends(get_admin_service),
-    current_user: UserEntity = Depends(require_data_editor),
-):
-    return service.set_meal_set_active(meal_set_id, data.is_active, current_user.id)
-
-
 # ------------------------------------------------------------------------- quality
 @router.get("/quality/issues", response_model=QualityIssuePage)
 def list_quality_issues(
-    entity_type: Literal["ingredient", "dish", "meal_set"] | None = None,
+    entity_type: Literal["ingredient", "dish"] | None = None,
     severity: Literal["error", "warning"] | None = None,
     code: str | None = None,
     search: str | None = None,

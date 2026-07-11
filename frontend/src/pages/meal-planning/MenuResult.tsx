@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { UtensilsCrossed, RefreshCw, Save, ArrowLeft } from "lucide-react";
+import { UtensilsCrossed, RefreshCw, Save, ArrowLeft, Sparkles } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { mealPlanApi, isInfeasible } from "../../api/mealPlanApi";
 import { aiApi } from "../../api/aiApi";
-import { PageHeader, Button, EmptyState, TextField } from "../../components/ui";
+import type { SwapSuggestion } from "../../api/aiApi";
+import { PageHeader, Button, Card, EmptyState, TextField, Textarea, Modal } from "../../components/ui";
 import { MealPlanView } from "../../components/domain/MealPlanView";
 import { ApiError } from "../../lib/apiClient";
-import { todayISO } from "../../lib/format";
-import type { GeneratedMealPlan, GenerateParams, PlannedMeal } from "../../types";
+import { defaultMealPlanName, todayISO } from "../../lib/format";
+import type { GeneratedMealPlan, GenerateParams, MealType, PlanDish } from "../../types";
 
 interface ResultState {
   plan?: GeneratedMealPlan;
@@ -23,9 +24,15 @@ export function MenuResult() {
   const state = (location.state as ResultState | null) ?? {};
 
   const [plan, setPlan] = useState<GeneratedMealPlan | null>(state.plan ?? null);
-  const [name, setName] = useState(state.plan?.name ?? "Thực đơn của tôi");
+  const [name, setName] = useState(() => state.plan?.name && state.plan.name !== "Thực đơn tuần" ? state.plan.name : defaultMealPlanName());
   const [regenerating, setRegenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [explaining, setExplaining] = useState(false);
+  const [explanation, setExplanation] = useState("");
+  const [swapping, setSwapping] = useState(false);
+  const [swapSuggestions, setSwapSuggestions] = useState<SwapSuggestion[]>([]);
+  const [swapTarget, setSwapTarget] = useState<{ day: number; mealType: MealType; dish: PlanDish } | null>(null);
+  const [swapNote, setSwapNote] = useState("Món tương tự, phù hợp ngân sách");
 
   if (!plan) {
     return (
@@ -53,13 +60,17 @@ export function MenuResult() {
     setRegenerating(true);
     try {
       const seed = Math.floor(Math.random() * 1e9);
-      const result = await mealPlanApi.generate({ ...state.params, seed });
+      const result = await mealPlanApi.generate({
+        ...state.params,
+        seed,
+        previous_plan_signature: plan.plan_data.plan_signature,
+      });
       if (isInfeasible(result)) {
-        toast.error(result.reasons[0] ?? "Không thể tạo thực đơn khác.");
+        toast.error(result.reasons[0]?.message ?? "Không thể tạo thực đơn khác.");
         return;
       }
       setPlan(result);
-      setName(result.name);
+      setName(defaultMealPlanName());
       toast.success("Đã tạo thực đơn mới.");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
@@ -73,14 +84,14 @@ export function MenuResult() {
     setSaving(true);
     try {
       await mealPlanApi.save({
-        name: name.trim() || "Thực đơn của tôi",
+        name: name.trim() || defaultMealPlanName(),
         start_date: todayISO(),
         budget_limit: plan.budget_limit,
         days: plan.plan_data.days.map((d) => ({
           day: d.day,
           meals: d.meals.map((m) => ({
             slot: m.meal_type,
-            meal_set_id: m.meal_set_id as number,
+            dish_ids: m.dishes?.map((dish) => dish.dish_id) ?? [],
           })),
         })),
       });
@@ -93,18 +104,29 @@ export function MenuResult() {
     }
   };
 
-  const handleSwap = async (_day: number, meal: PlannedMeal) => {
-    // Phase A: candidate là meal_set -> chưa hỗ trợ swap; tránh gửi meal_id=null.
-    if (meal.candidate_type === "meal_set" || meal.meal_id == null) {
-      toast("Đổi món cho mâm cơm đang được phát triển.", { icon: "🛠️" });
-      return;
-    }
+  const explain = async () => {
+    setExplaining(true);
+    try { const result = await aiApi.explainPlan({ plan_data: plan.plan_data, total_cost: plan.total_cost, total_calories: plan.total_calories, budget_limit: plan.budget_limit }); setExplanation(result.reply); }
+    catch (err) { toast.error(err instanceof ApiError ? err.message : "AI đang tạm không khả dụng."); }
+    finally { setExplaining(false); }
+  };
+
+  const requestSwap = async (day: number, mealType: MealType, dish: PlanDish) => {
+    setSwapTarget({ day, mealType, dish });
+    setSwapNote("Món tương tự, phù hợp ngân sách");
+  };
+
+  const submitSwap = async () => {
+    if (!swapTarget) return;
+    const { day, mealType, dish } = swapTarget;
+    setSwapping(true); setSwapSuggestions([]);
     try {
-      await aiApi.suggestSwap({ meal_id: meal.meal_id, meal_type: meal.meal_type });
-      toast.success("Đã nhận gợi ý đổi món.");
-    } catch {
-      toast("Tính năng đổi món bằng AI đang được phát triển.", { icon: "🛠️" });
-    }
+      const result = await aiApi.suggestSwap({ day, meal_type: mealType, target_dish_id: dish.dish_id, plan, note: swapNote.trim() });
+      setSwapSuggestions(result);
+      if (!result.length) toast("Không có món thay thế nào giữ được toàn bộ ràng buộc.");
+      setSwapTarget(null);
+    } catch (err) { toast.error(err instanceof ApiError ? err.message : "Không thể tìm món thay thế."); }
+    finally { setSwapping(false); }
   };
 
   return (
@@ -134,16 +156,23 @@ export function MenuResult() {
           <Button onClick={save} loading={saving}>
             <Save className="h-4 w-4" /> Lưu thực đơn
           </Button>
+          <Button variant="secondary" onClick={explain} loading={explaining}><Sparkles className="h-4 w-4" /> AI giải thích</Button>
         </div>
       </div>
+
+      {explanation && <Card title="AI giải thích thực đơn" icon={<Sparkles className="h-5 w-5" />} className="mb-5"><p className="whitespace-pre-wrap text-sm leading-6 text-gray-700">{explanation}</p><p className="mt-3 text-xs text-gray-500">Nội dung mang tính tham khảo và được lưu tối đa 30 ngày.</p></Card>}
+      {(swapping || swapSuggestions.length > 0) && <Card title="Phương án đổi món đã kiểm tra" className="mb-5"><div className="space-y-2">{swapping ? <p className="text-sm text-gray-500">Đang xếp hạng và kiểm tra toàn bộ thực đơn...</p> : swapSuggestions.map(item => <button key={item.dish_id} onClick={() => { setPlan(item.plan); setSwapSuggestions([]); toast.success(`Đã đổi sang ${item.name}.`); }} className="block w-full rounded-xl border border-sand-200 p-3 text-left hover:border-brand-300 hover:bg-brand-50"><span className="font-medium text-gray-800">{item.name}</span><span className="mt-1 block text-sm text-gray-500">{item.reason}</span><span className="mt-1 block text-xs font-medium text-brand-700">Chọn phương án này</span></button>)}</div></Card>}
 
       <MealPlanView
         planData={plan.plan_data}
         totalCost={plan.total_cost}
         totalCalories={plan.total_calories}
         budgetLimit={plan.budget_limit}
-        onSwapMeal={handleSwap}
+        onSwap={requestSwap}
       />
+      <Modal open={!!swapTarget} onClose={() => !swapping && setSwapTarget(null)} title={swapTarget ? `Đổi “${swapTarget.dish.name}”` : "Đổi món"} size="sm" footer={<><Button variant="ghost" onClick={() => setSwapTarget(null)} disabled={swapping}>Hủy</Button><Button onClick={submitSwap} loading={swapping}>Tìm món thay thế</Button></>}>
+        <Textarea label="Bạn muốn đổi theo hướng nào?" value={swapNote} onChange={(e) => setSwapNote(e.target.value)} rows={3} />
+      </Modal>
     </div>
   );
 }

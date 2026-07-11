@@ -12,7 +12,7 @@ def _to_entity(row: MealPlanModel) -> MealPlanEntity:
     return MealPlanEntity(
         id=row.id, user_id=row.user_id, name=row.name, start_date=row.start_date,
         end_date=row.end_date, budget_limit=row.budget_limit, total_cost=row.total_cost,
-        total_calories=row.total_calories, plan_data=row.plan_data,
+        total_calories=row.total_calories, plan_data=row.plan_data, created_at=row.created_at,
     )
 
 
@@ -33,7 +33,7 @@ class SqlMealPlanRepository(MealPlanRepositoryPort):
 
     def list_by_user(self, user_id: int) -> list[MealPlanEntity]:
         rows = self._session.exec(
-            select(MealPlanModel).where(MealPlanModel.user_id == user_id).order_by(MealPlanModel.start_date.desc())
+            select(MealPlanModel).where(MealPlanModel.user_id == user_id).order_by(MealPlanModel.created_at.desc())
         ).all()
         return [_to_entity(r) for r in rows]
 

@@ -23,6 +23,8 @@ def _default_ai_base_url(provider: str) -> str:
         return "https://api.deepseek.com/v1"
     if provider == "openai":
         return "https://api.openai.com/v1"
+    if provider == "google":
+        return "https://generativelanguage.googleapis.com/v1beta/openai"
     return ""
 
 
@@ -43,6 +45,7 @@ class Settings:
     )
     ai_model: str = os.getenv("AI_MODEL", "").strip()
     ai_timeout_seconds: float = float(os.getenv("AI_TIMEOUT_SECONDS", "60"))
+    ai_config_encryption_key: str | None = os.getenv("AI_CONFIG_ENCRYPTION_KEY")
 
 
 settings = Settings()

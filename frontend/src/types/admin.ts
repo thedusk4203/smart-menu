@@ -1,6 +1,4 @@
-import type {
-  CookingMethod, DishRole, DishType, FoodGroup, MealType, UserRole,
-} from "./index";
+import type { CookingMethod, DishType, FoodGroup, UserRole } from "./index";
 
 export interface Page<T> {
   items: T[];
@@ -16,7 +14,12 @@ export interface AdminDashboardSummary {
   ingredients_total: number;
   ingredients_active: number;
   dishes_total: number;
-  meal_sets_total: number;
+  planner_ready_dishes: number;
+  breakfast_count: number;
+  staple_count: number;
+  savory_count: number;
+  vegetable_count: number;
+  soup_count: number;
   missing_price: number;
   missing_nutrition: number;
   missing_conversion: number;
@@ -129,37 +132,8 @@ export interface AdminDishWrite {
   ingredients: Array<{ ingredient_id: number; quantity: number; unit: string }>;
 }
 
-export interface AdminMealSet {
-  id: number;
-  name: string;
-  meal_type: MealType;
-  description: string | null;
-  tags: string[];
-  is_active: boolean;
-  total_calories: number;
-  total_protein_g: number;
-  total_carbs_g: number;
-  total_fat_g: number;
-  estimated_cost: number;
-  dish_count: number;
-  all_dishes_active: boolean;
-  missing_recipe: boolean;
-  created_at: string;
-  updated_at: string;
-  dishes: Array<{ dish_id: number; role: DishRole; name: string; sort_order: number }>;
-}
-
-export interface AdminMealSetWrite {
-  name: string;
-  meal_type: MealType;
-  description: string | null;
-  tags: string[];
-  is_active: boolean;
-  dishes: Array<{ dish_id: number; role: DishRole; sort_order: number }>;
-}
-
 export interface QualityIssue {
-  entity_type: "ingredient" | "dish" | "meal_set";
+  entity_type: "ingredient" | "dish";
   entity_id: number;
   entity_name: string;
   code: string;
@@ -200,4 +174,55 @@ export interface ImportJob {
   created_by: number;
   created_at: string;
   completed_at: string | null;
+}
+
+export type LLMProviderType = "openai" | "deepseek" | "lmstudio" | "google" | "custom";
+
+export interface LLMProvider {
+  id: number;
+  name: string;
+  provider_type: LLMProviderType;
+  base_url: string;
+  model: string;
+  has_api_key: boolean;
+  masked_api_key: string | null;
+  timeout_seconds: number;
+  structured_output_mode: "json_schema" | "json_object" | null;
+  config_version: number;
+  tested_version: number | null;
+  test_status: "untested" | "success" | "failed";
+  last_tested_at: string | null;
+  last_test_error: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LLMProviderWrite {
+  name: string;
+  provider_type: LLMProviderType;
+  base_url: string;
+  model: string;
+  api_key?: string | null;
+  clear_api_key?: boolean;
+  timeout_seconds: number;
+}
+
+export interface AIRequestLog {
+  id: number;
+  user_id: number | null;
+  provider_config_id: number | null;
+  feature: string;
+  provider_type: string;
+  model: string;
+  status: "success" | "error";
+  latency_ms: number;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  error_message: string | null;
+  created_at: string;
+  expires_at: string;
+  request_data?: Record<string, unknown>;
+  response_data?: unknown;
 }

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 
 interface ModalProps {
@@ -18,16 +18,21 @@ const SIZE: Record<NonNullable<ModalProps["size"]>, string> = {
 };
 
 export function Modal({ open, onClose, title, children, footer, size = "md" }: ModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocus = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (!open) return;
+    previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
+    requestAnimationFrame(() => dialogRef.current?.focus());
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
+      previousFocus.current?.focus();
     };
   }, [open, onClose]);
 
@@ -39,6 +44,11 @@ export function Modal({ open, onClose, title, children, footer, size = "md" }: M
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={typeof title === "string" ? title : "Hộp thoại"}
+        tabIndex={-1}
         className={`mt-8 w-full ${SIZE[size]} rounded-2xl bg-white shadow-xl`}
         onClick={(e) => e.stopPropagation()}
       >

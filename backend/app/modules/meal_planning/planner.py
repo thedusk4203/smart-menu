@@ -1,224 +1,154 @@
 from __future__ import annotations
 
-import random
 from dataclasses import asdict
 from datetime import date, timedelta
 
-from app.modules.meal_planning import constraint_checker, scorer
+from app.modules.meal_planning import constraint_checker, feasibility
+from app.modules.meal_planning.composition import canonical_dishes_for_meal
 from app.modules.meal_planning.domain import (
-    MealCandidate,
+    ComposedMeal,
+    DishCandidate,
+    InfeasibleReason,
     MealPlanEntity,
+    PlanMetrics,
     PlannedDay,
     PlannedMeal,
+    PlannerMetadata,
     PlanRequest,
+    QualityPolicy,
+    StructuredWarning,
     ValidationResult,
 )
+from app.modules.meal_planning.optimizer import DishCpSatOptimizer
 from app.modules.meal_planning.ports import MealPlannerPort
-from app.modules.meal_planning.scorer import DEFAULT_WEIGHTS, ScoringWeights
-
-# Cảnh báo mềm khi tổng calo/ngày lệch quá ngưỡng so với mục tiêu.
-_CALORIE_WARN_TOLERANCE = 0.25
-
-# Khi regenerate (FR-PLAN-05) có seed: thay vì luôn chọn món điểm cao nhất,
-# chọn NGẪU NHIÊN (theo seed) trong top-K món điểm cao nhất còn hợp lệ. Nhờ đó
-# mỗi lần "tạo lại" cho thực đơn KHÁC nhau nhưng vẫn chất lượng + vẫn qua validator.
-_VARIETY_TOP_K = 3
+from app.modules.meal_planning.quality import DEFAULT_QUALITY_POLICY
 
 
-class HeuristicPlanner(MealPlannerPort):
-    """Sinh thực đơn bằng greedy + chấm điểm soft-constraint."""
+class DishPlanner(MealPlannerPort):
+    """Orchestrator Dish Planner V2: data → precheck → CP-SAT → checker."""
 
-    def __init__(self, weights: ScoringWeights = DEFAULT_WEIGHTS) -> None:
-        # Bộ trọng số soft-constraint (review D-06) — có thể inject để thử
-        # nghiệm chiến lược khác (ưu tiên tiết kiệm, đa dạng...).
-        self._weights = weights
+    def __init__(self, policy: QualityPolicy = DEFAULT_QUALITY_POLICY) -> None:
+        self._policy = policy
+        self._optimizer = DishCpSatOptimizer(policy)
 
     def generate(
         self,
         request: PlanRequest,
-        candidates: list[MealCandidate],
+        candidates: list[DishCandidate],
         *,
         start_date: date | None = None,
         seed: int | None = None,
     ) -> MealPlanEntity | ValidationResult:
-        # seed=None  -> chọn deterministic (luôn món điểm cao nhất) như cũ.
-        # seed=<int> -> chọn ngẫu nhiên-có-kiểm-soát trong top-K để "tạo lại" ra
-        #               thực đơn khác (FR-PLAN-05). Cùng seed -> cùng kết quả (tái lập được).
-        rng = random.Random(seed) if seed is not None else None
-        slots = constraint_checker.slots_for(request.meals_per_day)
-
         excluded = set(request.excluded_ingredient_ids)
-
-        by_slot: dict[str, list[MealCandidate]] = {slot: [] for slot in slots}
-        for slot in by_slot:
-            by_slot[slot] = [
-                c for c in candidates
-                if constraint_checker.candidate_is_eligible(c, slot, excluded)
-            ]
-
-        # Tiền kiểm tính khả thi: thiếu món cho bất kỳ slot nào -> bất khả thi.
-        empty_slots = [slot for slot, pool in by_slot.items() if not pool]
-        if empty_slots:
+        eligible = [
+            candidate
+            for candidate in candidates
+            if constraint_checker.candidate_is_eligible(candidate, excluded)
+        ]
+        precheck = feasibility.assess(eligible, request)
+        if not precheck.is_feasible:
+            return ValidationResult(
+                status="infeasible",
+                infeasible_reasons=precheck.infeasible_reasons,
+                warnings=precheck.warnings,
+            )
+        solved = self._optimizer.solve(request, eligible, seed=seed)
+        if solved is None:
             return ValidationResult(
                 status="infeasible",
                 infeasible_reasons=[
-                    f"Không có món hợp lệ cho bữa '{slot}' (sau khi loại trừ dị ứng/"
-                    f"thực phẩm không ăn và lọc dữ liệu thiếu)."
-                    for slot in empty_slots
-                ],
-            )
-
-        # max_cost để chuẩn hoá điểm "tiết kiệm" (SC-06) — trên toàn pool hợp lệ.
-        max_cost = max(c.estimated_cost for pool in by_slot.values() for c in pool)
-
-        usage_count: dict[int, int] = {}
-        remaining_budget = (
-            request.budget_limit if request.budget_limit is not None else float("inf")
-        )
-        days: list[list[MealCandidate]] = []
-
-        for _day in range(request.days):
-            day_meals: list[MealCandidate] = []
-            day_ingredient_ids: set[int] = set()
-
-            for slot in slots:
-                pick = self._pick_for_slot(
-                    pool=by_slot[slot],
-                    request=request,
-                    usage_count=usage_count,
-                    day_ingredient_ids=day_ingredient_ids,
-                    max_cost=max_cost,
-                    remaining_budget=remaining_budget,
-                    rng=rng,
-                )
-                if pick is None:
-                    # Không còn món nào nằm trong ngân sách còn lại -> bất khả thi.
-                    return ValidationResult(
-                        status="infeasible",
-                        infeasible_reasons=[
-                            f"Hết ngân sách trước khi xếp đủ bữa '{slot}' "
-                            f"(còn {remaining_budget:.0f}đ). Hãy tăng ngân sách hoặc "
-                            f"giảm số ngày/số bữa."
-                        ],
+                    # Precheck has established role/budget feasibility. Solver failure
+                    # therefore remains explicit instead of claiming lack of candidates.
+                    InfeasibleReason(
+                        "SOLVER_NO_FEASIBLE_SOLUTION",
+                        "Không tìm được nghiệm hợp lệ trong giới hạn solver.",
                     )
-                day_meals.append(pick)
-                day_ingredient_ids.update(pick.ingredient_ids)
-                usage_count[pick.meal_id] = usage_count.get(pick.meal_id, 0) + 1
-                remaining_budget -= pick.estimated_cost
-
-            days.append(day_meals)
-
-        #validate toàn bộ thực đơn theo hard constraints ---
-        validation = constraint_checker.validate_plan(days, request)
+                ],
+                warnings=precheck.warnings,
+            )
+        validation = constraint_checker.validate_plan(solved.days, request)
         if not validation.is_feasible:
             return validation
 
-        # --- Bước 9: dựng MealPlanEntity + gắn cảnh báo mềm ---
-        warnings = self._collect_warnings(days, request)
-        return self._build_entity(days, request, start_date, warnings)
-
-    def _pick_for_slot(
-        self,
-        *,
-        pool: list[MealCandidate],
-        request: PlanRequest,
-        usage_count: dict[int, int],
-        day_ingredient_ids: set[int],
-        max_cost: float,
-        remaining_budget: float,
-        rng: random.Random | None = None,
-    ) -> MealCandidate | None:
-        """Trả món phù hợp cho slot, còn nằm trong ngân sách còn lại; None nếu
-        không còn món nào đủ rẻ (HC-01 ở mức ghép động).
-
-        - rng is None : chọn deterministic — món điểm cao nhất (hành vi mặc định).
-        - rng có seed : chọn ngẫu nhiên trong top-K món điểm cao nhất (FR-PLAN-05,
-          "tạo lại thực đơn khác"), vẫn ưu tiên món tốt nên chất lượng không giảm.
-        """
-        affordable = [c for c in pool if c.estimated_cost <= remaining_budget]
-        if not affordable:
-            return None
-
-        def _score(c: MealCandidate) -> float:
-            return scorer.score_candidate(
-                c,
-                request,
-                usage_count=usage_count,
-                day_ingredient_ids=day_ingredient_ids,
-                max_cost=max_cost,
-                weights=self._weights,
+        warnings = list(precheck.warnings)
+        if solved.timed_out_with_solution:
+            warnings.append(
+                StructuredWarning(
+                    "SOLVER_TIMEOUT_BEST_EFFORT",
+                    "Solver hết thời gian nhưng đã trả nghiệm hợp lệ tốt nhất tìm được.",
+                    {"solver_time_ms": solved.solver_time_ms},
+                )
             )
+        return self.build_entity(solved.days, request, start_date, warnings, solved)
 
-        if rng is None:
-            return max(affordable, key=_score)
-
-        # Xếp điểm giảm dần, lấy top-K rồi bốc ngẫu nhiên (theo seed) 1 món.
-        ranked = sorted(affordable, key=_score, reverse=True)
-        top = ranked[: min(_VARIETY_TOP_K, len(ranked))]
-        return rng.choice(top)
-
-
-    def _collect_warnings(
-        self, days: list[list[MealCandidate]], request: PlanRequest
-    ) -> list[str]:
-        warnings: list[str] = []
-        if request.target_calories > 0:
-            for i, day in enumerate(days, start=1):
-                day_cal = sum(m.total_calories for m in day)
-                deviation = abs(day_cal - request.target_calories) / request.target_calories
-                if deviation > _CALORIE_WARN_TOLERANCE:
-                    warnings.append(
-                        f"Ngày {i}: tổng calo {day_cal:.0f} lệch {deviation * 100:.0f}% "
-                        f"so với mục tiêu {request.target_calories:.0f} kcal."
-                    )
-        return warnings
-
-
-    def _build_entity(
+    def build_entity(
         self,
-        days: list[list[MealCandidate]],
+        days: list[list[ComposedMeal]],
         request: PlanRequest,
         start_date: date | None,
-        warnings: list[str],
+        warnings: list[StructuredWarning],
+        solved,
     ) -> MealPlanEntity:
-        plan_days = []
+        plan_days: list[dict] = []
         total_cost = 0.0
         total_calories = 0.0
-        for i, day in enumerate(days):
-            day_date = (start_date + timedelta(days=i)).isoformat() if start_date else None
-            day_cost = sum(m.estimated_cost for m in day)
-            day_cal = sum(m.total_calories for m in day)
+        signature_parts: list[str] = []
+        for day_index, meals in enumerate(days, start=1):
+            day_date = (start_date + timedelta(days=day_index - 1)).isoformat() if start_date else None
+            day_cost = sum(meal.estimated_cost for meal in meals)
+            day_calories = sum(meal.calories for meal in meals)
             total_cost += day_cost
-            total_calories += day_cal
-            # Dựng theo dataclass (review D-10) rồi asdict() -> JSON nguyên dạng cũ.
-            planned_day = PlannedDay(
-                day=i + 1,
-                date=day_date,
-                meals=[
+            total_calories += day_calories
+            planned_meals: list[PlannedMeal] = []
+            for meal in meals:
+                dishes = canonical_dishes_for_meal(meal)
+                signature_parts.extend(f"{day_index}:{meal.slot.value}:{dish.dish_id}" for dish in dishes)
+                dish_snapshots = [
+                    {
+                        "dish_id": dish.dish_id,
+                        "name": dish.name,
+                        "dish_type": dish.dish_type.value,
+                        "cooking_method": dish.cooking_method.value if dish.cooking_method else None,
+                        "calories": round(dish.calories, 1),
+                        "protein_g": round(dish.protein_g, 1),
+                        "fat_g": round(dish.fat_g, 1),
+                        "carb_g": round(dish.carb_g, 1),
+                        "cost": round(dish.estimated_cost, 0),
+                        "tags": list(dish.tags),
+                        "ingredients": [asdict(ingredient) for ingredient in dish.ingredients],
+                    }
+                    for dish in dishes
+                ]
+                planned_meals.append(
                     PlannedMeal(
-                        meal_id=None,
-                        name=m.name,
-                        meal_type=m.meal_type,
-                        components=list(m.components),
-                        calories=round(m.total_calories, 1),
-                        protein_g=round(m.total_protein_g, 1),
-                        fat_g=round(m.total_fat_g, 1),
-                        carb_g=round(m.total_carb_g, 1),
-                        cost=round(m.estimated_cost, 0),
-                        dishes=list(m.dishes),
-                        meal_set_id=m.meal_id,
-                        candidate_type="meal_set",
+                        name=" · ".join(dish.name for dish in dishes),
+                        meal_type=meal.slot.value,
+                        components=[dish.name for dish in dishes],
+                        calories=round(meal.calories, 1),
+                        protein_g=round(meal.protein_g, 1),
+                        fat_g=round(meal.fat_g, 1),
+                        carb_g=round(meal.carb_g, 1),
+                        cost=round(meal.estimated_cost, 0),
+                        dishes=dish_snapshots,
                     )
-                    for m in day
-                ],
-                day_calories=round(day_cal, 1),
-                day_cost=round(day_cost, 0),
+                )
+            plan_days.append(
+                asdict(
+                    PlannedDay(
+                        day=day_index,
+                        date=day_date,
+                        meals=planned_meals,
+                        day_calories=round(day_calories, 1),
+                        day_cost=round(day_cost, 0),
+                    )
+                )
             )
-            plan_days.append(asdict(planned_day))
-
-        end_date = (
-            start_date + timedelta(days=request.days - 1) if start_date else None
+        metrics = self._metrics(days, request, solved.solver_time_ms, solved.nutrition_score)
+        metadata = PlannerMetadata(
+            plan_signature="|".join(signature_parts),
+            solver_status=solved.solver_status,
         )
+        end_date = start_date + timedelta(days=request.days - 1) if start_date else None
         return MealPlanEntity(
             id=None,
             user_id=request.user_id,
@@ -228,8 +158,63 @@ class HeuristicPlanner(MealPlannerPort):
             total_cost=round(total_cost, 0),
             total_calories=round(total_calories, 1),
             plan_data={
+                "schema_version": 2,
+                "algorithm_version": metadata.algorithm_version,
+                "plan_signature": metadata.plan_signature,
+                "solver_status": metadata.solver_status,
+                "request_snapshot": {
+                    "days": request.days,
+                    "meals_per_day": request.meals_per_day,
+                    "budget_limit": request.budget_limit,
+                    "excluded_ingredient_ids": sorted(set(request.excluded_ingredient_ids)),
+                    "preferred_tags": list(request.preferred_tags),
+                },
+                "nutrition_target": {
+                    "calories": request.target_calories,
+                    "protein_g": request.target_protein_g,
+                    "fat_g": request.target_fat_g,
+                    "carb_g": request.target_carb_g,
+                },
                 "days": plan_days,
-                "warnings": warnings,
+                "metrics": asdict(metrics),
+                "warnings": [asdict(warning) for warning in warnings],
                 "meals_per_day": request.meals_per_day,
             },
+        )
+
+    @staticmethod
+    def _metrics(
+        days: list[list[ComposedMeal]],
+        request: PlanRequest,
+        solver_time_ms: int,
+        nutrition_score: int,
+    ) -> PlanMetrics:
+        calories = [sum(meal.calories for meal in day) for day in days]
+        deviations = [
+            abs(value - request.target_calories) / request.target_calories * 100
+            for value in calories
+        ] if request.target_calories else []
+        total_protein = sum(meal.protein_g for day in days for meal in day)
+        total_protein_target = request.target_protein_g * request.days
+        protein_shortage = max(0.0, total_protein_target - total_protein)
+        type_counts: dict[str, dict[int, int]] = {}
+        for day in days:
+            for meal in day:
+                for dish in meal.dishes:
+                    counts = type_counts.setdefault(dish.dish_type.value, {})
+                    counts[dish.dish_id] = counts.get(dish.dish_id, 0) + 1
+        repeat_counts = {
+            ("side" if dish_type in {"soup", "vegetable_side"} else dish_type): 0
+            for dish_type in type_counts
+        }
+        for dish_type, counts in type_counts.items():
+            key = "side" if dish_type in {"soup", "vegetable_side"} else dish_type
+            repeat_counts[key] = repeat_counts.get(key, 0) + sum(max(0, count - 1) for count in counts.values())
+        return PlanMetrics(
+            average_calorie_deviation_pct=round(sum(deviations) / len(deviations), 1) if deviations else 0.0,
+            maximum_calorie_deviation_pct=round(max(deviations), 1) if deviations else 0.0,
+            protein_shortage_pct=round(protein_shortage / total_protein_target * 100, 1) if total_protein_target else 0.0,
+            repeat_counts=repeat_counts,
+            solver_time_ms=solver_time_ms,
+            nutrition_score=nutrition_score,
         )

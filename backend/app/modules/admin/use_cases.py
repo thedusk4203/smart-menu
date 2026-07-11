@@ -16,7 +16,6 @@ from app.core.security import hash_password
 from app.modules.admin.schemas import (
     AdminDishWrite,
     AdminIngredientWrite,
-    AdminMealSetWrite,
     AdminUserCreate,
 )
 from app.shared.enums import DishType, FoodGroup, UserRole
@@ -82,6 +81,52 @@ def _as_float(value: Any, field: str, row_number: int, *, default: float | None 
         raise ValueError(f"{field} phải là số") from exc
 
 
+def _as_money(
+    value: Any,
+    field: str,
+    row_number: int,
+    *,
+    default: float | None = None,
+    max_fraction_digits: int = 0,
+) -> float | None:
+    """Đọc số tiền thô hoặc định dạng Việt Nam từ CSV/XLSX thành số chuẩn."""
+    if value is None or str(value).strip() == "":
+        return default
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        result = float(value)
+    else:
+        raw = str(value).strip().replace("đ", "").replace("Đ", "")
+        raw = re.sub(r"\s+", "", raw)
+        if not raw or not re.fullmatch(r"[0-9.,]+", raw):
+            raise ValueError(f"{field} phải là số tiền hợp lệ")
+        fraction = ""
+        if "," in raw:
+            if raw.count(",") != 1:
+                raise ValueError(f"{field} phải là số tiền hợp lệ")
+            integer, fraction = raw.split(",")
+            integer = integer.replace(".", "")
+        elif re.fullmatch(r"\d{1,3}(?:\.\d{3})+", raw):
+            integer = raw.replace(".", "")
+        elif re.fullmatch(r"\d+", raw):
+            integer = raw
+        elif re.fullmatch(r"\d+\.\d+", raw):
+            integer, fraction = raw.split(".")
+        else:
+            raise ValueError(f"{field} phải là số tiền hợp lệ")
+        if not integer.isdigit() or (fraction and not fraction.isdigit()):
+            raise ValueError(f"{field} phải là số tiền hợp lệ")
+        if fraction and max_fraction_digits == 0:
+            raise ValueError(f"{field} phải là số nguyên đồng")
+        if len(fraction) > max_fraction_digits:
+            raise ValueError(f"{field} chỉ được có tối đa {max_fraction_digits} số lẻ")
+        result = float(f"{integer}.{fraction}" if fraction else integer)
+    if result < 0:
+        raise ValueError(f"{field} không được âm")
+    if max_fraction_digits == 0 and not result.is_integer():
+        raise ValueError(f"{field} phải là số nguyên đồng")
+    return result
+
+
 class AdminService:
     """Ứng dụng quản trị tập trung cho dashboard, dữ liệu canonical và import.
 
@@ -91,6 +136,19 @@ class AdminService:
 
     def __init__(self, session: Session) -> None:
         self.session = session
+
+    def _validate_catalog_tags(self, tags: list[str]) -> None:
+        names = [" ".join(str(tag).split()) for tag in tags if str(tag).strip()]
+        if not names:
+            return
+        rows = self.session.execute(
+            text("SELECT name FROM tag_catalog WHERE is_active=TRUE AND name = ANY(:names)"),
+            {"names": names},
+        ).fetchall()
+        found = {row.name for row in rows}
+        missing = [name for name in names if name not in found]
+        if missing:
+            raise ValidationAppError("Thẻ chưa có trong danh mục hoặc đã ngừng dùng: " + ", ".join(missing))
 
     def _audit(
         self,
@@ -129,7 +187,12 @@ class AdminService:
                     (SELECT COUNT(*) FROM ingredients) AS ingredients_total,
                     (SELECT COUNT(*) FROM ingredients WHERE is_active) AS ingredients_active,
                     (SELECT COUNT(*) FROM dishes) AS dishes_total,
-                    (SELECT COUNT(*) FROM meal_sets) AS meal_sets_total,
+                    (SELECT COUNT(*) FROM v_dish_candidates) AS planner_ready_dishes,
+                    (SELECT COUNT(*) FROM v_dish_candidates WHERE dish_type = 'breakfast') AS breakfast_count,
+                    (SELECT COUNT(*) FROM v_dish_candidates WHERE dish_type = 'staple') AS staple_count,
+                    (SELECT COUNT(*) FROM v_dish_candidates WHERE dish_type = 'savory') AS savory_count,
+                    (SELECT COUNT(*) FROM v_dish_candidates WHERE dish_type = 'vegetable_side') AS vegetable_count,
+                    (SELECT COUNT(*) FROM v_dish_candidates WHERE dish_type = 'soup') AS soup_count,
                     (SELECT COUNT(*) FROM ingredients i WHERE NOT EXISTS (
                         SELECT 1 FROM price_snapshots p
                         WHERE p.ingredient_id = i.id AND p.price_per_default_unit IS NOT NULL
@@ -140,8 +203,7 @@ class AdminService:
                     (SELECT COUNT(*) FROM ingredients
                      WHERE default_unit NOT IN ('g', 'gram') AND grams_per_unit = 1) AS missing_conversion,
                     (SELECT COUNT(*) FROM dishes d WHERE
-                        NULLIF(BTRIM(COALESCE(d.instructions, '')), '') IS NULL
-                        OR NOT EXISTS (SELECT 1 FROM dish_ingredients di WHERE di.dish_id = d.id)
+                        NOT EXISTS (SELECT 1 FROM dish_ingredients di WHERE di.dish_id = d.id)
                         OR EXISTS (
                             SELECT 1 FROM dish_ingredients di
                             LEFT JOIN nutrition_facts n ON n.ingredient_id = di.ingredient_id
@@ -160,7 +222,6 @@ class AdminService:
                         SELECT COUNT(*) AS group_size FROM (
                             SELECT LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g')) AS n FROM ingredients
                             UNION ALL SELECT LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g')) FROM dishes
-                            UNION ALL SELECT LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g')) FROM meal_sets
                         ) names GROUP BY n HAVING COUNT(*) > 1
                     ) duplicate_groups) AS duplicate_names,
                     (SELECT MAX(created_at) FROM import_jobs) AS last_import_at"""
@@ -391,6 +452,69 @@ class AdminService:
             items.append(data)
         return {"items": items, "total": total, "limit": limit, "offset": offset}
 
+    def export_ingredients(
+        self,
+        output_format: str,
+        search: str | None,
+        food_group: str | None,
+        status: str | None,
+        quality: str | None,
+    ) -> tuple[bytes, str, str]:
+        where = ["1=1"]
+        params: dict[str, Any] = {}
+        if search:
+            where.append("i.name ILIKE :search")
+            params["search"] = f"%{search.strip()}%"
+        if food_group:
+            where.append("i.food_group::text = :food_group")
+            params["food_group"] = food_group
+        if status == "active":
+            where.append("i.is_active")
+        elif status == "inactive":
+            where.append("NOT i.is_active")
+        if quality == "missing_price":
+            where.append("(p.id IS NULL OR p.price_per_default_unit IS NULL)")
+        elif quality == "missing_nutrition":
+            where.append("n.id IS NULL")
+        elif quality == "missing_conversion":
+            where.append("i.default_unit NOT IN ('g', 'gram') AND i.grams_per_unit = 1")
+        joins = """LEFT JOIN nutrition_facts n ON n.ingredient_id = i.id
+                   LEFT JOIN LATERAL (
+                       SELECT id, price, unit, price_per_default_unit, source, recorded_at
+                       FROM price_snapshots WHERE ingredient_id = i.id
+                       ORDER BY recorded_at DESC LIMIT 1
+                   ) p ON TRUE"""
+        rows = self.session.execute(
+            text(
+                f"""SELECT i.id, i.code, i.name, i.food_group, i.default_unit, i.grams_per_unit,
+                           n.calories, n.protein_g, n.carbs_g, n.fat_g, n.fiber_g,
+                           p.price, p.unit AS price_unit, p.price_per_default_unit, p.source, i.is_active
+                    FROM ingredients i {joins}
+                    WHERE {' AND '.join(where)}
+                    ORDER BY i.updated_at DESC, i.name"""
+            ),
+            params,
+        ).fetchall()
+        records = []
+        for row in rows:
+            data = _row_dict(row)
+            records.append({
+                "id": data["id"], "code": data["code"], "name": data["name"],
+                "food_group": _enum_value(data["food_group"]), "default_unit": data["default_unit"],
+                "grams_per_unit": float(data["grams_per_unit"]),
+                "calories": float(data["calories"]) if data["calories"] is not None else None,
+                "protein_g": float(data["protein_g"]) if data["protein_g"] is not None else None,
+                "carbs_g": float(data["carbs_g"]) if data["carbs_g"] is not None else None,
+                "fat_g": float(data["fat_g"]) if data["fat_g"] is not None else None,
+                "fiber_g": float(data["fiber_g"]) if data["fiber_g"] is not None else None,
+                "price": float(data["price"]) if data["price"] is not None else None,
+                "price_unit": data["price_unit"],
+                "price_per_default_unit": float(data["price_per_default_unit"])
+                if data["price_per_default_unit"] is not None else None,
+                "source": data["source"], "is_active": data["is_active"],
+            })
+        return self._build_export_file("ingredients", output_format, records)
+
     def save_ingredient(
         self,
         data: AdminIngredientWrite,
@@ -490,8 +614,7 @@ class AdminService:
                          COALESCE(v.total_fat_g, 0) AS total_fat_g,
                          COALESCE(v.estimated_cost, 0) AS estimated_cost,
                          COALESCE(v.ingredient_count, 0) AS ingredient_count,
-                         (COALESCE(v.ingredient_count, 0) = 0 OR
-                          NULLIF(BTRIM(COALESCE(d.instructions, '')), '') IS NULL) AS missing_recipe,
+                         (COALESCE(v.ingredient_count, 0) = 0) AS missing_recipe,
                          EXISTS (
                            SELECT 1 FROM dish_ingredients di
                            WHERE di.dish_id = d.id AND NOT EXISTS (
@@ -562,7 +685,7 @@ class AdminService:
         elif status == "inactive":
             where.append("NOT d.is_active")
         if quality == "missing_recipe":
-            where.append("(COALESCE(v.ingredient_count, 0) = 0 OR NULLIF(BTRIM(COALESCE(d.instructions, '')), '') IS NULL)")
+            where.append("COALESCE(v.ingredient_count, 0) = 0")
         elif quality == "missing_price":
             where.append("EXISTS (SELECT 1 FROM dish_ingredients di WHERE di.dish_id = d.id AND NOT EXISTS (SELECT 1 FROM price_snapshots p WHERE p.ingredient_id = di.ingredient_id AND p.price_per_default_unit IS NOT NULL))")
         elif quality == "missing_nutrition":
@@ -585,12 +708,85 @@ class AdminService:
             items.append(data)
         return {"items": items, "total": total, "limit": limit, "offset": offset}
 
+    def export_dishes(
+        self,
+        output_format: str,
+        search: str | None,
+        dish_type: str | None,
+        status: str | None,
+        quality: str | None,
+    ) -> tuple[bytes, str, str]:
+        where = ["1=1"]
+        params: dict[str, Any] = {}
+        if search:
+            where.append("d.name ILIKE :search")
+            params["search"] = f"%{search.strip()}%"
+        if dish_type:
+            where.append("d.dish_type::text = :dtype")
+            params["dtype"] = dish_type
+        if status == "active":
+            where.append("d.is_active")
+        elif status == "inactive":
+            where.append("NOT d.is_active")
+        if quality == "missing_recipe":
+            where.append("NOT EXISTS (SELECT 1 FROM dish_ingredients di WHERE di.dish_id = d.id)")
+        elif quality == "missing_price":
+            where.append("EXISTS (SELECT 1 FROM dish_ingredients di WHERE di.dish_id = d.id AND NOT EXISTS (SELECT 1 FROM price_snapshots p WHERE p.ingredient_id = di.ingredient_id AND p.price_per_default_unit IS NOT NULL))")
+        elif quality == "missing_nutrition":
+            where.append("EXISTS (SELECT 1 FROM dish_ingredients di LEFT JOIN nutrition_facts n ON n.ingredient_id = di.ingredient_id WHERE di.dish_id = d.id AND n.id IS NULL)")
+        rows = self.session.execute(
+            text(
+                f"""SELECT d.id, d.code, d.name, d.dish_type, d.cooking_method, d.description,
+                           d.instructions, d.tags, d.is_active,
+                           COALESCE(
+                               jsonb_agg(jsonb_build_object(
+                                   'ingredient_id', di.ingredient_id, 'name', i.name,
+                                   'quantity', di.quantity, 'unit', di.unit
+                               ) ORDER BY i.name) FILTER (WHERE di.ingredient_id IS NOT NULL),
+                               '[]'::jsonb
+                           ) AS ingredients
+                    FROM dishes d
+                    LEFT JOIN dish_ingredients di ON di.dish_id = d.id
+                    LEFT JOIN ingredients i ON i.id = di.ingredient_id
+                    WHERE {' AND '.join(where)}
+                    GROUP BY d.id
+                    ORDER BY d.updated_at DESC, d.name"""
+            ),
+            params,
+        ).fetchall()
+        records = []
+        for row in rows:
+            data = _row_dict(row)
+            ingredients = data.get("ingredients") or []
+            if isinstance(ingredients, str):
+                ingredients = json.loads(ingredients)
+            tags = data.get("tags") or []
+            if isinstance(tags, str):
+                tags = json.loads(tags)
+            records.append({
+                "id": data["id"], "code": data["code"], "name": data["name"],
+                "dish_type": _enum_value(data["dish_type"]),
+                "cooking_method": _enum_value(data["cooking_method"]) if data["cooking_method"] else None,
+                "description": data["description"], "instructions": data["instructions"],
+                "tags": ", ".join(str(tag).strip() for tag in tags if str(tag).strip()),
+                "ingredients_json": _json([
+                    {
+                        "ingredient_id": item["ingredient_id"], "name": item["name"],
+                        "quantity": float(item["quantity"]), "unit": item["unit"],
+                    }
+                    for item in ingredients
+                ]),
+                "is_active": data["is_active"],
+            })
+        return self._build_export_file("dishes", output_format, records)
+
     def save_dish(
         self,
         data: AdminDishWrite,
         actor_id: int,
         dish_id: int | None = None,
     ) -> dict[str, Any]:
+        self._validate_catalog_tags(data.tags)
         ids = [i.ingredient_id for i in data.ingredients]
         if len(ids) != len(set(ids)):
             raise ValidationAppError("Mỗi nguyên liệu chỉ được xuất hiện một lần trong công thức")
@@ -607,11 +803,36 @@ class AdminService:
         if duplicate:
             raise ConflictError("Tên món đã tồn tại")
         if ids:
-            found = self.session.execute(
-                text("SELECT COUNT(*) FROM ingredients WHERE id = ANY(:ids)"), {"ids": ids}
-            ).scalar_one()
-            if found != len(ids):
+            ingredient_rows = self.session.execute(
+                text(
+                    """SELECT i.id, i.default_unit, i.is_active,
+                              EXISTS (SELECT 1 FROM nutrition_facts n WHERE n.ingredient_id = i.id) AS has_nutrition,
+                              EXISTS (SELECT 1 FROM price_snapshots p
+                                      WHERE p.ingredient_id = i.id
+                                        AND p.price_per_default_unit IS NOT NULL) AS has_price
+                       FROM ingredients i WHERE i.id = ANY(:ids)"""
+                ),
+                {"ids": ids},
+            ).fetchall()
+            if len(ingredient_rows) != len(ids):
                 raise ValidationAppError("Công thức chứa nguyên liệu không tồn tại")
+            if data.is_active:
+                by_id = {row.id: row for row in ingredient_rows}
+                problems: list[str] = []
+                for item in data.ingredients:
+                    ingredient = by_id[item.ingredient_id]
+                    if not ingredient.is_active:
+                        problems.append(f"nguyên liệu id={item.ingredient_id} đang inactive")
+                    if not ingredient.has_nutrition:
+                        problems.append(f"nguyên liệu id={item.ingredient_id} thiếu dinh dưỡng")
+                    if not ingredient.has_price:
+                        problems.append(f"nguyên liệu id={item.ingredient_id} thiếu giá chuẩn hoá")
+                    if item.unit != ingredient.default_unit:
+                        problems.append(
+                            f"đơn vị '{item.unit}' của nguyên liệu id={item.ingredient_id} không khớp default_unit '{ingredient.default_unit}'"
+                        )
+                if problems:
+                    raise ValidationAppError("Không thể kích hoạt dish: " + "; ".join(problems))
         before = self._dish_from_db(dish_id) if dish_id else None
         payload = {
             "name": data.name,
@@ -662,168 +883,27 @@ class AdminService:
 
     def set_dish_active(self, dish_id: int, active: bool, actor_id: int) -> dict[str, Any]:
         before = self._dish_from_db(dish_id)
-        if active and before["ingredient_count"] == 0:
-            raise ValidationAppError("Không thể kích hoạt món chưa có nguyên liệu")
+        if active:
+            ready = self.session.execute(
+                text(
+                    """SELECT ingredient_count, has_complete_nutrition, has_complete_price,
+                              all_ingredients_active
+                       FROM v_dishes_full WHERE id = :id"""
+                ),
+                {"id": dish_id},
+            ).first()
+            if not ready or not (
+                ready.ingredient_count > 0
+                and ready.has_complete_nutrition
+                and ready.has_complete_price
+                and ready.all_ingredients_active
+            ):
+                raise ValidationAppError(
+                    "Không thể kích hoạt dish thiếu recipe, nutrition, price hoặc chứa nguyên liệu inactive"
+                )
         self.session.execute(text("UPDATE dishes SET is_active = :active WHERE id = :id"), {"active": active, "id": dish_id})
         after = self._dish_from_db(dish_id)
         self._audit(actor_id, "restore" if active else "deactivate", "dish", dish_id, before, after)
-        self.session.commit()
-        return after
-
-    # ------------------------------------------------------------------ meal sets
-    def _meal_set_from_db(self, meal_set_id: int) -> dict[str, Any]:
-        row = self.session.execute(
-            text(
-                """SELECT ms.id, ms.name, ms.meal_type, ms.description, ms.tags, ms.is_active,
-                          COALESCE(v.total_calories, 0) AS total_calories,
-                          COALESCE(v.total_protein_g, 0) AS total_protein_g,
-                          COALESCE(v.total_carbs_g, 0) AS total_carbs_g,
-                          COALESCE(v.total_fat_g, 0) AS total_fat_g,
-                          COALESCE(v.estimated_cost, 0) AS estimated_cost,
-                          COALESCE(v.dish_count, 0) AS dish_count,
-                          COALESCE(v.all_dishes_active, TRUE) AS all_dishes_active,
-                          (COALESCE(v.dish_count, 0) = 0) AS missing_recipe,
-                          ms.created_at, ms.updated_at, COALESCE(v.dishes, '[]'::jsonb) AS dishes
-                   FROM meal_sets ms LEFT JOIN v_meal_sets_full v ON v.id = ms.id
-                   WHERE ms.id = :id"""
-            ),
-            {"id": meal_set_id},
-        ).first()
-        if not row:
-            raise NotFoundError("Không tìm thấy bữa/mâm món")
-        data = _row_dict(row)
-        for key in ("total_calories", "total_protein_g", "total_carbs_g", "total_fat_g", "estimated_cost"):
-            data[key] = float(data[key] or 0)
-        return data
-
-    def list_meal_sets(
-        self,
-        search: str | None,
-        meal_type: str | None,
-        status: str | None,
-        limit: int,
-        offset: int,
-    ) -> dict[str, Any]:
-        where = ["1=1"]
-        params: dict[str, Any] = {"limit": limit, "offset": offset}
-        if search:
-            where.append("ms.name ILIKE :search")
-            params["search"] = f"%{search.strip()}%"
-        if meal_type:
-            where.append("ms.meal_type::text = :meal_type")
-            params["meal_type"] = meal_type
-        if status == "active":
-            where.append("ms.is_active")
-        elif status == "inactive":
-            where.append("NOT ms.is_active")
-        clause = " AND ".join(where)
-        total = self.session.execute(text(f"SELECT COUNT(*) FROM meal_sets ms WHERE {clause}"), params).scalar_one()
-        rows = self.session.execute(
-            text(
-                f"""SELECT ms.id, ms.name, ms.meal_type, ms.description, ms.tags, ms.is_active,
-                           COALESCE(v.total_calories, 0) AS total_calories,
-                           COALESCE(v.total_protein_g, 0) AS total_protein_g,
-                           COALESCE(v.total_carbs_g, 0) AS total_carbs_g,
-                           COALESCE(v.total_fat_g, 0) AS total_fat_g,
-                           COALESCE(v.estimated_cost, 0) AS estimated_cost,
-                           COALESCE(v.dish_count, 0) AS dish_count,
-                           COALESCE(v.all_dishes_active, TRUE) AS all_dishes_active,
-                           (COALESCE(v.dish_count, 0) = 0) AS missing_recipe,
-                           ms.created_at, ms.updated_at, COALESCE(v.dishes, '[]'::jsonb) AS dishes
-                    FROM meal_sets ms LEFT JOIN v_meal_sets_full v ON v.id = ms.id
-                    WHERE {clause} ORDER BY ms.updated_at DESC, ms.name
-                    LIMIT :limit OFFSET :offset"""
-            ),
-            params,
-        ).fetchall()
-        items = []
-        for row in rows:
-            data = _row_dict(row)
-            for key in ("total_calories", "total_protein_g", "total_carbs_g", "total_fat_g", "estimated_cost"):
-                data[key] = float(data[key] or 0)
-            items.append(data)
-        return {"items": items, "total": total, "limit": limit, "offset": offset}
-
-    def save_meal_set(
-        self,
-        data: AdminMealSetWrite,
-        actor_id: int,
-        meal_set_id: int | None = None,
-    ) -> dict[str, Any]:
-        dish_ids = [d.dish_id for d in data.dishes]
-        if len(dish_ids) != len(set(dish_ids)):
-            raise ValidationAppError("Mỗi món chỉ được xuất hiện một lần trong bữa")
-        if data.is_active and not dish_ids:
-            raise ValidationAppError("Bữa đang hoạt động phải có ít nhất một món")
-        if dish_ids:
-            found = self.session.execute(text("SELECT COUNT(*) FROM dishes WHERE id = ANY(:ids)"), {"ids": dish_ids}).scalar_one()
-            if found != len(dish_ids):
-                raise ValidationAppError("Bữa chứa món không tồn tại")
-        duplicate = self.session.execute(
-            text(
-                """SELECT id FROM meal_sets
-                   WHERE LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g')) = :name
-                     AND (:id IS NULL OR id <> :id)"""
-            ),
-            {"name": _normalized(data.name), "id": meal_set_id},
-        ).first()
-        if duplicate:
-            raise ConflictError("Tên bữa/mâm món đã tồn tại")
-        before = self._meal_set_from_db(meal_set_id) if meal_set_id else None
-        payload = {
-            "name": data.name,
-            "meal_type": data.meal_type.value,
-            "description": data.description,
-            "tags": _json(data.tags),
-            "active": data.is_active,
-        }
-        if meal_set_id is None:
-            row = self.session.execute(
-                text(
-                    """INSERT INTO meal_sets (name, meal_type, description, tags, is_active)
-                       VALUES (:name, CAST(:meal_type AS meal_type), :description,
-                               CAST(:tags AS jsonb), :active) RETURNING id"""
-                ),
-                payload,
-            ).first()
-            meal_set_id = row.id
-            action = "create"
-        else:
-            self.session.execute(
-                text(
-                    """UPDATE meal_sets SET name = :name, meal_type = CAST(:meal_type AS meal_type),
-                           description = :description, tags = CAST(:tags AS jsonb), is_active = :active
-                       WHERE id = :id"""
-                ),
-                {**payload, "id": meal_set_id},
-            )
-            self.session.execute(text("DELETE FROM meal_set_dishes WHERE meal_set_id = :id"), {"id": meal_set_id})
-            action = "update"
-        for item in data.dishes:
-            self.session.execute(
-                text(
-                    """INSERT INTO meal_set_dishes (meal_set_id, dish_id, role, sort_order)
-                       VALUES (:meal_set_id, :dish_id, CAST(:role AS dish_role), :sort_order)"""
-                ),
-                {
-                    "meal_set_id": meal_set_id,
-                    "dish_id": item.dish_id,
-                    "role": item.role.value,
-                    "sort_order": item.sort_order,
-                },
-            )
-        after = self._meal_set_from_db(meal_set_id)
-        self._audit(actor_id, action, "meal_set", meal_set_id, before, after)
-        self.session.commit()
-        return after
-
-    def set_meal_set_active(self, meal_set_id: int, active: bool, actor_id: int) -> dict[str, Any]:
-        before = self._meal_set_from_db(meal_set_id)
-        if active and before["dish_count"] == 0:
-            raise ValidationAppError("Không thể kích hoạt bữa chưa có món")
-        self.session.execute(text("UPDATE meal_sets SET is_active = :active WHERE id = :id"), {"active": active, "id": meal_set_id})
-        after = self._meal_set_from_db(meal_set_id)
-        self._audit(actor_id, "restore" if active else "deactivate", "meal_set", meal_set_id, before, after)
         self.session.commit()
         return after
 
@@ -851,9 +931,8 @@ class AdminService:
             FROM ingredients i WHERE i.default_unit NOT IN ('g', 'gram') AND i.grams_per_unit = 1
             UNION ALL
             SELECT 'dish', d.id, d.name, 'missing_recipe', 'error',
-                   'Thiếu công thức', 'Món chưa có nguyên liệu hoặc chưa có hướng dẫn chế biến.', d.updated_at
-            FROM dishes d WHERE NULLIF(BTRIM(COALESCE(d.instructions, '')), '') IS NULL
-               OR NOT EXISTS (SELECT 1 FROM dish_ingredients di WHERE di.dish_id = d.id)
+                   'Thiếu công thức', 'Món chưa có nguyên liệu trong công thức.', d.updated_at
+            FROM dishes d WHERE NOT EXISTS (SELECT 1 FROM dish_ingredients di WHERE di.dish_id = d.id)
             UNION ALL
             SELECT 'dish', d.id, d.name, 'missing_price', 'error',
                    'Không tính được chi phí', 'Ít nhất một nguyên liệu trong món đang thiếu giá.', d.updated_at
@@ -872,12 +951,6 @@ class AdminService:
                 WHERE di.dish_id = d.id AND n.id IS NULL
             )
             UNION ALL
-            SELECT 'meal_set', ms.id, ms.name, 'missing_recipe', 'error',
-                   'Bữa chưa có món', 'Bữa/mâm món chưa có món thành phần.', ms.updated_at
-            FROM meal_sets ms WHERE NOT EXISTS (
-                SELECT 1 FROM meal_set_dishes md WHERE md.meal_set_id = ms.id
-            )
-            UNION ALL
             SELECT src.entity_type, src.id, src.name, 'duplicate_name', 'warning',
                    'Tên có khả năng trùng', 'Tên chuẩn hóa trùng với một bản ghi khác.', src.updated_at
             FROM (
@@ -885,13 +958,10 @@ class AdminService:
                        LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g')) normalized FROM ingredients
                 UNION ALL SELECT 'dish', id, name, updated_at,
                        LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g')) FROM dishes
-                UNION ALL SELECT 'meal_set', id, name, updated_at,
-                       LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g')) FROM meal_sets
             ) src JOIN (
                 SELECT normalized FROM (
                     SELECT LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g')) normalized FROM ingredients
                     UNION ALL SELECT LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g')) FROM dishes
-                    UNION ALL SELECT LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g')) FROM meal_sets
                 ) all_names GROUP BY normalized HAVING COUNT(*) > 1
             ) duplicates USING (normalized)
         )"""
@@ -929,6 +999,84 @@ class AdminService:
         return {"items": [_row_dict(r) for r in rows], "total": total, "limit": limit, "offset": offset}
 
     # ------------------------------------------------------------------ imports
+    def _build_export_file(
+        self,
+        entity_type: str,
+        output_format: str,
+        records: list[dict[str, Any]],
+    ) -> tuple[bytes, str, str]:
+        definitions = {
+            "ingredients": {
+                "headers": [
+                    "id", "code", "name", "food_group", "default_unit", "grams_per_unit",
+                    "calories", "protein_g", "carbs_g", "fat_g", "fiber_g", "price",
+                    "price_unit", "price_per_default_unit", "source", "is_active",
+                ],
+                "notes": [
+                    "File dùng đúng cấu trúc import nguyên liệu và có thể chỉnh sửa rồi import lại.",
+                    "Giá là số sạch, không có ký hiệu tiền hoặc dấu phân cách.",
+                ],
+            },
+            "dishes": {
+                "headers": [
+                    "id", "code", "name", "dish_type", "cooking_method", "description",
+                    "instructions", "tags", "ingredients_json", "is_active",
+                ],
+                "notes": [
+                    "File dùng đúng cấu trúc import món ăn (món thành phần).",
+                    "Import nguyên liệu trước, sau đó mới import món ăn để các thành phần được đối chiếu.",
+                ],
+            },
+        }
+        if entity_type not in definitions or output_format not in {"csv", "xlsx"}:
+            raise ValidationAppError("Không hỗ trợ loại file export này")
+
+        definition = definitions[entity_type]
+        headers = definition["headers"]
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        filename = f"smart-menu-{entity_type}-export-{timestamp}.{output_format}"
+        if output_format == "csv":
+            stream = io.StringIO(newline="")
+            writer = csv.DictWriter(stream, fieldnames=headers, extrasaction="ignore")
+            writer.writeheader()
+            writer.writerows(records)
+            return stream.getvalue().encode("utf-8-sig"), "text/csv; charset=utf-8", filename
+
+        try:
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, PatternFill
+            from openpyxl.utils import get_column_letter
+        except ImportError as exc:  # pragma: no cover - kiểm tra ở môi trường đóng gói
+            raise ValidationAppError("Backend chưa cài thư viện tạo XLSX") from exc
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Dữ liệu"
+        sheet.append(headers)
+        for record in records:
+            sheet.append([record.get(header) for header in headers])
+        sheet.freeze_panes = "A2"
+        sheet.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{max(1, len(records) + 1)}"
+        header_fill = PatternFill("solid", fgColor="047857")
+        for index, header in enumerate(headers, start=1):
+            cell = sheet.cell(row=1, column=index)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = header_fill
+            sheet.column_dimensions[get_column_letter(index)].width = min(max(len(header) + 4, 14), 28)
+
+        guide = workbook.create_sheet("Hướng dẫn")
+        guide.append(["Hướng dẫn export"])
+        guide["A1"].font = Font(bold=True, color="FFFFFF")
+        guide["A1"].fill = header_fill
+        guide.append([f"Số bản ghi: {len(records)}"])
+        for note in definition["notes"]:
+            guide.append([note])
+        guide.column_dimensions["A"].width = 110
+
+        output = io.BytesIO()
+        workbook.save(output)
+        return output.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename
+
     def import_template(self, entity_type: str, output_format: str) -> tuple[bytes, str, str]:
         templates = {
             "ingredients": {
@@ -954,6 +1102,7 @@ class AdminService:
                     "code: mã riêng, duy nhất; để trống sẽ không thay đổi mã hiện có khi replace.",
                     "dish_type: staple, savory, soup, vegetable_side, side hoặc breakfast.",
                     "ingredients_json: mảng JSON với ingredient_id hoặc name, quantity và unit.",
+                    "Import nguyên liệu trước, sau đó mới import món ăn để các thành phần được đối chiếu.",
                 ],
             },
         }
@@ -1062,6 +1211,54 @@ class AdminService:
             return [dict(zip(headers, row)) for row in rows if any(v is not None and str(v).strip() for v in row)]
         raise ValidationAppError("Chỉ hỗ trợ file CSV hoặc XLSX")
 
+    def _parse_dish_ingredients(self, raw_ingredients: Any, dish_name: str) -> list[dict[str, Any]]:
+        if not isinstance(raw_ingredients, list):
+            raise ValueError("ingredients_json phải là một JSON array")
+        parsed: list[dict[str, Any]] = []
+        seen_ingredients: set[int] = set()
+        for position, item in enumerate(raw_ingredients, start=1):
+            if not isinstance(item, dict):
+                raise ValueError(f"Thành phần #{position} phải là một object JSON")
+            ingredient_id = _as_optional_id(item.get("ingredient_id"))
+            ingredient_name = " ".join(str(item.get("name") or "").split())
+            by_id = None
+            if ingredient_id is not None:
+                by_id = self.session.execute(
+                    text("SELECT id, name, default_unit FROM ingredients WHERE id=:id"), {"id": ingredient_id}
+                ).first()
+                if not by_id:
+                    raise ValueError(f"Không tìm thấy nguyên liệu id={ingredient_id} trong món {dish_name}")
+            by_name = None
+            if ingredient_name:
+                by_name = self.session.execute(
+                    text("""SELECT id, name, default_unit FROM ingredients
+                            WHERE LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g'))=:name"""),
+                    {"name": _normalized(ingredient_name)},
+                ).first()
+                if not by_name:
+                    raise ValueError(f"Không tìm thấy nguyên liệu '{ingredient_name}' trong món {dish_name}")
+            if not by_id and not by_name:
+                raise ValueError(f"Thành phần #{position} cần ingredient_id hoặc name")
+            if by_id and by_name and by_id.id != by_name.id:
+                raise ValueError(f"ingredient_id và name của thành phần #{position} trỏ tới hai nguyên liệu khác nhau")
+            resolved_id = (by_id or by_name).id
+            if resolved_id in seen_ingredients:
+                raise ValueError(f"Nguyên liệu bị lặp trong món {dish_name}")
+            quantity = _as_float(item.get("quantity"), "quantity", position)
+            if quantity is None or quantity <= 0:
+                raise ValueError(f"Định lượng thành phần #{position} phải lớn hơn 0")
+            unit = str(item.get("unit") or "").strip()
+            if not unit:
+                raise ValueError(f"Thành phần #{position} thiếu unit")
+            expected_unit = str((by_id or by_name).default_unit).strip()
+            if unit.casefold() != expected_unit.casefold():
+                raise ValueError(
+                    f"Đơn vị '{unit}' của thành phần #{position} không khớp đơn vị mặc định '{expected_unit}'"
+                )
+            seen_ingredients.add(resolved_id)
+            parsed.append({"ingredient_id": resolved_id, "quantity": quantity, "unit": expected_unit})
+        return parsed
+
     def preview_import(
         self,
         entity_type: str,
@@ -1120,9 +1317,12 @@ class AdminService:
                     price = None
                     if has_price:
                         price = {
-                            "price": _as_float(raw.get("price"), "price", index, default=0),
+                            "price": _as_money(raw.get("price"), "price", index, default=0),
                             "unit": str(raw.get("price_unit") or raw.get("unit") or "kg").strip(),
-                            "price_per_default_unit": _as_float(raw.get("price_per_default_unit"), "price_per_default_unit", index),
+                            "price_per_default_unit": _as_money(
+                                raw.get("price_per_default_unit"), "price_per_default_unit", index,
+                                max_fraction_digits=4,
+                            ),
                             "source": str(raw.get("source") or "").strip() or None,
                         }
                         if price["price_per_default_unit"] is None:
@@ -1145,8 +1345,7 @@ class AdminService:
                         raise ValueError("dish_type không hợp lệ")
                     ingredients_raw = raw.get("ingredients_json") or raw.get("ingredients") or "[]"
                     ingredients = json.loads(ingredients_raw) if isinstance(ingredients_raw, str) else ingredients_raw
-                    if not isinstance(ingredients, list):
-                        raise ValueError("ingredients_json phải là một JSON array")
+                    ingredients = self._parse_dish_ingredients(ingredients, name)
                     valid.append({
                         "source_row": index,
                         "id": record_id,
@@ -1266,19 +1465,16 @@ class AdminService:
                 else:
                     ingredient_payload = []
                     for item in raw.get("ingredients", []):
-                        ingredient_id = item.get("ingredient_id")
-                        if not ingredient_id and item.get("name"):
-                            found = self.session.execute(
-                                text("SELECT id FROM ingredients WHERE LOWER(name) = LOWER(:name)"),
-                                {"name": item["name"]},
-                            ).first()
-                            ingredient_id = found.id if found else None
-                        if not ingredient_id:
+                        ingredient_id = _as_optional_id(item.get("ingredient_id"))
+                        found = self.session.execute(
+                            text("SELECT id FROM ingredients WHERE id=:id"), {"id": ingredient_id}
+                        ).first() if ingredient_id else None
+                        if not found:
                             raise ValidationAppError(f"Không tìm thấy nguyên liệu trong món {raw['name']}")
                         ingredient_payload.append({
-                            "ingredient_id": ingredient_id,
+                            "ingredient_id": found.id,
                             "quantity": float(item.get("quantity") or 0),
-                            "unit": item.get("unit") or "g",
+                            "unit": str(item.get("unit") or "").strip(),
                         })
                     if existing:
                         dish_id = existing["id"]
@@ -1309,6 +1505,8 @@ class AdminService:
                     for item in ingredient_payload:
                         if item["quantity"] <= 0:
                             raise ValidationAppError(f"Định lượng trong món {raw['name']} phải lớn hơn 0")
+                        if not item["unit"]:
+                            raise ValidationAppError(f"Thiếu đơn vị trong món {raw['name']}")
                         self.session.execute(
                             text("""INSERT INTO dish_ingredients (dish_id, ingredient_id, quantity, unit)
                                    VALUES (:dish_id, :ingredient_id, :quantity, :unit)"""),
