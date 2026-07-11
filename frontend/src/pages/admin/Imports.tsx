@@ -191,7 +191,7 @@ export function AdminImports() {
               value={entityType}
               options={[
                 { value: "ingredients", label: "Nguyên liệu" },
-                { value: "dishes", label: "Món thành phần" },
+                { value: "dishes", label: "Món ăn (món thành phần)" },
               ]}
               onChange={(event) => {
                 setEntityType(event.target.value as "ingredients" | "dishes");
@@ -228,6 +228,7 @@ export function AdminImports() {
               <p><strong>id</strong> xác định chính xác bản ghi đang có; để trống khi tạo mới.</p>
               <p><strong>code</strong> là mã riêng, duy nhất. Nếu để trống khi replace, mã hiện có được giữ lại.</p>
               <p>Nếu không có id/code, hệ thống dùng tên chuẩn hóa để phát hiện bản ghi trùng.</p>
+              <p>Import nguyên liệu trước, sau đó mới import món ăn để kiểm tra thành phần chính xác.</p>
             </div>
           </details>
         </section>
@@ -398,7 +399,7 @@ function ImportJobRow({ item }: { item: ImportJob }) {
   return (
     <tr>
       <td className="px-5 py-3.5 font-medium text-gray-900">{item.filename}</td>
-      <td className="px-5 py-3.5 text-gray-600">{item.entity_type === "ingredients" ? "Nguyên liệu" : "Món thành phần"}</td>
+      <td className="px-5 py-3.5 text-gray-600">{item.entity_type === "ingredients" ? "Nguyên liệu" : "Món ăn (món thành phần)"}</td>
       <td className="px-5 py-3.5">
         <Badge className={statusClass}>{statusLabel}</Badge>
         <p className="mt-1 text-xs text-gray-600">{item.valid_rows}/{item.total_rows} hợp lệ · {item.error_count} lỗi</p>

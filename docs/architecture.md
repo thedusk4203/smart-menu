@@ -80,8 +80,8 @@ Quy tắc phụ thuộc:
 | `ingredients` | Nguyên liệu, giá, dinh dưỡng | ingredients, nutrition_facts, price_snapshots |
 | `meals` | Món ăn, công thức, định lượng nguyên liệu | meals, meal_ingredients |
 | `nutrition` | Tính BMR/TDEE và macro target | calculator, nutrition target DTO |
-| `meal_planning` | Lọc candidate, scoring, sinh plan, kiểm tra ràng buộc | planner, scorer, constraint_checker |
-| `shopping_lists` | Gộp nguyên liệu từ plan đã validate | shopping list generator |
+| `meal_planning` | Dish candidate, precheck, CP-SAT composition, checker, snapshot V2 | dish_candidate_repository, feasibility, optimizer, planner, constraint_checker |
+| `shopping_lists` | Gộp ingredient snapshot V2; best-effort recipe hiện tại cho V1 | shopping list generator |
 | `ai` | Prompt, parse JSON, giải thích, ngôn ngữ thay thế | prompts, AI client, schema validation |
 | `admin` | Tác vụ quản trị và kiểm tra dữ liệu | data quality checks |
 
@@ -130,12 +130,12 @@ sequenceDiagram
 2. Validate các trường request.
 3. Tải hồ sơ, dị ứng, thực phẩm loại trừ và sở thích.
 4. Tính target dinh dưỡng/ngày.
-5. Tải món đang active và dữ liệu nguyên liệu.
-6. Lọc món theo hard constraints.
-7. Chấm điểm món còn lại theo soft constraints.
-8. Điền món vào từng ngày và từng slot bữa ăn.
-9. Cộng tổng chi phí và dinh dưỡng.
-10. Chạy Constraint Checker.
+5. Tải `v_dish_candidates` planner-ready theo batch.
+6. Tiền kiểm role bắt buộc, budget tối thiểu và macro attainable range.
+7. CP-SAT ghép dish cho toàn bộ ngày: breakfast 1 dish; lunch/dinner 3 dish theo role.
+8. Tối ưu nutrition toàn ngày trước, sau đó đa dạng/preference/cost.
+9. Recompute totals từ dish snapshot và chạy Constraint Checker độc lập.
+10. Lưu schema_version=2 và dùng snapshot để lập shopping list.
 11. Sinh shopping list.
 12. Trả kết quả hợp lệ hoặc infeasible report.
 

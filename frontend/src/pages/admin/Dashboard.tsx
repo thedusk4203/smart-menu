@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  ArrowRight, ChefHat, CircleAlert, Clock3, Database, FileUp, Salad, ShieldCheck, Users,
+  ArrowRight, ChefHat, CircleAlert, Clock3, FileUp, Salad, ShieldCheck, Users,
 } from "lucide-react";
 import { adminApi } from "../../api/adminApi";
 import { useAuth } from "../../context/AuthContext";
@@ -90,7 +90,7 @@ export function AdminDashboard() {
             )}
             <Metric label="Nguyên liệu" value={data.ingredients_total} note={`${data.ingredients_active} đang được sử dụng`} icon={Salad} to="/admin/ingredients" />
             <Metric label="Món thành phần" value={data.dishes_total} note={`${data.incomplete_dishes} món cần bổ sung`} icon={ChefHat} to="/admin/dishes" />
-            <Metric label="Bữa / Mâm món" value={data.meal_sets_total} note="Nguồn candidate của planner" icon={Database} to="/admin/meal-sets" />
+            <Metric label="Món sẵn sàng cho planner" value={data.planner_ready_dishes} note={`Sáng ${data.breakfast_count} · Tinh bột ${data.staple_count} · Mặn ${data.savory_count} · Rau/Canh ${data.vegetable_count + data.soup_count}`} icon={ChefHat} to="/admin/dishes" />
           </section>
 
           <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.7fr)]">
@@ -132,7 +132,7 @@ export function AdminDashboard() {
                 </span>
                 <h2 className="mt-4 font-semibold text-brand-950">Dữ liệu canonical</h2>
                 <p className="mt-1 text-sm leading-6 text-brand-900">
-                  Planner đọc món thành phần và bữa/mâm món. Mọi thay đổi tại đây được dùng ở lần tạo thực đơn tiếp theo.
+                  Planner ghép trực tiếp dish theo vai trò dinh dưỡng. Mọi thay đổi hợp lệ tại đây được dùng ở lần tạo thực đơn tiếp theo.
                 </p>
               </div>
               <div className="rounded-2xl border border-sand-200 bg-white p-5 shadow-sm">

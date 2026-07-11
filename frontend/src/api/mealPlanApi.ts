@@ -9,11 +9,11 @@ type GenerateResult = GeneratedMealPlan | InfeasibleResult;
 export const isInfeasible = (r: GenerateResult): r is InfeasibleResult =>
   (r as InfeasibleResult).status === "infeasible";
 
-// Gate 0: khi luu chi gui id mam com theo ngay/slot; backend recompute totals
-// va gan user tu JWT. Khong gui user_id/total_cost/total_calories/plan_data.
+// Client chỉ gửi dish selection; backend suy ra role từ dish_type, kiểm tra
+// cấu trúc bữa và lưu lại snapshot totals/ingredients.
 export interface SaveSlotInput {
   slot: string;
-  meal_set_id: number;
+  dish_ids: number[];
 }
 export interface SaveDayInput {
   day: number;
@@ -35,6 +35,7 @@ export const mealPlanApi = {
       budget_limit: params.budget_limit ?? null,
       preferred_tags: params.preferred_tags ?? null,
       seed: params.seed ?? null,
+      previous_plan_signature: params.previous_plan_signature ?? null,
     }),
 
   save: (input: SavePlanInput) => api.post<MealPlan>("/api/meal-plans", input),
@@ -44,5 +45,45 @@ export const mealPlanApi = {
 
   get: (id: number) => api.get<MealPlan>(`/api/meal-plans/${id}`),
 
+  shoppingList: (id: number) => api.get<ShoppingListResponse>(`/api/meal-plans/${id}/shopping-list`),
+
+  updateShoppingItem: (planId: number, itemId: number, is_purchased: boolean) =>
+    api.patch<ShoppingListResponse>(`/api/meal-plans/${planId}/shopping-list/items/${itemId}`, { is_purchased }),
+  shareShoppingList: (planId: number) =>
+    api.post<ShoppingShareResponse>(`/api/meal-plans/${planId}/shopping-list/share`),
+  revokeShoppingShare: (planId: number) => api.del<void>(`/api/meal-plans/${planId}/shopping-list/share`),
+
   remove: (id: number) => api.del<void>(`/api/meal-plans/${id}`),
 };
+
+export interface ShoppingListItem {
+  id?: number | null;
+  ingredient_id: number;
+  name: string;
+  quantity: number;
+  unit: string;
+  estimated_cost: number;
+  is_purchased: boolean;
+}
+
+export interface ShoppingListResponse {
+    plan_id: number;
+  plan_name?: string | null;
+  schema_version: number;
+  items: ShoppingListItem[];
+  total_estimated_cost: number;
+  warnings: Array<{ code: string; message: string }>;
+}
+
+export interface ShoppingShareResponse {
+  token: string;
+  expires_at: string;
+}
+
+export const publicShoppingListApi = {
+  get: (token: string) => api.publicGet<PublicShoppingListResponse>(`/api/public/shopping-lists/${token}`),
+  updateItem: (token: string, itemId: number, is_purchased: boolean) =>
+    api.publicPatch<PublicShoppingListResponse>(`/api/public/shopping-lists/${token}/items/${itemId}`, { is_purchased }),
+};
+
+export interface PublicShoppingListResponse extends ShoppingListResponse { expires_at: string; }

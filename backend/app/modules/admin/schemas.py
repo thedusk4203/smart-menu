@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from app.shared.enums import CookingMethod, DishRole, DishType, FoodGroup, MealType, UserRole
+from app.shared.enums import CookingMethod, DishType, FoodGroup, UserRole
 
 
 class DashboardSummary(BaseModel):
@@ -15,7 +15,12 @@ class DashboardSummary(BaseModel):
     ingredients_total: int
     ingredients_active: int
     dishes_total: int
-    meal_sets_total: int
+    planner_ready_dishes: int
+    breakfast_count: int
+    staple_count: int
+    savory_count: int
+    vegetable_count: int
+    soup_count: int
     missing_price: int
     missing_nutrition: int
     missing_conversion: int
@@ -184,55 +189,8 @@ class AdminDishPage(BaseModel):
     offset: int
 
 
-class MealSetDishPayload(BaseModel):
-    dish_id: int
-    role: DishRole
-    sort_order: int = Field(default=0, ge=0)
-
-
-class AdminMealSetWrite(BaseModel):
-    name: str = Field(min_length=1, max_length=255)
-    meal_type: MealType
-    description: str | None = None
-    tags: list[str] = []
-    is_active: bool = True
-    dishes: list[MealSetDishPayload] = []
-
-    @field_validator("name")
-    @classmethod
-    def strip_name(cls, value: str) -> str:
-        return " ".join(value.split())
-
-
-class AdminMealSetItem(BaseModel):
-    id: int
-    name: str
-    meal_type: MealType
-    description: str | None = None
-    tags: list[str] = []
-    is_active: bool
-    total_calories: float
-    total_protein_g: float
-    total_carbs_g: float
-    total_fat_g: float
-    estimated_cost: float
-    dish_count: int
-    all_dishes_active: bool
-    missing_recipe: bool
-    created_at: datetime
-    updated_at: datetime
-    dishes: list[dict] = []
-
-
-class AdminMealSetPage(BaseModel):
-    items: list[AdminMealSetItem]
-    total: int
-    limit: int
-    offset: int
-
-
 class QualityIssue(BaseModel):
-    entity_type: Literal["ingredient", "dish", "meal_set"]
+    entity_type: Literal["ingredient", "dish"]
     entity_id: int
     entity_name: str
     code: str

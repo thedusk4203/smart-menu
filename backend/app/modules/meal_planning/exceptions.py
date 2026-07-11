@@ -31,8 +31,7 @@ class InfeasibleNutritionError(ValidationAppError):
 
 
 class InvalidMealSelectionError(ValidationAppError):
-    """Khi LƯU thực đơn: client gửi meal_set_id không tồn tại/không active, hoặc
-    slot không khớp loại bữa của mâm cơm. Map 422 thay vì 500."""
+    """Khi LƯU thực đơn: client gửi dish không hợp lệ hoặc ghép sai cấu trúc."""
 
     def __init__(self, detail: str) -> None:
         super().__init__(f"Lựa chọn thực đơn không hợp lệ: {detail}")

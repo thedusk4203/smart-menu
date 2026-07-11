@@ -73,7 +73,8 @@ CREATE TYPE exclusion_reason AS ENUM (
     'dislike'              -- Không thích / không ăn (ràng buộc cứng theo yêu cầu user)
 );
 
--- [MỚI Phase A] Phân loại nội tại của món con (dish) + vai trò trong một mâm cơm
+-- Phân loại nội tại của dish. `side` được giữ trong enum cho dữ liệu catalogue
+-- nhưng không tham gia Dish Planner V2.
 CREATE TYPE dish_type AS ENUM (
     'staple',              -- Tinh bột (cơm, gạo lứt...)
     'savory',              -- Món mặn (thịt/cá/đậu kho, xào...)
@@ -82,11 +83,6 @@ CREATE TYPE dish_type AS ENUM (
     'side',                -- Món phụ khác
     'breakfast'            -- Món ăn sáng gọn
 );
-
-CREATE TYPE dish_role AS ENUM (
-    'staple', 'savory', 'soup', 'vegetable_side', 'side', 'breakfast'
-);
-
 
 -- ============================================================
 -- PHẦN 2: HÀM TỰ ĐỘNG CẬP NHẬT updated_at
@@ -282,9 +278,7 @@ CREATE INDEX idx_meal_ingredients_ingredient ON meal_ingredients (ingredient_id)
 
 
 -- ============================================================
--- [MỚI Phase A] dishes / dish_ingredients / meal_sets / meal_set_dishes
--- Mô hình chuẩn hoá: bữa chính = meal_set gồm nhiều dish; dinh dưỡng/giá tính
--- từ dish_ingredients rồi cộng lên meal_set. Song song với meals cũ (Phase B mới bỏ).
+-- dishes / dish_ingredients: planner ghép trực tiếp các dish trong lúc chạy.
 -- ============================================================
 CREATE TABLE dishes (
     id              SERIAL          PRIMARY KEY,
@@ -315,34 +309,6 @@ CREATE TABLE dish_ingredients (
 );
 CREATE INDEX idx_dish_ingredients_ingredient ON dish_ingredients (ingredient_id);
 
-CREATE TABLE meal_sets (
-    id              SERIAL          PRIMARY KEY,
-    name            VARCHAR(255)    NOT NULL UNIQUE,
-    meal_type       meal_type       NOT NULL,
-    description     TEXT,
-    tags            JSONB           NOT NULL DEFAULT '[]'::jsonb,
-    is_active       BOOLEAN         NOT NULL DEFAULT TRUE,
-    created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
-);
-COMMENT ON TABLE meal_sets IS 'Mâm cơm/bữa: breakfast=1 dish; lunch/dinner nhiều dish theo role';
-
-CREATE TRIGGER trg_meal_sets_updated_at
-    BEFORE UPDATE ON meal_sets
-    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
-CREATE TABLE meal_set_dishes (
-    id              SERIAL          PRIMARY KEY,
-    meal_set_id     INTEGER         NOT NULL REFERENCES meal_sets(id) ON DELETE CASCADE,
-    dish_id         INTEGER         NOT NULL REFERENCES dishes(id) ON DELETE RESTRICT,
-    role            dish_role       NOT NULL,
-    sort_order      INTEGER         NOT NULL DEFAULT 0,
-    UNIQUE (meal_set_id, dish_id)
-);
-CREATE INDEX idx_meal_set_dishes_set ON meal_set_dishes (meal_set_id);
-CREATE INDEX idx_meal_set_dishes_dish ON meal_set_dishes (dish_id);
-
-
 -- ============================================================
 -- BẢNG QUẢN TRỊ: audit log + import có preview/commit
 -- ============================================================
@@ -358,6 +324,90 @@ CREATE TABLE audit_logs (
 );
 CREATE INDEX idx_audit_logs_created_at ON audit_logs (created_at DESC);
 CREATE INDEX idx_audit_logs_entity ON audit_logs (entity_type, entity_id);
+
+CREATE TABLE llm_provider_configs (
+    id                      BIGSERIAL       PRIMARY KEY,
+    name                    VARCHAR(100)    NOT NULL,
+    provider_type           VARCHAR(30)     NOT NULL
+                                            CHECK (provider_type IN ('openai', 'deepseek', 'lmstudio', 'google', 'custom')),
+    base_url                VARCHAR(500)    NOT NULL,
+    model                   VARCHAR(200)    NOT NULL,
+    encrypted_api_key       TEXT,
+    api_key_suffix          VARCHAR(8),
+    timeout_seconds         NUMERIC(6,2)    NOT NULL DEFAULT 60
+                                            CHECK (timeout_seconds BETWEEN 1 AND 300),
+    structured_output_mode  VARCHAR(20)     CHECK (structured_output_mode IN ('json_schema', 'json_object')),
+    config_version          INTEGER         NOT NULL DEFAULT 1,
+    tested_version          INTEGER,
+    test_status             VARCHAR(20)     NOT NULL DEFAULT 'untested'
+                                            CHECK (test_status IN ('untested', 'success', 'failed')),
+    last_tested_at          TIMESTAMPTZ,
+    last_test_error         TEXT,
+    is_active               BOOLEAN         NOT NULL DEFAULT FALSE,
+    created_by              INTEGER         NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    updated_by              INTEGER         NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    created_at              TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    updated_at              TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX uq_llm_provider_one_active
+    ON llm_provider_configs ((is_active)) WHERE is_active = TRUE;
+
+CREATE TABLE ai_request_logs (
+    id                  BIGSERIAL       PRIMARY KEY,
+    user_id             INTEGER         REFERENCES users(id) ON DELETE SET NULL,
+    provider_config_id  BIGINT          REFERENCES llm_provider_configs(id) ON DELETE SET NULL,
+    feature             VARCHAR(40)     NOT NULL,
+    provider_type       VARCHAR(30)     NOT NULL,
+    model               VARCHAR(200)    NOT NULL,
+    request_data        JSONB           NOT NULL,
+    response_data       JSONB,
+    status              VARCHAR(20)     NOT NULL CHECK (status IN ('success', 'error')),
+    latency_ms          INTEGER         NOT NULL DEFAULT 0,
+    prompt_tokens       INTEGER,
+    completion_tokens   INTEGER,
+    total_tokens        INTEGER,
+    error_message       TEXT,
+    created_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    expires_at          TIMESTAMPTZ     NOT NULL DEFAULT (NOW() + INTERVAL '30 days')
+);
+CREATE INDEX idx_ai_request_logs_created_at ON ai_request_logs (created_at DESC);
+CREATE INDEX idx_ai_request_logs_filters ON ai_request_logs (feature, status, user_id);
+
+CREATE TABLE ai_conversations (
+    id          BIGSERIAL       PRIMARY KEY,
+    user_id     INTEGER         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title       VARCHAR(80)     NOT NULL,
+    created_at  TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_ai_conversations_user_updated
+    ON ai_conversations (user_id, updated_at DESC, id DESC);
+
+CREATE TABLE ai_conversation_turns (
+    id                  BIGSERIAL       PRIMARY KEY,
+    conversation_id     BIGINT          NOT NULL
+                                        REFERENCES ai_conversations(id) ON DELETE CASCADE,
+    turn_number         SMALLINT        NOT NULL CHECK (turn_number BETWEEN 1 AND 20),
+    user_content        VARCHAR(4000)   NOT NULL,
+    assistant_content   TEXT,
+    status              VARCHAR(20)     NOT NULL DEFAULT 'pending'
+                                        CHECK (status IN ('pending', 'completed', 'failed')),
+    created_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    UNIQUE (conversation_id, turn_number),
+    CONSTRAINT ck_ai_conversation_completed_answer
+        CHECK (status <> 'completed' OR NULLIF(BTRIM(assistant_content), '') IS NOT NULL)
+);
+CREATE INDEX idx_ai_conversation_turns_order
+    ON ai_conversation_turns (conversation_id, turn_number);
+
+CREATE TRIGGER trg_ai_conversations_updated_at
+    BEFORE UPDATE ON ai_conversations
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_ai_conversation_turns_updated_at
+    BEFORE UPDATE ON ai_conversation_turns
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE TABLE import_jobs (
     id              BIGSERIAL       PRIMARY KEY,
@@ -385,7 +435,7 @@ CREATE TABLE meal_plans (
     id              SERIAL          PRIMARY KEY,
     user_id         INTEGER         NOT NULL
                                     REFERENCES users(id) ON DELETE CASCADE,
-    name            VARCHAR(255)    NOT NULL DEFAULT 'Thực đơn tuần',
+    name            VARCHAR(255)    NOT NULL DEFAULT 'Thực đơn',
     start_date      DATE            NOT NULL,
     end_date        DATE,
     budget_limit    NUMERIC(12,2)   CHECK (budget_limit IS NULL OR budget_limit >= 0),  -- ngân sách CẢ TUẦN
@@ -425,6 +475,15 @@ CREATE TABLE shopping_lists (
     UNIQUE (meal_plan_id, ingredient_id)
 );
 COMMENT ON TABLE shopping_lists IS 'Tổng hợp nguyên liệu cần mua cho một thực đơn';
+
+CREATE TABLE shopping_list_shares (
+    id UUID PRIMARY KEY,
+    meal_plan_id INTEGER NOT NULL REFERENCES meal_plans(id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    revoked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX uq_active_shopping_list_share ON shopping_list_shares(meal_plan_id) WHERE revoked_at IS NULL;
 
 
 -- ============================================================
@@ -491,7 +550,8 @@ LEFT JOIN LATERAL (
 GROUP BY m.id;
 COMMENT ON VIEW v_meals_full IS 'Món ăn kèm tổng dinh dưỡng (quy về gram) và chi phí ước tính từ giá mới nhất';
 
--- [MỚI Phase A] v_dishes_full: tổng dinh dưỡng & chi phí từng dish (từ dish_ingredients)
+-- Dish aggregates. Completeness được tính theo TỪNG nguyên liệu, không suy ra
+-- từ SUM (SUM có thể che mất một ingredient chưa có nutrition/giá).
 CREATE VIEW v_dishes_full AS
 SELECT
     d.id, d.name, d.dish_type, d.cooking_method, d.tags, d.is_active,
@@ -500,7 +560,28 @@ SELECT
     COALESCE(SUM(di.quantity * i.grams_per_unit * nf.carbs_g   / 100.0), 0) AS total_carbs_g,
     COALESCE(SUM(di.quantity * i.grams_per_unit * nf.fat_g     / 100.0), 0) AS total_fat_g,
     COALESCE(SUM(di.quantity * lp.price_per_default_unit), 0)               AS estimated_cost,
-    COUNT(di.id)                                                           AS ingredient_count
+    COUNT(di.id)                                                            AS ingredient_count,
+    COUNT(nf.ingredient_id)                                                 AS nutrition_count,
+    COUNT(lp.price_per_default_unit)                                        AS priced_ingredient_count,
+    COUNT(di.id) > 0 AND COUNT(nf.ingredient_id) = COUNT(di.id)             AS has_complete_nutrition,
+    COUNT(di.id) > 0 AND COUNT(lp.price_per_default_unit) = COUNT(di.id)    AS has_complete_price,
+    COUNT(di.id) > 0 AND COALESCE(BOOL_AND(i.is_active), FALSE)             AS all_ingredients_active,
+    COALESCE(
+        JSONB_AGG(di.ingredient_id ORDER BY di.id) FILTER (WHERE di.id IS NOT NULL),
+        '[]'::jsonb
+    ) AS ingredient_ids,
+    COALESCE(
+        JSONB_AGG(
+            JSONB_BUILD_OBJECT(
+                'ingredient_id', i.id,
+                'name', i.name,
+                'quantity', di.quantity,
+                'unit', di.unit,
+                'estimated_cost', COALESCE(di.quantity * lp.price_per_default_unit, 0)
+            ) ORDER BY di.id
+        ) FILTER (WHERE di.id IS NOT NULL),
+        '[]'::jsonb
+    ) AS ingredients
 FROM dishes d
 LEFT JOIN dish_ingredients di ON di.dish_id = d.id
 LEFT JOIN ingredients     i  ON i.id = di.ingredient_id
@@ -510,64 +591,24 @@ LEFT JOIN LATERAL (
     WHERE ps.ingredient_id = di.ingredient_id ORDER BY ps.recorded_at DESC LIMIT 1
 ) lp ON TRUE
 GROUP BY d.id;
-COMMENT ON VIEW v_dishes_full IS 'Món con + tổng dinh dưỡng/chi phí tính từ dish_ingredients';
+COMMENT ON VIEW v_dishes_full IS 'Dish totals + completeness theo từng ingredient.';
 
--- [MỚI Phase A] v_meal_sets_full: cộng dish trong mâm cơm. TÁCH CTE để tránh nhân đôi:
---   totals (grain = ingredient) tách khỏi agg (grain = dish, dựng JSON dishes/components).
-CREATE VIEW v_meal_sets_full AS
-WITH totals AS (
-    SELECT
-        ms.id AS meal_set_id,
-        COALESCE(SUM(di.quantity * i.grams_per_unit * nf.calories  / 100.0), 0) AS total_calories,
-        COALESCE(SUM(di.quantity * i.grams_per_unit * nf.protein_g / 100.0), 0) AS total_protein_g,
-        COALESCE(SUM(di.quantity * i.grams_per_unit * nf.carbs_g   / 100.0), 0) AS total_carbs_g,
-        COALESCE(SUM(di.quantity * i.grams_per_unit * nf.fat_g     / 100.0), 0) AS total_fat_g,
-        COALESCE(SUM(di.quantity * lp.price_per_default_unit), 0)               AS estimated_cost
-    FROM meal_sets ms
-    LEFT JOIN meal_set_dishes msd ON msd.meal_set_id = ms.id
-    LEFT JOIN dish_ingredients di ON di.dish_id = msd.dish_id
-    LEFT JOIN ingredients     i  ON i.id = di.ingredient_id
-    LEFT JOIN nutrition_facts nf ON nf.ingredient_id = di.ingredient_id
-    LEFT JOIN LATERAL (
-        SELECT price_per_default_unit FROM price_snapshots ps
-        WHERE ps.ingredient_id = di.ingredient_id ORDER BY ps.recorded_at DESC LIMIT 1
-    ) lp ON TRUE
-    GROUP BY ms.id
-),
-agg AS (
-    SELECT
-        msd.meal_set_id,
-        jsonb_agg(jsonb_build_object(
-            'dish_id', d.id, 'role', msd.role, 'name', d.name, 'sort_order', msd.sort_order
-        ) ORDER BY msd.sort_order) AS dishes,
-        jsonb_agg(d.name ORDER BY msd.sort_order) AS components,
-        COUNT(*)              AS dish_count,
-        bool_and(d.is_active) AS all_dishes_active
-    FROM meal_set_dishes msd
-    JOIN dishes d ON d.id = msd.dish_id
-    GROUP BY msd.meal_set_id
-)
+CREATE VIEW v_dish_candidates AS
 SELECT
-    ms.id, ms.name, ms.meal_type, ms.tags, ms.is_active,
-    t.total_calories, t.total_protein_g, t.total_carbs_g, t.total_fat_g, t.estimated_cost,
-    COALESCE(a.dishes, '[]'::jsonb)     AS dishes,
-    COALESCE(a.components, '[]'::jsonb) AS components,
-    COALESCE(a.dish_count, 0)           AS dish_count,
-    COALESCE(a.all_dishes_active, TRUE) AS all_dishes_active
-FROM meal_sets ms
-LEFT JOIN totals t ON t.meal_set_id = ms.id
-LEFT JOIN agg    a ON a.meal_set_id = ms.id;
-COMMENT ON VIEW v_meal_sets_full IS 'Mâm cơm: tổng dinh dưỡng/chi phí (grain ingredient) + dishes JSON (grain dish), tách CTE tránh nhân đôi';
-
--- [MỚI Phase A] v_meal_candidates: view planner đọc (không cần biết dish/meal_set)
-CREATE VIEW v_meal_candidates AS
-SELECT
-    id, name, meal_type,
+    id, name, dish_type, cooking_method, tags,
     total_calories, total_protein_g, total_carbs_g, total_fat_g, estimated_cost,
-    tags, dishes, components
-FROM v_meal_sets_full
-WHERE is_active = TRUE AND all_dishes_active = TRUE;
-COMMENT ON VIEW v_meal_candidates IS 'View planner đọc: mâm cơm active + mọi dish active';
+    ingredient_count, nutrition_count, priced_ingredient_count,
+    all_ingredients_active, has_complete_nutrition, has_complete_price,
+    ingredient_ids, ingredients
+FROM v_dishes_full
+WHERE is_active = TRUE
+  AND ingredient_count > 0
+  AND all_ingredients_active = TRUE
+  AND has_complete_nutrition = TRUE
+  AND has_complete_price = TRUE
+  AND total_calories > 0
+  AND estimated_cost > 0;
+COMMENT ON VIEW v_dish_candidates IS 'Dish planner-ready: active, đủ recipe, nutrition, giá và ingredient active.';
 
 -- v_meal_plan_summary: tóm tắt thực đơn kèm email người tạo
 CREATE VIEW v_meal_plan_summary AS
@@ -919,7 +960,7 @@ WHERE name = 'Đậu phộng';
 
 
 -- ============================================================
--- [MỚI Phase A] SEED dishes + dish_ingredients + meal_sets + meal_set_dishes
+-- Seed Dish Planner V2: dishes + dish_ingredients.
 -- ============================================================
 INSERT INTO dishes (name, dish_type, cooking_method, description, tags) VALUES
 ('Cơm trắng',            'staple',         'boil',     'Cơm gạo trắng', '["cơ bản"]'::jsonb),
@@ -1069,110 +1110,25 @@ FROM (VALUES
 JOIN dishes d ON d.name = v.dish_name
 JOIN ingredients i ON i.name = v.ingredient_name;
 
-INSERT INTO meal_sets (name, meal_type, description, tags) VALUES
-('Mâm trưa thịt kho canh cua',    'lunch',  'Cơm, thịt kho tàu, canh cua rau đay, rau muống xào', '["đầy đủ"]'::jsonb),
-('Mâm trưa cá kho canh bí',       'lunch',  'Cơm, cá thu kho, canh bí đỏ thịt nạc, cải ngọt luộc', '["đầy đủ"]'::jsonb),
-('Mâm trưa gà kho canh cải',      'lunch',  'Cơm, gà kho gừng, canh cải ngọt, bông cải xào', '["đầy đủ"]'::jsonb),
-('Mâm trưa đậu phụ canh mướp',    'lunch',  'Cơm, đậu phụ sốt cà, canh mướp mồng tơi, cà rốt xào', '["chay","đầy đủ"]'::jsonb),
-('Mâm trưa tôm rim canh rau',     'lunch',  'Cơm, tôm rim, canh rau muống, rau đay luộc', '["đầy đủ"]'::jsonb),
-('Mâm trưa heo kho canh bí',      'lunch',  'Cơm gạo lứt, thịt heo kho, canh bí đỏ, mồng tơi xào', '["đầy đủ"]'::jsonb),
-('Mâm trưa bò xào canh cua',      'lunch',  'Cơm, bò xào hành, canh cua rau đay, xà lách trộn', '["đầy đủ"]'::jsonb),
-('Mâm trưa cá rô phi canh cải',   'lunch',  'Cơm gạo lứt, cá rô phi kho, canh cải ngọt, bí đỏ hấp', '["đầy đủ"]'::jsonb),
-('Mâm tối heo kho canh cua',      'dinner', 'Cơm, thịt heo kho, canh cua rau đay, bông cải xào', '["đầy đủ"]'::jsonb),
-('Mâm tối cá kho canh mướp',      'dinner', 'Cơm gạo lứt, cá thu kho, canh mướp mồng tơi, rau muống xào', '["đầy đủ"]'::jsonb),
-('Mâm tối gà kho canh bí',        'dinner', 'Cơm, gà kho gừng, canh bí đỏ, cải ngọt luộc', '["đầy đủ"]'::jsonb),
-('Mâm tối đậu phụ canh rau',      'dinner', 'Cơm, đậu phụ sốt cà, canh rau muống, cà rốt xào', '["chay","đầy đủ"]'::jsonb),
-('Mâm tối tôm rim canh bí',       'dinner', 'Cơm gạo lứt, tôm rim, canh bí đỏ thịt nạc, mồng tơi xào', '["đầy đủ"]'::jsonb),
-('Mâm tối bò xào canh cải',       'dinner', 'Cơm, bò xào hành, canh cải ngọt, rau đay luộc', '["đầy đủ"]'::jsonb),
-('Mâm tối cá rô phi canh cua',    'dinner', 'Cơm, cá rô phi kho, canh cua rau đay, xà lách trộn', '["đầy đủ"]'::jsonb),
-('Mâm tối trứng chiên canh mướp', 'dinner', 'Cơm, trứng chiên, canh mướp mồng tơi, bí đỏ hấp', '["rẻ","đầy đủ"]'::jsonb),
-('Sáng trứng chiên bánh mì',      'breakfast', 'Trứng chiên bánh mì', '["nhanh"]'::jsonb),
-('Sáng cháo yến mạch chuối',      'breakfast', 'Cháo yến mạch chuối', '["healthy"]'::jsonb),
-('Sáng bún trứng rau cải',        'breakfast', 'Bún trứng rau cải', '["nhanh"]'::jsonb),
-('Sáng bánh mì trứng',            'breakfast', 'Bánh mì trứng dưa leo', '["nhanh"]'::jsonb),
-('Sáng sữa chua yến mạch',        'breakfast', 'Sữa chua yến mạch táo', '["healthy"]'::jsonb),
-('Sáng khoai lang trứng',         'breakfast', 'Khoai lang trứng luộc', '["healthy"]'::jsonb),
-('Sáng nui xào trứng',            'breakfast', 'Nui xào trứng', '["nhanh"]'::jsonb),
-('Sáng cơm gạo lứt trứng',        'breakfast', 'Cơm gạo lứt trứng', '["healthy"]'::jsonb);
+-- Danh mục thẻ chuẩn tiếng Việt. Dữ liệu demo cũ dùng "healthy" được đổi
+-- ngay khi khởi tạo để không tạo thêm giá trị tiếng Anh trong DB mới.
+UPDATE meals SET tags = replace(tags::text, '"healthy"', '"lành mạnh"')::jsonb
+WHERE tags::text LIKE '%"healthy"%';
+UPDATE dishes SET tags = replace(tags::text, '"healthy"', '"lành mạnh"')::jsonb
+WHERE tags::text LIKE '%"healthy"%';
 
-INSERT INTO meal_set_dishes (meal_set_id, dish_id, role, sort_order)
-SELECT ms.id, d.id, v.role::dish_role, v.sort_order
-FROM (VALUES
-('Mâm trưa thịt kho canh cua',    'Cơm trắng',            'staple',         1),
-('Mâm trưa thịt kho canh cua',    'Thịt kho tàu',         'savory',         2),
-('Mâm trưa thịt kho canh cua',    'Canh cua rau đay',     'soup',           3),
-('Mâm trưa thịt kho canh cua',    'Rau muống xào tỏi',    'vegetable_side', 4),
-('Mâm trưa cá kho canh bí',       'Cơm trắng',            'staple',         1),
-('Mâm trưa cá kho canh bí',       'Cá thu kho cà chua',   'savory',         2),
-('Mâm trưa cá kho canh bí',       'Canh bí đỏ thịt nạc',  'soup',           3),
-('Mâm trưa cá kho canh bí',       'Cải ngọt luộc',        'vegetable_side', 4),
-('Mâm trưa gà kho canh cải',      'Cơm trắng',            'staple',         1),
-('Mâm trưa gà kho canh cải',      'Gà kho gừng',          'savory',         2),
-('Mâm trưa gà kho canh cải',      'Canh cải ngọt',        'soup',           3),
-('Mâm trưa gà kho canh cải',      'Bông cải xào',         'vegetable_side', 4),
-('Mâm trưa đậu phụ canh mướp',    'Cơm trắng',            'staple',         1),
-('Mâm trưa đậu phụ canh mướp',    'Đậu phụ sốt cà chua',  'savory',         2),
-('Mâm trưa đậu phụ canh mướp',    'Canh mướp mồng tơi',   'soup',           3),
-('Mâm trưa đậu phụ canh mướp',    'Cà rốt xào',           'vegetable_side', 4),
-('Mâm trưa tôm rim canh rau',     'Cơm trắng',            'staple',         1),
-('Mâm trưa tôm rim canh rau',     'Tôm rim',              'savory',         2),
-('Mâm trưa tôm rim canh rau',     'Canh rau muống',       'soup',           3),
-('Mâm trưa tôm rim canh rau',     'Rau đay luộc',         'vegetable_side', 4),
-('Mâm trưa heo kho canh bí',      'Cơm gạo lứt',          'staple',         1),
-('Mâm trưa heo kho canh bí',      'Thịt heo kho',         'savory',         2),
-('Mâm trưa heo kho canh bí',      'Canh bí đỏ',           'soup',           3),
-('Mâm trưa heo kho canh bí',      'Mồng tơi xào tỏi',     'vegetable_side', 4),
-('Mâm trưa bò xào canh cua',      'Cơm trắng',            'staple',         1),
-('Mâm trưa bò xào canh cua',      'Bò xào hành',          'savory',         2),
-('Mâm trưa bò xào canh cua',      'Canh cua rau đay',     'soup',           3),
-('Mâm trưa bò xào canh cua',      'Xà lách trộn',         'vegetable_side', 4),
-('Mâm trưa cá rô phi canh cải',   'Cơm gạo lứt',          'staple',         1),
-('Mâm trưa cá rô phi canh cải',   'Cá rô phi kho',        'savory',         2),
-('Mâm trưa cá rô phi canh cải',   'Canh cải ngọt',        'soup',           3),
-('Mâm trưa cá rô phi canh cải',   'Bí đỏ hấp',            'vegetable_side', 4),
-('Mâm tối heo kho canh cua',      'Cơm trắng',            'staple',         1),
-('Mâm tối heo kho canh cua',      'Thịt heo kho',         'savory',         2),
-('Mâm tối heo kho canh cua',      'Canh cua rau đay',     'soup',           3),
-('Mâm tối heo kho canh cua',      'Bông cải xào',         'vegetable_side', 4),
-('Mâm tối cá kho canh mướp',      'Cơm gạo lứt',          'staple',         1),
-('Mâm tối cá kho canh mướp',      'Cá thu kho cà chua',   'savory',         2),
-('Mâm tối cá kho canh mướp',      'Canh mướp mồng tơi',   'soup',           3),
-('Mâm tối cá kho canh mướp',      'Rau muống xào tỏi',    'vegetable_side', 4),
-('Mâm tối gà kho canh bí',        'Cơm trắng',            'staple',         1),
-('Mâm tối gà kho canh bí',        'Gà kho gừng',          'savory',         2),
-('Mâm tối gà kho canh bí',        'Canh bí đỏ',           'soup',           3),
-('Mâm tối gà kho canh bí',        'Cải ngọt luộc',        'vegetable_side', 4),
-('Mâm tối đậu phụ canh rau',      'Cơm trắng',            'staple',         1),
-('Mâm tối đậu phụ canh rau',      'Đậu phụ sốt cà chua',  'savory',         2),
-('Mâm tối đậu phụ canh rau',      'Canh rau muống',       'soup',           3),
-('Mâm tối đậu phụ canh rau',      'Cà rốt xào',           'vegetable_side', 4),
-('Mâm tối tôm rim canh bí',       'Cơm gạo lứt',          'staple',         1),
-('Mâm tối tôm rim canh bí',       'Tôm rim',              'savory',         2),
-('Mâm tối tôm rim canh bí',       'Canh bí đỏ thịt nạc',  'soup',           3),
-('Mâm tối tôm rim canh bí',       'Mồng tơi xào tỏi',     'vegetable_side', 4),
-('Mâm tối bò xào canh cải',       'Cơm trắng',            'staple',         1),
-('Mâm tối bò xào canh cải',       'Bò xào hành',          'savory',         2),
-('Mâm tối bò xào canh cải',       'Canh cải ngọt',        'soup',           3),
-('Mâm tối bò xào canh cải',       'Rau đay luộc',         'vegetable_side', 4),
-('Mâm tối cá rô phi canh cua',    'Cơm trắng',            'staple',         1),
-('Mâm tối cá rô phi canh cua',    'Cá rô phi kho',        'savory',         2),
-('Mâm tối cá rô phi canh cua',    'Canh cua rau đay',     'soup',           3),
-('Mâm tối cá rô phi canh cua',    'Xà lách trộn',         'vegetable_side', 4),
-('Mâm tối trứng chiên canh mướp', 'Cơm trắng',            'staple',         1),
-('Mâm tối trứng chiên canh mướp', 'Trứng chiên',          'savory',         2),
-('Mâm tối trứng chiên canh mướp', 'Canh mướp mồng tơi',   'soup',           3),
-('Mâm tối trứng chiên canh mướp', 'Bí đỏ hấp',            'vegetable_side', 4),
-('Sáng trứng chiên bánh mì',      'Trứng chiên bánh mì',  'breakfast',      1),
-('Sáng cháo yến mạch chuối',      'Cháo yến mạch chuối',  'breakfast',      1),
-('Sáng bún trứng rau cải',        'Bún trứng rau cải',    'breakfast',      1),
-('Sáng bánh mì trứng',            'Bánh mì trứng dưa leo','breakfast',      1),
-('Sáng sữa chua yến mạch',        'Sữa chua yến mạch táo','breakfast',      1),
-('Sáng khoai lang trứng',         'Khoai lang trứng luộc','breakfast',      1),
-('Sáng nui xào trứng',            'Nui xào trứng',        'breakfast',      1),
-('Sáng cơm gạo lứt trứng',        'Cơm gạo lứt trứng',    'breakfast',      1)
-) AS v(meal_set_name, dish_name, role, sort_order)
-JOIN meal_sets ms ON ms.name = v.meal_set_name
-JOIN dishes d ON d.name = v.dish_name;
-
+CREATE TABLE tag_catalog (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(64) NOT NULL UNIQUE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+INSERT INTO tag_catalog (name)
+SELECT DISTINCT tag FROM (
+    SELECT jsonb_array_elements_text(tags) AS tag FROM meals
+    UNION SELECT jsonb_array_elements_text(tags) AS tag FROM dishes
+) AS all_tags
+WHERE btrim(tag) <> '';
 
 COMMIT;

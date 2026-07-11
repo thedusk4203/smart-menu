@@ -179,19 +179,35 @@ export interface MealUpdate {
 }
 
 // ── Meal plans ──────────────────────────────────────────────────────────
-export type DishRole =
-  | "staple" | "savory" | "soup" | "vegetable_side" | "side" | "breakfast";
+export interface PlanIngredientSnapshot {
+  ingredient_id: number;
+  name: string;
+  quantity: number;
+  unit: string;
+  estimated_cost: number;
+}
 export interface PlanDish {
   dish_id: number;
-  role: DishRole;
   name: string;
-  sort_order: number;
+  dish_type: DishType;
+  cooking_method?: CookingMethod | null;
+  calories?: number;
+  protein_g?: number;
+  fat_g?: number;
+  carb_g?: number;
+  cost?: number;
+  tags?: string[];
+  ingredients?: PlanIngredientSnapshot[];
+  // Dữ liệu V1 có role/sort_order từ mâm cũ; chỉ dùng để hiển thị lịch sử.
+  role?: DishType;
+  sort_order?: number;
 }
 export interface PlannedMeal {
-  // Phase A: candidate là meal_set -> meal_id=null, dùng meal_set_id.
-  meal_id: number | null;
+  // Compatibility schema_version=1: plan history cũ từng tham chiếu meal_set.
+  // Không có luồng V2 nào đọc/ghi hai field này.
+  meal_id?: number | null;
   meal_set_id?: number;
-  candidate_type?: "meal_set" | "meal";
+  candidate_type?: "dynamic_meal" | "meal_set" | "meal";
   name: string;
   meal_type: MealType;
   components?: string[];
@@ -210,8 +226,20 @@ export interface PlannedDay {
   day_cost: number;
 }
 export interface PlanData {
+  schema_version?: 1 | 2;
+  algorithm_version?: string;
+  plan_signature?: string;
   days: PlannedDay[];
-  warnings: string[];
+  nutrition_target?: { calories: number; protein_g: number; fat_g: number; carb_g: number };
+  metrics?: {
+    average_calorie_deviation_pct: number;
+    maximum_calorie_deviation_pct: number;
+    protein_shortage_pct: number;
+    repeat_counts: Record<string, number>;
+    solver_time_ms: number;
+    nutrition_score: number;
+  };
+  warnings: Array<string | { code: string; message: string; details?: Record<string, number | string> }>;
   meals_per_day: number;
 }
 export interface GeneratedMealPlan {
@@ -226,7 +254,8 @@ export interface GeneratedMealPlan {
 }
 export interface InfeasibleResult {
   status: "infeasible";
-  reasons: string[];
+  reasons: Array<{ code: string; message: string; details?: Record<string, number | string> }>;
+  warnings?: Array<{ code: string; message: string; details?: Record<string, number | string> }>;
 }
 export interface MealPlan {
   id: number;
@@ -238,6 +267,7 @@ export interface MealPlan {
   total_cost: number;
   total_calories: number;
   plan_data: PlanData;
+  created_at?: string | null;
 }
 export interface GenerateParams {
   days?: number;
@@ -245,6 +275,7 @@ export interface GenerateParams {
   budget_limit?: number | null;
   preferred_tags?: string[];
   seed?: number;
+  previous_plan_signature?: string;
 }
 
 export interface ListParams {

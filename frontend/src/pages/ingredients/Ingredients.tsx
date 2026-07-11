@@ -6,7 +6,7 @@ import { useAuth } from "../../context/AuthContext";
 import { ingredientApi } from "../../api/ingredientApi";
 import {
   PageHeader, Card, Button, Badge, Modal, TextField, NumberField, SelectField,
-  Spinner, EmptyState, Pagination,
+  Spinner, EmptyState, Pagination, ConfirmDialog,
 } from "../../components/ui";
 import { FilterBar } from "../../components/domain/FilterBar";
 import { FOOD_GROUP_LABELS, FOOD_GROUP_STYLES } from "../../lib/labels";
@@ -49,6 +49,7 @@ export function Ingredients() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState<Ingredient | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -133,7 +134,7 @@ export function Ingredients() {
   };
 
   const deactivate = async (ing: Ingredient) => {
-    if (!window.confirm(`Ẩn nguyên liệu "${ing.name}"?`)) return;
+    setConfirming(null);
     try {
       await ingredientApi.remove(ing.id);
       toast.success("Đã ẩn nguyên liệu.");
@@ -246,7 +247,7 @@ export function Ingredients() {
                             <Pencil className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => deactivate(ing)}
+                            onClick={() => setConfirming(ing)}
                             className="rounded-lg p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
                             aria-label="Ẩn"
                           >
@@ -351,6 +352,7 @@ export function Ingredients() {
           )}
         </form>
       </Modal>
+      <ConfirmDialog open={!!confirming} onClose={() => setConfirming(null)} onConfirm={() => confirming && deactivate(confirming)} title="Ẩn nguyên liệu" message={confirming ? `Ẩn nguyên liệu “${confirming.name}”?` : ""} confirmLabel="Ẩn nguyên liệu" />
     </div>
   );
 }

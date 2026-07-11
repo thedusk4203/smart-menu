@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from typing import Any, Literal, TypedDict
 
 
@@ -15,10 +16,10 @@ class AIClientPort(ABC):
     def complete_text(
         self,
         messages: list[AIMessage],
-        *,
-        temperature: float = 0.4,
-        max_tokens: int = 700,
     ) -> str: ...
+
+    @abstractmethod
+    def stream_text(self, messages: list[AIMessage]) -> Iterator[str]: ...
 
     @abstractmethod
     def complete_json(
@@ -27,6 +28,4 @@ class AIClientPort(ABC):
         *,
         schema_name: str,
         json_schema: dict[str, Any],
-        temperature: float = 0.1,
-        max_tokens: int = 700,
     ) -> dict[str, Any]: ...

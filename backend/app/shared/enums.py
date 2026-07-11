@@ -98,17 +98,6 @@ class DishType(str, Enum):
     SIDE = "side"
     BREAKFAST = "breakfast"
 
-
-class DishRole(str, Enum):
-    """Vai trò của món thành phần trong một meal set."""
-    STAPLE = "staple"
-    SAVORY = "savory"
-    SOUP = "soup"
-    VEGETABLE_SIDE = "vegetable_side"
-    SIDE = "side"
-    BREAKFAST = "breakfast"
-
-
 class ExclusionReason(str, Enum):
     """Lý do loại trừ nguyên liệu khỏi thực đơn của một người dùng."""
     ALLERGY = "allergy"
