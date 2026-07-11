@@ -1,46 +1,21 @@
-// File: frontend/src/api/mealApi.ts
-import { apiRequest } from "./httpClient";
+import { api, qs } from "../lib/apiClient";
+import type {
+  ListParams, MealCreate, MealDetail, MealSummary, MealType, MealUpdate,
+} from "../types";
 
-export interface MealSummary {
-  id: number;
-  name: string;
-  meal_type: "breakfast" | "lunch" | "dinner";
-  cooking_method: string | null;
-  servings: number;
-  tags: string[];
-  total_calories: number;
-  total_protein_g: number;
-  total_carbs_g: number;
-  total_fat_g: number;
-  estimated_cost: number;
+interface MealListParams extends ListParams {
+  meal_type?: MealType;
 }
 
-export interface MealIngredient {
-  ingredient_id: number;
-  name: string | null;
-  quantity: number;
-  unit: string;
-}
+export const mealApi = {
+  list: (params: MealListParams = {}) =>
+    api.get<MealSummary[]>(`/api/meals${qs({ active_only: true, limit: 100, ...params })}`),
 
-export interface MealDetail extends MealSummary {
-  description: string | null;
-  instructions: string | null;
-  ingredients: MealIngredient[];
-}
+  get: (id: number) => api.get<MealDetail>(`/api/meals/${id}`),
 
-// Lấy danh sách món ăn
-export async function getMeals(params?: {
-  meal_type?: string;
-  search?: string;
-}): Promise<MealSummary[]> {
-  const query = new URLSearchParams();
-  if (params?.meal_type) query.set("meal_type", params.meal_type);
-  if (params?.search) query.set("search", params.search);
-  const qs = query.toString();
-  return apiRequest<MealSummary[]>(`/api/meals${qs ? `?${qs}` : ""}`);
-}
+  create: (data: MealCreate) => api.post<MealDetail>("/api/meals", data),
 
-// Lấy chi tiết một món ăn (kèm nguyên liệu)
-export async function getMealDetail(mealId: number): Promise<MealDetail> {
-  return apiRequest<MealDetail>(`/api/meals/${mealId}`);
-}
+  update: (id: number, data: MealUpdate) => api.put<MealDetail>(`/api/meals/${id}`, data),
+
+  remove: (id: number) => api.del<void>(`/api/meals/${id}`),
+};

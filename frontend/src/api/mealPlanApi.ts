@@ -1,46 +1,48 @@
-// File: frontend/src/api/mealPlanApi.ts
-import { apiRequest } from "./httpClient";
-import { getMe } from "./authApi";
+import { api } from "../lib/apiClient";
+import type {
+  GeneratedMealPlan, GenerateParams, InfeasibleResult, MealPlan,
+} from "../types";
 
-export interface MealPlan {
-  id: number;
-  user_id: number;
+type GenerateResult = GeneratedMealPlan | InfeasibleResult;
+
+// Phan biet ket qua bat kha thi voi thuc don da sinh.
+export const isInfeasible = (r: GenerateResult): r is InfeasibleResult =>
+  (r as InfeasibleResult).status === "infeasible";
+
+// Gate 0: khi luu chi gui id mam com theo ngay/slot; backend recompute totals
+// va gan user tu JWT. Khong gui user_id/total_cost/total_calories/plan_data.
+export interface SaveSlotInput {
+  slot: string;
+  meal_set_id: number;
+}
+export interface SaveDayInput {
+  day: number;
+  meals: SaveSlotInput[];
+}
+export interface SavePlanInput {
   name: string;
   start_date: string;
-  end_date: string | null;
-  budget_limit: number | null;
-  total_cost: number;
-  total_calories: number;
-  // {"2026-06-16": {"breakfast": [1], "lunch": [2], "dinner": [3]}}
-  plan_data: Record<string, Record<string, number[]>>;
+  budget_limit?: number | null;
+  days: SaveDayInput[];
 }
 
-export interface MealPlanCreate {
-  name?: string;
-  start_date: string;
-  end_date?: string;
-  budget_limit?: number;
-  total_cost?: number;
-  total_calories?: number;
-  plan_data?: Record<string, Record<string, number[]>>;
-}
+export const mealPlanApi = {
+  // Sinh thuc don (khong tu luu). User lay tu JWT.
+  generate: (params: GenerateParams = {}) =>
+    api.post<GenerateResult>("/api/meal-plans/generate", {
+      days: params.days ?? null,
+      meals_per_day: params.meals_per_day ?? null,
+      budget_limit: params.budget_limit ?? null,
+      preferred_tags: params.preferred_tags ?? null,
+      seed: params.seed ?? null,
+    }),
 
-// Lấy danh sách thực đơn của tài khoản đang đăng nhập
-export async function getMyMealPlans(): Promise<MealPlan[]> {
-  const me = await getMe();
-  return apiRequest<MealPlan[]>(`/api/meal-plans?user_id=${me.id}`);
-}
+  save: (input: SavePlanInput) => api.post<MealPlan>("/api/meal-plans", input),
 
-// Lưu thực đơn mới
-export async function saveMealPlan(data: MealPlanCreate): Promise<MealPlan> {
-  const me = await getMe();
-  return apiRequest<MealPlan>("/api/meal-plans", {
-    method: "POST",
-    body: { ...data, user_id: me.id },
-  });
-}
+  // Danh sach thuc don cua nguoi dung hien tai (JWT).
+  list: () => api.get<MealPlan[]>("/api/meal-plans"),
 
-// Xoá thực đơn
-export async function deleteMealPlan(planId: number): Promise<void> {
-  return apiRequest(`/api/meal-plans/${planId}`, { method: "DELETE" });
-}
+  get: (id: number) => api.get<MealPlan>(`/api/meal-plans/${id}`),
+
+  remove: (id: number) => api.del<void>(`/api/meal-plans/${id}`),
+};

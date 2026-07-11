@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, status
 
+from app.core.deps import require_data_editor
+from app.modules.identity.domain import UserEntity
+
 from app.dependencies import (
     get_create_meal_use_case,
     get_deactivate_meal_use_case,
@@ -39,18 +42,31 @@ def get_meal(meal_id: int, use_case: GetMealUseCase = Depends(get_get_meal_use_c
 
 
 @router.post("", response_model=MealDetail, status_code=status.HTTP_201_CREATED)
-def create_meal(data: MealCreate, use_case: CreateMealUseCase = Depends(get_create_meal_use_case)):
+def create_meal(
+    data: MealCreate,
+    use_case: CreateMealUseCase = Depends(get_create_meal_use_case),
+    _: UserEntity = Depends(require_data_editor),
+):
     ingredients = [MealIngredientEntity(ingredient_id=i.ingredient_id, quantity=i.quantity, unit=i.unit)
                    for i in data.ingredients]
     return use_case.execute(data.name, data.meal_type, data.cooking_method, data.description,
-                             data.instructions, data.servings, data.tags, ingredients)
+                             data.instructions, data.servings, data.tags, data.components, ingredients)
 
 
 @router.put("/{meal_id}", response_model=MealDetail)
-def update_meal(meal_id: int, data: MealUpdate, use_case: UpdateMealUseCase = Depends(get_update_meal_use_case)):
+def update_meal(
+    meal_id: int,
+    data: MealUpdate,
+    use_case: UpdateMealUseCase = Depends(get_update_meal_use_case),
+    _: UserEntity = Depends(require_data_editor),
+):
     return use_case.execute(meal_id, **data.model_dump(exclude_unset=True))
 
 
 @router.delete("/{meal_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_meal(meal_id: int, use_case: DeactivateMealUseCase = Depends(get_deactivate_meal_use_case)):
+def delete_meal(
+    meal_id: int,
+    use_case: DeactivateMealUseCase = Depends(get_deactivate_meal_use_case),
+    _: UserEntity = Depends(require_data_editor),
+):
     use_case.execute(meal_id)

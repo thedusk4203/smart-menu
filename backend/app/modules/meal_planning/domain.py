@@ -37,8 +37,11 @@ class PlanRequest:
 
 @dataclass(frozen=True)
 class MealCandidate:
-    """Món ăn hợp lệ để chọn vào thực đơn — đọc tổng hợp từ v_meals_full
-    kèm danh sách ingredient_ids (để kiểm tra loại trừ + tái sử dụng)."""
+    """Mâm cơm hợp lệ để chọn vào thực đơn — đọc tổng hợp từ v_meal_candidates
+    kèm ingredient_ids (union của mọi dish, để loại trừ + tái sử dụng).
+
+    `meal_id` = id của meal_set. `dishes` là các món con {dish_id, role, name,
+    sort_order}; `components` là tên món con dạng phẳng (tương thích cũ)."""
     meal_id: int
     name: str
     meal_type: str                       # breakfast/lunch/dinner
@@ -49,6 +52,8 @@ class MealCandidate:
     estimated_cost: float
     ingredient_ids: list[int] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
+    components: list[str] = field(default_factory=list)
+    dishes: list[dict] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -70,15 +75,25 @@ class ValidationResult:
 
 @dataclass(frozen=True)
 class PlannedMeal:
-    """Một món đã xếp vào một slot bữa trong ngày."""
-    meal_id: int
+    """Một bữa (mâm cơm/meal_set) đã xếp vào một slot trong ngày.
+
+    `dishes` = các món con {dish_id, role, name, sort_order} để UI nhóm theo vai
+    trò; `components` = tên món con dạng phẳng (tương thích cũ). Với candidate
+    meal_set: `meal_id=None`, dùng `meal_set_id`. `meal_id` giữ lại để plan cũ
+    (vốn tham chiếu meals.id) không vỡ.
+    """
+    meal_id: int | None
     name: str
     meal_type: str          # breakfast/lunch/dinner
+    components: list[str]
     calories: float
     protein_g: float
     fat_g: float
     carb_g: float
     cost: float
+    dishes: list[dict] = field(default_factory=list)
+    meal_set_id: int | None = None
+    candidate_type: str = "meal_set"
 
 
 @dataclass(frozen=True)

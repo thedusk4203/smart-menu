@@ -1,15 +1,26 @@
-// File: frontend/src/app/providers.tsx
-// Nơi đặt các provider dùng chung toàn app (Toaster, và sau này có thể thêm
-// Context, React Query...). Bọc quanh RouterProvider.
-import { RouterProvider } from "react-router-dom";
+// Gom cac provider toan cuc: xac thuc + thong bao toast.
+import type { ReactNode } from "react";
 import { Toaster } from "react-hot-toast";
-import { router } from "./router";
+import { AuthProvider } from "../context/AuthContext";
 
-export default function AppProviders() {
+export function Providers({ children }: { children: ReactNode }) {
   return (
-    <>
-      <Toaster position="top-center" />
-      <RouterProvider router={router} />
-    </>
+    <AuthProvider>
+      {children}
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3500,
+          style: {
+            borderRadius: "0.875rem",
+            background: "#1c2b27",
+            color: "#fff",
+            fontSize: "0.9rem",
+          },
+          success: { iconTheme: { primary: "#10b981", secondary: "#fff" } },
+          error: { iconTheme: { primary: "#ef4444", secondary: "#fff" } },
+        }}
+      />
+    </AuthProvider>
   );
 }

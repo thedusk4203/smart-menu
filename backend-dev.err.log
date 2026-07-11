@@ -1,0 +1,493 @@
+INFO:     Started server process [24312]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 1319, in _checkout
+    raise exc.InvalidatePoolError()
+sqlalchemy.exc.InvalidatePoolError: ()
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 144, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3319, in raw_connection
+    return self.pool.connect()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 1353, in _checkout
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 122, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 1350, in _checkout
+    fairy._connection_record.get_connection()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 837, in get_connection
+    self.__connect()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 122, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5433 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5433 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\uvicorn\protocols\http\h11_impl.py", line 415, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 62, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\applications.py", line 1163, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\middleware\cors.py", line 88, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 2531, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 1700, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 2586, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 1711, in _handle_selected
+    await route.handle(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 1700, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 2586, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 1720, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 1239, in handle
+    await app(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 150, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 136, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 473, in app
+    solved_result = await solve_dependencies(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\dependencies\utils.py", line 680, in solve_dependencies
+    solved = await run_in_threadpool(call, **solved_result.values)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\anyio\to_thread.py", line 63, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 2592, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 1029, in run
+    result = context.run(func, *args)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\app\core\deps.py", line 28, in get_current_user
+    user = repo.get_by_id(int(payload["sub"]))
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\app\modules\identity\repository.py", line 30, in get_by_id
+    row = self._session.get(UserModel, user_id)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 3702, in get
+    return self._get_impl(
+           ~~~~~~~~~~~~~~^
+        entity,
+        ^^^^^^^
+    ...<7 lines>...
+        bind_arguments=bind_arguments,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 3881, in _get_impl
+    return db_load_fn(
+        self,
+    ...<5 lines>...
+        bind_arguments=bind_arguments,
+    )
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\orm\loading.py", line 695, in load_on_pk_identity
+    session.execute(
+    ~~~~~~~~~~~~~~~^
+        q,
+        ^^
+    ...<2 lines>...
+        bind_arguments=bind_arguments,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlmodel\orm\session.py", line 136, in execute
+    return super().execute(
+           ~~~~~~~~~~~~~~~^
+        statement,
+        ^^^^^^^^^^
+    ...<4 lines>...
+        _add_event=_add_event,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2373, in execute
+    return self._execute_internal(
+           ~~~~~~~~~~~~~~~~~~~~~~^
+        statement,
+        ^^^^^^^^^^
+    ...<4 lines>...
+        _add_event=_add_event,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2261, in _execute_internal
+    conn = self._connection_for_bind(bind)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2113, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1191, in _connection_for_bind
+    conn = bind.connect()
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3295, in connect
+    return self._connection_cls(self)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 146, in __init__
+    Connection._handle_dbapi_exception_noconnection(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        err, dialect, engine
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2450, in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 144, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3319, in raw_connection
+    return self.pool.connect()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 1353, in _checkout
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 122, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 1350, in _checkout
+    fairy._connection_record.get_connection()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 837, in get_connection
+    self.__connect()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 122, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5433 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5433 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 144, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3319, in raw_connection
+    return self.pool.connect()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 717, in checkout
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 122, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 715, in checkout
+    dbapi_connection = rec.get_connection()
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 866, in get_connection
+    self.__connect()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 122, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5433 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5433 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\uvicorn\protocols\http\h11_impl.py", line 415, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 62, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\applications.py", line 1163, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\middleware\cors.py", line 88, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 2531, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 1700, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 2586, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 1711, in _handle_selected
+    await route.handle(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 1700, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 2586, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 1720, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 1239, in handle
+    await app(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 150, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 136, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\routing.py", line 473, in app
+    solved_result = await solve_dependencies(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\fastapi\dependencies\utils.py", line 680, in solve_dependencies
+    solved = await run_in_threadpool(call, **solved_result.values)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\anyio\to_thread.py", line 63, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 2592, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 1029, in run
+    result = context.run(func, *args)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\app\core\deps.py", line 28, in get_current_user
+    user = repo.get_by_id(int(payload["sub"]))
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\app\modules\identity\repository.py", line 30, in get_by_id
+    row = self._session.get(UserModel, user_id)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 3702, in get
+    return self._get_impl(
+           ~~~~~~~~~~~~~~^
+        entity,
+        ^^^^^^^
+    ...<7 lines>...
+        bind_arguments=bind_arguments,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 3881, in _get_impl
+    return db_load_fn(
+        self,
+    ...<5 lines>...
+        bind_arguments=bind_arguments,
+    )
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\orm\loading.py", line 695, in load_on_pk_identity
+    session.execute(
+    ~~~~~~~~~~~~~~~^
+        q,
+        ^^
+    ...<2 lines>...
+        bind_arguments=bind_arguments,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlmodel\orm\session.py", line 136, in execute
+    return super().execute(
+           ~~~~~~~~~~~~~~~^
+        statement,
+        ^^^^^^^^^^
+    ...<4 lines>...
+        _add_event=_add_event,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2373, in execute
+    return self._execute_internal(
+           ~~~~~~~~~~~~~~~~~~~~~~^
+        statement,
+        ^^^^^^^^^^
+    ...<4 lines>...
+        _add_event=_add_event,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2261, in _execute_internal
+    conn = self._connection_for_bind(bind)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2113, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1191, in _connection_for_bind
+    conn = bind.connect()
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3295, in connect
+    return self._connection_cls(self)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 146, in __init__
+    Connection._handle_dbapi_exception_noconnection(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        err, dialect, engine
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2450, in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 144, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3319, in raw_connection
+    return self.pool.connect()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 717, in checkout
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 122, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 715, in checkout
+    dbapi_connection = rec.get_connection()
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 866, in get_connection
+    self.__connect()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 122, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\TheDusk4203\Desktop\Antigravity\smart-menu\backend\.venv\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5433 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5433 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)

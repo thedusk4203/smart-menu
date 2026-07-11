@@ -35,9 +35,32 @@ def get_current_user(
 
 
 def require_admin(current_user: UserEntity = Depends(get_current_user)) -> UserEntity:
-    if current_user.role != UserRole.ADMIN:
+    """Tương thích ngược: admin cũ được xem như super admin."""
+    if current_user.role not in {UserRole.ADMIN, UserRole.SUPER_ADMIN}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Yêu cầu quyền quản trị (admin)",
+        )
+    return current_user
+
+
+def require_super_admin(current_user: UserEntity = Depends(get_current_user)) -> UserEntity:
+    if current_user.role not in {UserRole.ADMIN, UserRole.SUPER_ADMIN}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ quản trị viên hệ thống mới được thực hiện thao tác này",
+        )
+    return current_user
+
+
+def require_data_editor(current_user: UserEntity = Depends(get_current_user)) -> UserEntity:
+    if current_user.role not in {
+        UserRole.ADMIN,
+        UserRole.SUPER_ADMIN,
+        UserRole.DATA_EDITOR,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn không có quyền quản lý dữ liệu thực phẩm",
         )
     return current_user

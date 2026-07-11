@@ -26,6 +26,7 @@ class MealSummary(BaseModel):
     cooking_method: CookingMethod | None = None
     servings: int
     tags: list = []
+    components: list[str] = []
     is_active: bool
     total_calories: float
     total_protein_g: float
@@ -48,6 +49,7 @@ class MealCreate(BaseModel):
     instructions: str | None = None
     servings: int = 1
     tags: list = []
+    components: list[str] = []
     ingredients: list[MealIngredientInput] = []
 
 
@@ -59,4 +61,5 @@ class MealUpdate(BaseModel):
     instructions: str | None = None
     servings: int | None = None
     tags: list | None = None
+    components: list[str] | None = None
     is_active: bool | None = None

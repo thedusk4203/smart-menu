@@ -15,7 +15,7 @@ def _f(v):
 def _summary(row) -> MealFullEntity:
     return MealFullEntity(
         id=row.id, name=row.name, meal_type=row.meal_type, cooking_method=row.cooking_method,
-        servings=row.servings, tags=row.tags, is_active=row.is_active,
+        servings=row.servings, tags=row.tags, components=row.components or [], is_active=row.is_active,
         total_calories=_f(row.total_calories), total_protein_g=_f(row.total_protein_g),
         total_carbs_g=_f(row.total_carbs_g), total_fat_g=_f(row.total_fat_g),
         estimated_cost=_f(row.estimated_cost),
@@ -26,7 +26,7 @@ def _to_entity(row: MealModel) -> MealEntity:
     return MealEntity(
         id=row.id, name=row.name, meal_type=row.meal_type, cooking_method=row.cooking_method,
         description=row.description, instructions=row.instructions, servings=row.servings,
-        tags=row.tags, is_active=row.is_active,
+        tags=row.tags, components=row.components or [], is_active=row.is_active,
     )
 
 
@@ -80,7 +80,7 @@ class SqlMealRepository(MealRepositoryPort):
     def create(self, meal: MealEntity, ingredients: list[MealIngredientEntity]) -> MealEntity:
         row = MealModel(name=meal.name, meal_type=meal.meal_type, cooking_method=meal.cooking_method,
                          description=meal.description, instructions=meal.instructions,
-                         servings=meal.servings, tags=meal.tags)
+                         servings=meal.servings, tags=meal.tags, components=meal.components)
         self._session.add(row)
         self._session.commit()
         self._session.refresh(row)
@@ -93,7 +93,7 @@ class SqlMealRepository(MealRepositoryPort):
     def save(self, meal: MealEntity) -> MealEntity:
         row = self._session.get(MealModel, meal.id)
         for f in ("name", "meal_type", "cooking_method", "description", "instructions",
-                  "servings", "tags", "is_active"):
+                  "servings", "tags", "components", "is_active"):
             setattr(row, f, getattr(meal, f))
         self._session.add(row)
         self._session.commit()

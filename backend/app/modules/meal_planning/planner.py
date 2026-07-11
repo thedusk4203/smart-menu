@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from dataclasses import asdict
 from datetime import date, timedelta
 
@@ -18,6 +19,11 @@ from app.modules.meal_planning.scorer import DEFAULT_WEIGHTS, ScoringWeights
 # Cảnh báo mềm khi tổng calo/ngày lệch quá ngưỡng so với mục tiêu.
 _CALORIE_WARN_TOLERANCE = 0.25
 
+# Khi regenerate (FR-PLAN-05) có seed: thay vì luôn chọn món điểm cao nhất,
+# chọn NGẪU NHIÊN (theo seed) trong top-K món điểm cao nhất còn hợp lệ. Nhờ đó
+# mỗi lần "tạo lại" cho thực đơn KHÁC nhau nhưng vẫn chất lượng + vẫn qua validator.
+_VARIETY_TOP_K = 3
+
 
 class HeuristicPlanner(MealPlannerPort):
     """Sinh thực đơn bằng greedy + chấm điểm soft-constraint."""
@@ -33,7 +39,12 @@ class HeuristicPlanner(MealPlannerPort):
         candidates: list[MealCandidate],
         *,
         start_date: date | None = None,
+        seed: int | None = None,
     ) -> MealPlanEntity | ValidationResult:
+        # seed=None  -> chọn deterministic (luôn món điểm cao nhất) như cũ.
+        # seed=<int> -> chọn ngẫu nhiên-có-kiểm-soát trong top-K để "tạo lại" ra
+        #               thực đơn khác (FR-PLAN-05). Cùng seed -> cùng kết quả (tái lập được).
+        rng = random.Random(seed) if seed is not None else None
         slots = constraint_checker.slots_for(request.meals_per_day)
 
         excluded = set(request.excluded_ingredient_ids)
@@ -78,6 +89,7 @@ class HeuristicPlanner(MealPlannerPort):
                     day_ingredient_ids=day_ingredient_ids,
                     max_cost=max_cost,
                     remaining_budget=remaining_budget,
+                    rng=rng,
                 )
                 if pick is None:
                     # Không còn món nào nằm trong ngân sách còn lại -> bất khả thi.
@@ -114,23 +126,36 @@ class HeuristicPlanner(MealPlannerPort):
         day_ingredient_ids: set[int],
         max_cost: float,
         remaining_budget: float,
+        rng: random.Random | None = None,
     ) -> MealCandidate | None:
-        """Trả món điểm cao nhất còn nằm trong ngân sách còn lại; None nếu
-        không còn món nào đủ rẻ (HC-01 ở mức ghép động)."""
+        """Trả món phù hợp cho slot, còn nằm trong ngân sách còn lại; None nếu
+        không còn món nào đủ rẻ (HC-01 ở mức ghép động).
+
+        - rng is None : chọn deterministic — món điểm cao nhất (hành vi mặc định).
+        - rng có seed : chọn ngẫu nhiên trong top-K món điểm cao nhất (FR-PLAN-05,
+          "tạo lại thực đơn khác"), vẫn ưu tiên món tốt nên chất lượng không giảm.
+        """
         affordable = [c for c in pool if c.estimated_cost <= remaining_budget]
         if not affordable:
             return None
-        return max(
-            affordable,
-            key=lambda c: scorer.score_candidate(
+
+        def _score(c: MealCandidate) -> float:
+            return scorer.score_candidate(
                 c,
                 request,
                 usage_count=usage_count,
                 day_ingredient_ids=day_ingredient_ids,
                 max_cost=max_cost,
                 weights=self._weights,
-            ),
-        )
+            )
+
+        if rng is None:
+            return max(affordable, key=_score)
+
+        # Xếp điểm giảm dần, lấy top-K rồi bốc ngẫu nhiên (theo seed) 1 món.
+        ranked = sorted(affordable, key=_score, reverse=True)
+        top = ranked[: min(_VARIETY_TOP_K, len(ranked))]
+        return rng.choice(top)
 
 
     def _collect_warnings(
@@ -171,14 +196,18 @@ class HeuristicPlanner(MealPlannerPort):
                 date=day_date,
                 meals=[
                     PlannedMeal(
-                        meal_id=m.meal_id,
+                        meal_id=None,
                         name=m.name,
                         meal_type=m.meal_type,
+                        components=list(m.components),
                         calories=round(m.total_calories, 1),
                         protein_g=round(m.total_protein_g, 1),
                         fat_g=round(m.total_fat_g, 1),
                         carb_g=round(m.total_carb_g, 1),
                         cost=round(m.estimated_cost, 0),
+                        dishes=list(m.dishes),
+                        meal_set_id=m.meal_id,
+                        candidate_type="meal_set",
                     )
                     for m in day
                 ],
