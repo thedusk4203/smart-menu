@@ -12,3 +12,6 @@ __pycache__/
 .venv/
 .uv-cache/
 AGENTS.md
+PRODUCT.md
+.impeccable/
+duc-tasks.md
