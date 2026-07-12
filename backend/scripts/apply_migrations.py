@@ -18,6 +18,7 @@ MIGRATION_ORDER = (
     "20260711_ai_conversation_nonempty_answers.sql",
     "20260711_google_gemini_provider.sql",
     "20260712_menu_names_tags_shares.sql",
+    "20260712_ai_conversation_retention.sql",
 )
 
 

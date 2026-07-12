@@ -382,6 +382,8 @@ CREATE TABLE ai_conversations (
 );
 CREATE INDEX idx_ai_conversations_user_updated
     ON ai_conversations (user_id, updated_at DESC, id DESC);
+CREATE INDEX idx_ai_conversations_retention
+    ON ai_conversations (updated_at);
 
 CREATE TABLE ai_conversation_turns (
     id                  BIGSERIAL       PRIMARY KEY,
