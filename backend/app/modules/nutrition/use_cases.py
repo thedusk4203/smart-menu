@@ -1,4 +1,3 @@
-# File: backend/app/modules/nutrition/use_cases.py
 # Application-layer use cases for the nutrition module.
 
 from __future__ import annotations

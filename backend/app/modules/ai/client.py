@@ -1,4 +1,3 @@
-# File: backend/app/modules/ai/client.py
 from __future__ import annotations
 
 import json

@@ -1,4 +1,3 @@
-# File: backend/app/modules/ingredients/schemas.py
 from __future__ import annotations
 
 from pydantic import BaseModel

@@ -1,32 +1,57 @@
-# Docker Compose cho DB Postgres cua Smart Menu (dung cho dev/demo).
-# Khoi dong:  docker compose up -d
-#
-# CHU Y: publish ra cong HOST 5433 (khong phai 5432) de tranh dung do voi
-# Postgres cai san tren may (cong 5432 dang bi mot Postgres khac chiem, gay loi
-# "password authentication failed"). Container van chay Postgres o cong noi bo 5432.
-# Vi vay backend phai tro toi cong 5433 -> xem backend/.env (DATABASE_URL).
-#
-# Lan dau khoi tao, Postgres tu chay moi file .sql trong /docker-entrypoint-initdb.d/
-# nen data/init_db.sql se tao schema + seed (2 tai khoan demo) mot cach tu dong.
-# Neu muon nap lai tu dau: docker compose down -v  roi  docker compose up -d
 services:
   db:
     image: postgres:16
-    container_name: smart-menu-db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: DATN
+      POSTGRES_USER: ${POSTGRES_USER:-smart_menu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-smart_menu}
     ports:
-      - "5433:5432"
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
     volumes:
       - ./data/init_db.sql:/docker-entrypoint-initdb.d/01_init_db.sql:ro
       - smart_menu_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d DATN"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 3s
       retries: 10
+
+  backend:
+    profiles: ["demo"]
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    environment:
+      APP_ENV: demo
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-smart_menu}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-smart_menu}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
+      AI_ENABLED: ${AI_ENABLED:-false}
+      AI_CONFIG_ENCRYPTION_KEY: ${AI_CONFIG_ENCRYPTION_KEY:-}
+      DEMO_SEED: ${DEMO_SEED:-false}
+      DEMO_ADMIN_EMAIL: ${DEMO_ADMIN_EMAIL:-}
+      DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-}
+      DEMO_USER_EMAIL: ${DEMO_USER_EMAIL:-}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  frontend:
+    profiles: ["demo"]
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    ports:
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   smart_menu_pgdata:

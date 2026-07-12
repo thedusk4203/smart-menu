@@ -171,7 +171,6 @@ export function Assistant() {
   const [input, setInput] = useState("");
   const [activeStream, setActiveStream] = useState<ActiveStream | null>(null);
   const [enabled, setEnabled] = useState<boolean | null>(null);
-  const [provider, setProvider] = useState("");
   const [historyLoading, setHistoryLoading] = useState(true);
   const [conversationLoading, setConversationLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -223,11 +222,6 @@ export function Assistant() {
       if (cancelled) return;
       if (statusResult.status === "fulfilled") {
         setEnabled(statusResult.value.enabled);
-        setProvider(
-          [statusResult.value.provider_name, statusResult.value.model]
-            .filter(Boolean)
-            .join(" · "),
-        );
       } else {
         setEnabled(false);
       }
@@ -474,7 +468,7 @@ export function Assistant() {
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
           {enabled
-            ? `Đang kết nối ${provider || "LLM provider"}. Tối đa 10 cuộc trò chuyện được lưu đến khi bạn xóa; nhật ký vận hành được giữ tối đa 30 ngày.`
+            ? "Lịch sử chat được lưu tối đa 30 ngày."
             : "AI chưa được quản trị viên kích hoạt. Lịch sử đã lưu vẫn có thể xem lại."}
         </span>
       </div>

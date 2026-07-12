@@ -1,4 +1,3 @@
-# File: backend/app/modules/meals/repository.py
 from __future__ import annotations
 
 from sqlalchemy import text

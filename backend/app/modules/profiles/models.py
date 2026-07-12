@@ -1,4 +1,3 @@
-# File: backend/app/modules/profiles/models.py
 # SQLModel ORM models — map to user_profiles và user_excluded_ingredients
 # (tạo bởi data/init_db.sql).
 from __future__ import annotations

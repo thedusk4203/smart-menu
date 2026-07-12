@@ -1,4 +1,3 @@
-# File: backend/app/modules/identity/domain.py
 # Domain entity for a user account. Pure Python — no FastAPI/SQLModel.
 from __future__ import annotations
 

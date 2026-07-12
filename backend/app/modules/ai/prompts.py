@@ -1,4 +1,3 @@
-# File: backend/app/modules/ai/prompts.py
 from __future__ import annotations
 
 

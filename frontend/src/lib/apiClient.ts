@@ -1,4 +1,3 @@
-// HTTP client dung chung: tu gan Bearer token, chuan hoa loi, xu ly 401.
 import { clearToken, getToken } from "./auth";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";

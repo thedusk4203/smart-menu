@@ -23,8 +23,8 @@ export function Register() {
       toast.error("Mật khẩu xác nhận không khớp");
       return;
     }
-    if (password.length < 6) {
-      toast.error("Mật khẩu cần tối thiểu 6 ký tự");
+    if (password.length < 8) {
+      toast.error("Mật khẩu cần tối thiểu 8 ký tự");
       return;
     }
     setLoading(true);
@@ -56,6 +56,7 @@ export function Register() {
           type="email"
           autoComplete="email"
           required
+          minLength={8}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="ban@email.com"
@@ -67,7 +68,7 @@ export function Register() {
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Tối thiểu 6 ký tự"
+          placeholder="Tối thiểu 8 ký tự"
         />
         <TextField
           label="Xác nhận mật khẩu"

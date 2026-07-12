@@ -1,4 +1,3 @@
-# File: backend/app/modules/identity/models.py
 # SQLModel ORM model (infrastructure layer) — maps to the `users` table
 # created by data/init_db.sql. Not imported by domain.py / use_cases.py.
 from __future__ import annotations

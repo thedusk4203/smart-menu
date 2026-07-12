@@ -1,4 +1,3 @@
-# File: backend/app/modules/meals/exceptions.py
 from __future__ import annotations
 
 from app.core.exceptions import NotFoundError

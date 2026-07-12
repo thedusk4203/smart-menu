@@ -1,4 +1,3 @@
-# File: backend/app/tests/test_nutrition/test_domain.py
 # Unit tests for nutrition domain objects.
 
 import pytest

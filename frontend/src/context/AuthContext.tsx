@@ -1,4 +1,3 @@
-// Context xac thuc: giu user hien tai, xu ly dang nhap/dang ky/dang xuat.
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { authApi } from "../api/authApi";

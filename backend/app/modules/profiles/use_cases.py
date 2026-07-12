@@ -1,4 +1,3 @@
-# File: backend/app/modules/profiles/use_cases.py
 from __future__ import annotations
 
 from app.modules.profiles.domain import ExcludedIngredientEntity, UserProfileEntity

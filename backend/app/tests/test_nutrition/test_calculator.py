@@ -1,4 +1,3 @@
-# File: backend/app/tests/test_nutrition/test_calculator.py
 # Unit tests for NutritionCalculator.
 
 import pytest

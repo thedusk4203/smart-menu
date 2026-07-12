@@ -1,4 +1,3 @@
-# File: backend/app/core/exceptions.py
 # Base application exceptions. Domain/use-case layers raise these (or
 # module-specific subclasses) without importing FastAPI. The presentation
 # layer (main.py) maps them to HTTP responses via a single exception handler.

@@ -40,16 +40,6 @@ export function Login() {
     }
   };
 
-  const fillDemo = (kind: "admin" | "user") => {
-    if (kind === "admin") {
-      setEmail("admin@demo.com");
-      setPassword("admin123");
-    } else {
-      setEmail("user@demo.com");
-      setPassword("user123");
-    }
-  };
-
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900">Đăng nhập</h1>
@@ -78,18 +68,6 @@ export function Login() {
           Đăng nhập
         </Button>
       </form>
-
-      <div className="mt-4 rounded-xl bg-sand-50 p-3">
-        <p className="mb-2 text-xs font-medium text-gray-500">Điền nhanh tài khoản demo:</p>
-        <div className="flex gap-2">
-          <Button variant="secondary" size="sm" onClick={() => fillDemo("admin")} className="flex-1">
-            Quản trị
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => fillDemo("user")} className="flex-1">
-            Người dùng
-          </Button>
-        </div>
-      </div>
 
       <p className="mt-6 text-center text-sm text-gray-500">
         Chưa có tài khoản?{" "}

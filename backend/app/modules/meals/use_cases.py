@@ -1,4 +1,3 @@
-# File: backend/app/modules/meals/use_cases.py
 from __future__ import annotations
 
 from app.modules.meals.domain import MealEntity, MealFullEntity, MealIngredientEntity

@@ -1,4 +1,3 @@
-# File: backend/app/modules/identity/exceptions.py
 # Domain exceptions for the identity module.
 from __future__ import annotations
 

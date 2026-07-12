@@ -1,16 +1,13 @@
-﻿# File: backend/app/main.py
-# Application entrypoint.
-#
-# NOTE: schema CSDL do data/init_db.sql (hoáº·c Alembic migrations) quáº£n lÃ½ â€”
-# KHÃ”NG gá»i SQLModel.metadata.create_all() á»Ÿ Ä‘Ã¢y.
 from __future__ import annotations
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api import api_router
 from app.core.exceptions import AppException
+from app.core.config import settings
+from app.core.database import engine
 
 app = FastAPI(
     title="Smart Menu API",
@@ -20,7 +17,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -40,6 +37,24 @@ app.include_router(api_router)
 
 @app.get("/health", tags=["system"])
 def health_check():
+    return {"status": "ok"}
+
+
+@app.get("/health/live", tags=["system"])
+def liveness_check():
+    return {"status": "ok"}
+
+
+@app.get("/health/ready", tags=["system"])
+def readiness_check():
+    try:
+        with engine.connect() as connection:
+            connection.exec_driver_sql("SELECT 1")
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database chưa sẵn sàng.",
+        ) from exc
     return {"status": "ok"}
 
 

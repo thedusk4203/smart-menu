@@ -1,4 +1,3 @@
-# File: backend/app/modules/ai/schemas.py
 from __future__ import annotations
 
 from datetime import datetime

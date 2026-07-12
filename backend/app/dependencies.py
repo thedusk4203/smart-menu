@@ -1,4 +1,3 @@
-# File: backend/app/dependencies.py
 # Composition root: nối use case với repository qua FastAPI Depends().
 from __future__ import annotations
 

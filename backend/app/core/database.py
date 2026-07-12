@@ -1,8 +1,3 @@
-# File: backend/app/core/database.py
-# Database engine and session factory.
-#
-# NOTE: schema is owned by Alembic migrations / data/init_db.sql (single
-# source of truth) — do NOT call SQLModel.metadata.create_all() here.
 from __future__ import annotations
 
 from collections.abc import Generator

@@ -1,4 +1,3 @@
-# File: backend/app/modules/profiles/ports.py
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

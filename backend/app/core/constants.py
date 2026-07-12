@@ -1,4 +1,3 @@
-# File: backend/app/core/constants.py
 # Shared constants used across modules.
 
 DEFAULT_PAGE_LIMIT = 100

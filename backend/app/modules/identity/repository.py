@@ -1,4 +1,3 @@
-# File: backend/app/modules/identity/repository.py
 # SQLModel implementation of UserRepositoryPort (infrastructure layer).
 from __future__ import annotations
 

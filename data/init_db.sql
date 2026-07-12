@@ -631,17 +631,7 @@ COMMENT ON VIEW v_meal_plan_summary IS 'Tóm tắt thực đơn + cờ vượt n
 
 -- ============================================================
 -- PHẦN 4: DỮ LIỆU MẪU (SEED) — tối thiểu để chạy/demo
--- 2 tài khoản demo: admin@demo.com / admin123, user@demo.com / user123
--- (Mật khẩu đã hash bằng bcrypt cost 12)
 -- ============================================================
-
-INSERT INTO users (email, hashed_password, role) VALUES
-('admin@demo.com', '$2b$12$4hzAQtCbT.JRoxgOrmaDoObP3brV5B9VUWQaOBOTuo0po1nAFs09C', 'admin'),
-('user@demo.com',  '$2b$12$4Na3jWlR4iZCJrESe6U2ceUn8LM/GHnG8V8mFw3S3/.M5Q2TUq8cW', 'user');
-
-INSERT INTO user_profiles (user_id, full_name, gender, age, height_cm, weight_kg, activity_level, goal, meals_per_day, daily_calorie_target, daily_budget)
-VALUES
-(2, 'Người dùng Demo', 'male', 22, 170.0, 65.0, 'moderate', 'gain_muscle', 3, 2400, 80000);
 
 -- Seed demo đủ rộng cho planner: ~40 nguyên liệu, 24 món (8 sáng / 8 trưa / 8 tối).
 -- Số liệu dinh dưỡng và giá là ước lượng hợp lý cho demo; không dùng như dữ liệu y tế/chợ chính thức.
@@ -950,14 +940,6 @@ FROM (VALUES
 ) AS v(meal_name, ingredient_name, quantity, unit)
 JOIN meals m ON m.name = v.meal_name
 JOIN ingredients i ON i.name = v.ingredient_name;
-
--- Ví dụ minh hoạ ràng buộc loại trừ: user demo không ăn đậu phộng.
--- Chỉ loại một món sáng, không làm mất nghiệm lunch/dinner của planner.
-INSERT INTO user_excluded_ingredients (user_id, ingredient_id, reason)
-SELECT 2, id, 'dislike'
-FROM ingredients
-WHERE name = 'Đậu phộng';
-
 
 -- ============================================================
 -- Seed Dish Planner V2: dishes + dish_ingredients.
