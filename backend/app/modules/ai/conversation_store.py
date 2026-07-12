@@ -10,6 +10,7 @@ from app.core.exceptions import ConflictError, NotFoundError
 
 MAX_CONVERSATIONS = 10
 MAX_TURNS = 20
+CONVERSATION_RETENTION_DAYS = 30
 
 
 def make_conversation_title(message: str) -> str:
@@ -26,6 +27,7 @@ class ConversationStore:
         self.session = session
 
     def list_for_user(self, user_id: int) -> list[dict[str, Any]]:
+        self.purge_expired()
         rows = self.session.execute(
             text(
                 """SELECT c.id, c.title, COUNT(t.id)::integer AS turn_count,
@@ -48,6 +50,7 @@ class ConversationStore:
         return [dict(row) for row in rows]
 
     def get_for_user(self, conversation_id: int, user_id: int) -> dict[str, Any]:
+        self.purge_expired()
         conversation = self._owned_conversation(conversation_id, user_id)
         turns = self.session.execute(
             text(
@@ -87,6 +90,7 @@ class ConversationStore:
         message: str,
         conversation_id: int | None,
     ) -> tuple[int, dict[str, Any]]:
+        self.purge_expired()
         if conversation_id is None:
             # Khóa row user để hai request đồng thời không cùng vượt giới hạn 10.
             self.session.execute(
@@ -166,6 +170,7 @@ class ConversationStore:
     def prepare_retry(
         self, *, conversation_id: int, turn_id: int, user_id: int
     ) -> dict[str, Any]:
+        self.purge_expired()
         self._lock_owned_conversation(conversation_id, user_id)
         latest = self.session.execute(
             text(
@@ -256,6 +261,24 @@ class ConversationStore:
         )
         self._touch(conversation_id)
         self.session.commit()
+
+    def purge_expired(self) -> int:
+        """Xóa toàn bộ conversation không hoạt động quá 30 ngày.
+
+        Foreign key `ON DELETE CASCADE` đảm bảo các turns liên quan cũng bị xóa.
+        Method này được gọi bởi lifecycle nền và ngay trước các thao tác đọc/ghi
+        để bản ghi quá hạn không thể xuất hiện lại giữa hai lần chạy job.
+        """
+        deleted = self.session.execute(
+            text(
+                """DELETE FROM ai_conversations
+                     WHERE updated_at < NOW() - make_interval(days => :retention_days)
+                 RETURNING id"""
+            ),
+            {"retention_days": CONVERSATION_RETENTION_DAYS},
+        ).scalars().all()
+        self.session.commit()
+        return len(deleted)
 
     def _owned_conversation(self, conversation_id: int, user_id: int):
         row = self.session.execute(

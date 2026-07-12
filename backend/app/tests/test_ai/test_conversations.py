@@ -258,3 +258,60 @@ def test_conversation_store_limits_twenty_turns(db_session):
     finally:
         db_session.execute(text("DELETE FROM users WHERE id=:id"), {"id": user_id})
         db_session.commit()
+
+
+def test_conversation_store_purges_only_history_inactive_for_over_thirty_days(db_session):
+    email = f"ai-retention-{uuid4()}@example.com"
+    user_id = int(
+        db_session.execute(
+            text(
+                """INSERT INTO users (email, hashed_password, role)
+                   VALUES (:email, 'test', 'user') RETURNING id"""
+            ),
+            {"email": email},
+        ).scalar_one()
+    )
+    old_conversation_id = int(
+        db_session.execute(
+            text(
+                """INSERT INTO ai_conversations (user_id, title, created_at, updated_at)
+                   VALUES (:user_id, 'Hết hạn', NOW() - INTERVAL '31 days',
+                           NOW() - INTERVAL '31 days')
+                   RETURNING id"""
+            ),
+            {"user_id": user_id},
+        ).scalar_one()
+    )
+    recent_conversation_id = int(
+        db_session.execute(
+            text(
+                """INSERT INTO ai_conversations (user_id, title, created_at, updated_at)
+                   VALUES (:user_id, 'Còn hạn', NOW() - INTERVAL '29 days',
+                           NOW() - INTERVAL '29 days')
+                   RETURNING id"""
+            ),
+            {"user_id": user_id},
+        ).scalar_one()
+    )
+    db_session.execute(
+        text(
+            """INSERT INTO ai_conversation_turns
+                   (conversation_id, turn_number, user_content, assistant_content, status)
+               VALUES (:conversation_id, 1, 'Câu hỏi cũ', 'Câu trả lời cũ', 'completed')"""
+        ),
+        {"conversation_id": old_conversation_id},
+    )
+    db_session.commit()
+    store = ConversationStore(db_session)
+
+    try:
+        summaries = store.list_for_user(user_id)
+
+        assert {item["id"] for item in summaries} == {recent_conversation_id}
+        assert db_session.execute(
+            text("SELECT COUNT(*) FROM ai_conversation_turns WHERE conversation_id=:id"),
+            {"id": old_conversation_id},
+        ).scalar_one() == 0
+    finally:
+        db_session.execute(text("DELETE FROM users WHERE id=:id"), {"id": user_id})
+        db_session.commit()

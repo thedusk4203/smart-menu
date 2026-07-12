@@ -49,6 +49,9 @@ class Settings:
     )
     ai_model: str = os.getenv("AI_MODEL", "").strip()
     ai_timeout_seconds: float = float(os.getenv("AI_TIMEOUT_SECONDS", "60"))
+    ai_conversation_cleanup_interval_seconds: int = int(
+        os.getenv("AI_CONVERSATION_CLEANUP_INTERVAL_SECONDS", "3600")
+    )
     ai_config_encryption_key: str | None = os.getenv("AI_CONFIG_ENCRYPTION_KEY")
     cors_origins: list[str] = _env_list(
         "CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
