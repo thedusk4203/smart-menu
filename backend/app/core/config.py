@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 
 from dotenv import load_dotenv
+from sqlalchemy.engine import URL
 
 load_dotenv()
 
@@ -17,6 +18,20 @@ def _env_bool(name: str, default: bool = False) -> bool:
 
 def _env_list(name: str, default: str) -> list[str]:
     return [value.strip() for value in os.getenv(name, default).split(",") if value.strip()]
+
+
+def _database_url() -> str:
+    explicit_url = os.getenv("DATABASE_URL")
+    if explicit_url:
+        return explicit_url
+    return URL.create(
+        drivername="postgresql+psycopg2",
+        username=os.getenv("POSTGRES_USER", "postgres"),
+        password=os.getenv("POSTGRES_PASSWORD", "postgres"),
+        host=os.getenv("POSTGRES_HOST", "localhost"),
+        port=int(os.getenv("POSTGRES_PORT", "5432")),
+        database=os.getenv("POSTGRES_DB", "DATN"),
+    ).render_as_string(hide_password=False)
 
 
 def _default_ai_base_url(provider: str) -> str:
@@ -33,10 +48,7 @@ def _default_ai_base_url(provider: str) -> str:
 
 class Settings:
     app_env: str = os.getenv("APP_ENV", "development").strip().lower()
-    database_url: str = os.getenv(
-        "DATABASE_URL",
-        "postgresql+psycopg2://postgres:postgres@localhost:5432/DATN",
-    )
+    database_url: str = _database_url()
     secret_key: str = os.getenv("SECRET_KEY", "change-me-in-env")
     algorithm: str = os.getenv("ALGORITHM", "HS256")
     access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
