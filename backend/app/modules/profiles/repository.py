@@ -1,4 +1,3 @@
-# File: backend/app/modules/profiles/repository.py
 from __future__ import annotations
 
 from sqlmodel import Session, select

@@ -1,4 +1,3 @@
-# File: backend/app/core/config.py
 # Application configuration, loaded from environment variables (.env).
 from __future__ import annotations
 
@@ -16,6 +15,10 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _env_list(name: str, default: str) -> list[str]:
+    return [value.strip() for value in os.getenv(name, default).split(",") if value.strip()]
+
+
 def _default_ai_base_url(provider: str) -> str:
     if provider == "lmstudio":
         return "http://localhost:1234/v1"
@@ -29,6 +32,7 @@ def _default_ai_base_url(provider: str) -> str:
 
 
 class Settings:
+    app_env: str = os.getenv("APP_ENV", "development").strip().lower()
     database_url: str = os.getenv(
         "DATABASE_URL",
         "postgresql+psycopg2://postgres:postgres@localhost:5432/DATN",
@@ -46,6 +50,21 @@ class Settings:
     ai_model: str = os.getenv("AI_MODEL", "").strip()
     ai_timeout_seconds: float = float(os.getenv("AI_TIMEOUT_SECONDS", "60"))
     ai_config_encryption_key: str | None = os.getenv("AI_CONFIG_ENCRYPTION_KEY")
+    cors_origins: list[str] = _env_list(
+        "CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+    )
+
+    def validate_runtime(self) -> None:
+        if self.app_env in {"development", "test"}:
+            return
+        invalid_values = {"", "change-me-in-env", "change-this-to-a-long-random-secret"}
+        if self.secret_key in invalid_values:
+            raise RuntimeError("SECRET_KEY phải được cấu hình ngoài môi trường development.")
+        if not self.cors_origins:
+            raise RuntimeError("CORS_ORIGINS phải có ít nhất một origin ngoài development.")
+        if self.ai_enabled and (not self.ai_config_encryption_key or self.ai_config_encryption_key in invalid_values):
+            raise RuntimeError("AI_CONFIG_ENCRYPTION_KEY phải được cấu hình khi AI được bật.")
 
 
 settings = Settings()
+settings.validate_runtime()

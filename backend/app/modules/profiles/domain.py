@@ -1,4 +1,3 @@
-# File: backend/app/modules/profiles/domain.py
 # Domain entities for user profiles. Pure Python — no FastAPI/SQLModel.
 #
 # NOTE (Bình -> nhóm): gender/activity_level/goal reuse app.shared.enums

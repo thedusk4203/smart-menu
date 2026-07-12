@@ -1,4 +1,3 @@
-// Luu/lay/xoa JWT trong localStorage.
 const TOKEN_KEY = "smart_menu_token";
 
 export const getToken = (): string | null => localStorage.getItem(TOKEN_KEY);

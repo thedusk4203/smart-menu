@@ -1,4 +1,3 @@
-# File: backend/app/modules/nutrition/exceptions.py
 # Domain exceptions for the nutrition module.
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# File: backend/app/tests/test_nutrition/test_use_cases.py
 # Unit tests for CalculateNutritionTargetUseCase.
 
 import pytest

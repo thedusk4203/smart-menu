@@ -1,4 +1,3 @@
-# File: backend/app/modules/meal_planning/router.py
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status

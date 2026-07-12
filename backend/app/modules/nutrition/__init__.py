@@ -1,4 +1,3 @@
-# File: backend/app/modules/nutrition/__init__.py
 # Public API for the nutrition module.
 #
 # P1 fix: Only domain, calculator, and exceptions are eagerly imported.

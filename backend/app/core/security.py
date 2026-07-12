@@ -1,6 +1,3 @@
-# File: backend/app/core/security.py
-# Password hashing (passlib/bcrypt). JWT helpers included for the upcoming
-# authentication feature; not yet wired into any router.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone

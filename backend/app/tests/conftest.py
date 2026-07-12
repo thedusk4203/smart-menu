@@ -1,4 +1,3 @@
-# File: backend/app/tests/conftest.py
 # Fixtures dùng chung cho test TÍCH HỢP cần Postgres đã seed (data/init_db.sql).
 # Các test pure-unit (dùng fake/factory) không phụ thuộc fixture này.
 from __future__ import annotations

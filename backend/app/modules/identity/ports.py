@@ -1,4 +1,3 @@
-# File: backend/app/modules/identity/ports.py
 # Repository interface (port). Infrastructure (repository.py) implements
 # this; use_cases.py depends only on this abstraction, never on SQLModel.
 from __future__ import annotations

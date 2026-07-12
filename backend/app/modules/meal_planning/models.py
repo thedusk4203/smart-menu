@@ -1,4 +1,3 @@
-# File: backend/app/modules/meal_planning/models.py
 from __future__ import annotations
 
 from sqlalchemy import Column

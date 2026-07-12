@@ -1,4 +1,3 @@
-# File: backend/app/modules/ingredients/exceptions.py
 from __future__ import annotations
 
 from app.core.exceptions import ConflictError, NotFoundError

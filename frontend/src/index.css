@@ -1,13 +1,8 @@
 @import "tailwindcss";
 
-/* ============================================================
-   Theme "Tuoi & Khoe" — xanh la tuoi (brand) + cam am (accent)
-   Font Be Vietnam Pro (ho tro dau tieng Viet).
-   ============================================================ */
 @theme {
   --font-sans: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif;
 
-  /* Brand — xanh la tuoi (suc khoe, rau xanh) */
   --color-brand-50: #ecfdf5;
   --color-brand-100: #d1fae5;
   --color-brand-200: #a7f3d0;
@@ -19,7 +14,6 @@
   --color-brand-800: #065f46;
   --color-brand-900: #064e3b;
 
-  /* Accent — cam am (khau vi, nang luong) */
   --color-accent-50: #fff7ed;
   --color-accent-100: #ffedd5;
   --color-accent-200: #fed7aa;
@@ -29,7 +23,6 @@
   --color-accent-600: #ea580c;
   --color-accent-700: #c2410c;
 
-  /* Neutral am */
   --color-sand-50: #faf9f7;
   --color-sand-100: #f4f2ee;
   --color-sand-200: #e7e3db;
@@ -57,7 +50,6 @@
   }
 }
 
-/* Nen gradient nhe dung cho hero / trang auth */
 .bg-hero {
   background:
     radial-gradient(1200px 500px at 10% -10%, #d1fae5 0%, transparent 55%),
@@ -65,7 +57,6 @@
     var(--color-sand-50);
 }
 
-/* Thanh cuon manh */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--color-sand-300); border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background: #bcb4a4; }

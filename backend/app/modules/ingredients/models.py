@@ -1,4 +1,3 @@
-# File: backend/app/modules/ingredients/models.py
 # SQLModel ORM models — map to ingredients, nutrition_facts (tạo bởi
 # data/init_db.sql). v_ingredients_full được đọc trực tiếp bằng raw SQL
 # trong repository.py (không có model ORM cho view).

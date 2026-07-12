@@ -1,4 +1,3 @@
-# File: backend/app/api.py
 # Gom router của các module đã triển khai.
 from __future__ import annotations
 

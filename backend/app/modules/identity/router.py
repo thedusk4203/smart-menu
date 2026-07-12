@@ -1,7 +1,3 @@
-# File: backend/app/modules/identity/router.py
-# Presentation layer: HTTP endpoints for account management (/api/users).
-# Basic CRUD only — login/register (JWT) will be added when the team starts
-# the authentication feature.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -21,12 +17,13 @@ from app.dependencies import (
 )
 from app.modules.identity.domain import UserEntity
 from app.modules.identity.schemas import (
-    LoginRequest,
+    RegisterRequest,
     TokenResponse,
     UserCreate,
     UserResponse,
     UserUpdate,
 )
+from app.shared.enums import UserRole
 from app.modules.identity.use_cases import (
     CreateUserUseCase,
     DeleteUserUseCase,
@@ -43,11 +40,11 @@ auth_router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 @auth_router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(
-    data: UserCreate,
+    data: RegisterRequest,
     use_case: CreateUserUseCase = Depends(get_create_user_use_case),
     profile_use_case: CreateEmptyProfileUseCase = Depends(get_create_empty_profile_use_case),
 ):
-    user = use_case.execute(data.email, data.password, data.role)
+    user = use_case.execute(data.email, data.password, UserRole.USER)
     profile_use_case.execute(user.id, data.full_name)
     return user.__dict__
 

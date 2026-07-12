@@ -1,7 +1,3 @@
-# File: backend/app/modules/identity/use_cases.py
-# Application-layer use cases for the identity module (account CRUD).
-# Login/Register/Logout (JWT-based authentication) will be added here as a
-# separate set of use cases once the team starts the auth feature.
 from __future__ import annotations
 
 from app.core.security import hash_password
