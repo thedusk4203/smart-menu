@@ -1,19 +1,36 @@
-# Git Rule:
-* Một commit chỉ nên giải quyết MỘT vấn đề duy nhất.
-* Tạo nhánh riêng để làm việc. git checkout loại/tên user/tên tính năng VD: Đạt: git checkout -b feat/dat/ui-dashboard
-* Commit comment rõ ràng, chi tiết.
-* Không ai được đụng vào 'main'. Mọi thay đổi phải đi qua Pull Request (PR).
-* Trước khi tạo PR gộp code vào main, người tạo PR bắt buộc phải pull code mới nhất từ main về nhánh của mình, tự giải quyết conflict (nếu có), test chạy mượt mà trên máy mình rồi hãy push lên và tạo PR.
-* Khi cần sửa các file docker-compose.yml, main.py (Backend), router.tsx / App.tsx (Frontend), file .gitignore... thì nhắn vào nhóm trước.
-* Không commit file .env (chứa mật khẩu DB, API Key DeepSeek). Nếu lỡ thì chạy (git rm -r --cached <tênfile>), commit lại, push lên.
-* Không push code "rác" hoặc code chưa test.
-* Xoá, merge nhầm bị conflict thì bỏ qua nhánh hiện tại và tạo nhánh mới
+# Smart Menu
 
-# Note:
-    Các file hiện tại đều là file trống tạo sẵn để chuẩn cấu trúc thôi.
+Smart Menu tạo thực đơn theo mục tiêu dinh dưỡng và ngân sách từ dữ liệu nguyên liệu/món có cấu trúc. Frontend dùng React/TypeScript, backend FastAPI modular monolith và PostgreSQL; AI là trợ lý tùy chọn, không phải authority cho giá, dinh dưỡng hoặc tính hợp lệ thực đơn.
 
-# Cổng dịch vụ chuẩn
+## Bắt đầu nhanh
 
-- Chạy local: frontend `5173`, backend `8001`, PostgreSQL `5433`.
-- Chạy Docker demo: ứng dụng được mở qua `8080`; backend dùng `8000` chỉ trong mạng nội bộ Docker.
-- Không chạy một backend local khác ở `8000`. Vite luôn proxy `/api` sang `http://127.0.0.1:8001`.
+1. Tạo `.env` từ `.env.example` và `backend/.env` từ `backend/.env.example`; thay placeholder secret bằng dữ liệu local riêng.
+2. Chạy database: `docker compose up -d` (PostgreSQL local port `5433`).
+3. Backend: `cd backend; uv sync --extra dev; uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8001`.
+4. Frontend: `cd frontend; npm install; npm run dev` (Vite port `5173`, proxy `/api` tới `8001`).
+5. Kiểm backend bằng `/health/live` và `/health/ready`.
+
+Docker demo dùng `docker compose --profile demo up --build -d`; frontend mặc định ở `127.0.0.1:8080`, backend `8000` chỉ ở Docker network.
+
+## Tài liệu
+
+- [Bộ tài liệu đồ án](docs/README.md): slide, demo và hướng dẫn non-tech.
+- [Handbook kỹ thuật](docs/code/README.md): code architecture, database, planner, AI, API 97 operation, test và vận hành.
+- [API reference](docs/code/api/README.md): schema đầy đủ theo domain; Swagger runtime ở `/docs`.
+- [ADR](docs/code/adr/README.md): quyết định kiến trúc retrospective.
+
+## Kiểm tra trước khi bàn giao
+
+```powershell
+cd backend; uv run pytest -q
+cd frontend; npm run build
+cd frontend; npm run lint
+cd frontend; npm run check:release
+```
+
+## Quy tắc làm việc
+
+- Không commit `.env`, database password, token, API key, log hoặc build artifact.
+- Một commit chỉ giải quyết một vấn đề; không push trực tiếp `main`.
+- Thay đổi `docker-compose.yml`, backend `main.py`, frontend `router.tsx`/`App.tsx` cần phối hợp nhóm.
+- Khi thay đổi contract/schema/feature, cập nhật API docs, handbook, test và guide liên quan theo [maintenance workflow](docs/code/maintenance.md).
