@@ -19,14 +19,17 @@ MIGRATION_ORDER = (
     "20260711_google_gemini_provider.sql",
     "20260712_menu_names_tags_shares.sql",
     "20260712_ai_conversation_retention.sql",
+    "20260713_typed_import_tags.sql",
 )
+
+MANUAL_SCRIPTS = {"20260713_reset_food_catalog.sql"}
 
 
 def main() -> None:
     known = [MIGRATIONS_DIR / name for name in MIGRATION_ORDER]
     unknown = sorted(
         path for path in MIGRATIONS_DIR.glob("*.sql")
-        if path.is_file() and path.name not in MIGRATION_ORDER
+        if path.is_file() and path.name not in MIGRATION_ORDER and path.name not in MANUAL_SCRIPTS
     )
     migration_files = [path for path in known if path.is_file()] + unknown
     with Session(engine) as session:
@@ -43,6 +46,29 @@ def main() -> None:
             row[0]
             for row in session.execute(text("SELECT version FROM schema_migrations"))
         }
+        # Database được tạo từ init_db.sql đã chứa toàn bộ schema lịch sử nhưng
+        # có thể chưa có bảng theo dõi migration. Khi các mốc cuối đã hiện diện,
+        # ghi nhận baseline thay vì chạy lại các migration phá/tạo view cũ.
+        baseline_markers = (
+            "public.v_dish_candidates",
+            "public.tag_catalog",
+            "public.shopping_list_shares",
+            "public.llm_provider_configs",
+            "public.ai_conversations",
+        )
+        has_full_baseline = all(
+            session.execute(text("SELECT to_regclass(:name)"), {"name": marker}).scalar_one() is not None
+            for marker in baseline_markers
+        )
+        if has_full_baseline and "20260713_typed_import_tags.sql" not in applied:
+            for version in MIGRATION_ORDER[:-1]:
+                session.execute(
+                    text("""INSERT INTO schema_migrations (version) VALUES (:version)
+                            ON CONFLICT (version) DO NOTHING"""),
+                    {"version": version},
+                )
+                applied.add(version)
+            session.commit()
 
     for path in migration_files:
         if path.name in applied:

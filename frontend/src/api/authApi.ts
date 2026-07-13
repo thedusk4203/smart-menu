@@ -18,6 +18,9 @@ export const authApi = {
       { form: true, auth: false }
     ),
 
+  loginWithGoogle: (credential: string) =>
+    api.post<TokenResponse>("/api/auth/google", { credential }, { auth: false }),
+
   getMe: () => api.get<User>("/api/auth/me"),
 
   logout: () => api.post<{ detail: string }>("/api/auth/logout"),

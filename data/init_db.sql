@@ -160,6 +160,7 @@ CREATE TABLE ingredients (
     -- để khớp nutrition_facts (vốn tính trên 100g).
     --   g  -> 1     | ml (dầu) -> ~0.92 | quả (trứng) -> ~55 ...
     grams_per_unit  NUMERIC(10,4)   NOT NULL DEFAULT 1 CHECK (grams_per_unit > 0),
+    tags            JSONB           NOT NULL DEFAULT '[]'::jsonb,
     is_active       BOOLEAN         NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
@@ -635,6 +636,9 @@ COMMENT ON VIEW v_meal_plan_summary IS 'Tóm tắt thực đơn + cờ vượt n
 -- PHẦN 4: DỮ LIỆU MẪU (SEED) — tối thiểu để chạy/demo
 -- ============================================================
 
+-- Không seed nguyên liệu, món hoặc tag mặc định. Hệ thống khởi tạo với
+-- catalog thực phẩm trống để quản trị viên tự nhập hoặc import dữ liệu.
+/*
 -- Seed demo đủ rộng cho planner: ~40 nguyên liệu, 24 món (8 sáng / 8 trưa / 8 tối).
 -- Số liệu dinh dưỡng và giá là ước lượng hợp lý cho demo; không dùng như dữ liệu y tế/chợ chính thức.
 -- grams_per_unit: g->1, ml dầu->~0.92, ml sữa->~1.03, quả trứng->55, hộp sữa chua->100.
@@ -1093,6 +1097,7 @@ FROM (VALUES
 ) AS v(dish_name, ingredient_name, quantity, unit)
 JOIN dishes d ON d.name = v.dish_name
 JOIN ingredients i ON i.name = v.ingredient_name;
+*/
 
 -- Danh mục thẻ chuẩn tiếng Việt. Dữ liệu demo cũ dùng "healthy" được đổi
 -- ngay khi khởi tạo để không tạo thêm giá trị tiếng Anh trong DB mới.
@@ -1103,13 +1108,20 @@ WHERE tags::text LIKE '%"healthy"%';
 
 CREATE TABLE tag_catalog (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(64) NOT NULL UNIQUE,
+    name VARCHAR(64) NOT NULL,
+    entity_type VARCHAR(20) NOT NULL DEFAULT 'dish'
+        CHECK (entity_type IN ('ingredient', 'dish')),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_tag_catalog_type_name UNIQUE (entity_type, name)
 );
-INSERT INTO tag_catalog (name)
-SELECT DISTINCT tag FROM (
+CREATE INDEX idx_tag_catalog_type_active_name ON tag_catalog (entity_type, is_active, name);
+CREATE UNIQUE INDEX uq_tag_catalog_type_normalized_name
+    ON tag_catalog (entity_type, LOWER(BTRIM(name)));
+CREATE INDEX idx_ingredients_tags ON ingredients USING GIN (tags);
+INSERT INTO tag_catalog (entity_type, name)
+SELECT 'dish', tag FROM (
     SELECT jsonb_array_elements_text(tags) AS tag FROM meals
     UNION SELECT jsonb_array_elements_text(tags) AS tag FROM dishes
 ) AS all_tags

@@ -107,16 +107,19 @@ class QualityPolicy:
     calorie_deviation_weight: int = 10
     protein_shortage_weight: int = 16
     macro_deviation_weight: int = 3
-    savory_repeat_penalty: int = 50
-    side_repeat_penalty: int = 30
-    breakfast_repeat_penalty: int = 30
-    staple_repeat_penalty: int = 10
-    same_day_repeat_penalty: int = 70
-    consecutive_repeat_penalty: int = 80
+    # Quality phase is lexicographic in spirit: after nutrition has reached a
+    # small tolerance, avoiding repeated dishes must outweigh a modest price
+    # difference.  Costs are measured in thousands of VND in that phase.
+    savory_repeat_penalty: int = 80
+    side_repeat_penalty: int = 60
+    breakfast_repeat_penalty: int = 80
+    staple_repeat_penalty: int = 40
+    same_day_repeat_penalty: int = 500
+    consecutive_repeat_penalty: int = 300
     preferred_tag_bonus: int = 5
-    cooking_method_repeat_penalty: int = 5
+    cooking_method_repeat_penalty: int = 20
     cost_weight: int = 1
-    regenerate_quality_slack_pct: int = 5
+    quality_nutrition_slack_pct: int = 5
     timeout_seconds: float = 0.30
 
 

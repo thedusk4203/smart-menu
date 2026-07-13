@@ -59,6 +59,14 @@ export interface ExplainPlanPayload {
   total_calories?: number | null;
   budget_limit?: number | null;
 }
+export interface PlanExplanation extends ChatResponse {
+  summary: string;
+  budget_assessment: string;
+  nutrition_assessment: string;
+  highlights: string[];
+  cautions: string[];
+  recommendations: string[];
+}
 export interface SwapSuggestion {
   dish_id: number;
   name: string;
@@ -107,7 +115,7 @@ export const aiApi = {
     api.post<ParsedMenuRequest>("/api/ai/parse-menu-request", { message }),
 
   explainPlan: (payload: ExplainPlanPayload) =>
-    api.post<ChatResponse>("/api/ai/explain-plan", payload),
+    api.post<PlanExplanation>("/api/ai/explain-plan", payload),
 
   // Goi y doi mon se chi bat khi backend co candidate hop le va validate lai.
   suggestSwap: (payload: { day: number; meal_type: string; target_dish_id: number;

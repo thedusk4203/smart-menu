@@ -6,7 +6,13 @@ import io
 import pytest
 from openpyxl import load_workbook
 
-from app.modules.admin.use_cases import AdminService, _as_money, _as_optional_id, _normalized_code
+from app.modules.admin.use_cases import (
+    AdminService,
+    _as_money,
+    _as_optional_id,
+    _normalized_code,
+    _normalized_tags,
+)
 
 
 def test_import_code_is_normalized_and_rejects_unsafe_values():
@@ -21,6 +27,13 @@ def test_optional_import_id_requires_positive_integer():
     assert _as_optional_id("") is None
     with pytest.raises(ValueError, match="số nguyên dương"):
         _as_optional_id("0")
+
+
+def test_import_tags_are_normalized_deduplicated_and_limited():
+    assert _normalized_tags("  giàu đạm, nhanh , GIÀU ĐẠM ") == ["giàu đạm", "nhanh"]
+    assert _normalized_tags(["rau củ", " rau   củ ", "ít dầu"]) == ["rau củ", "ít dầu"]
+    with pytest.raises(ValueError, match="vượt quá 64"):
+        _normalized_tags("x" * 65)
 
 
 def test_import_money_accepts_raw_and_vietnamese_grouping():
@@ -43,6 +56,7 @@ def test_ingredient_csv_template_exposes_identity_columns():
     assert media_type.startswith("text/csv")
     assert filename.endswith(".csv")
     assert headers[:3] == ["id", "code", "name"]
+    assert headers[6] == "tags"
     assert "price_per_default_unit" in headers
 
 
@@ -111,7 +125,7 @@ def test_ingredient_export_csv_uses_import_headers_and_utf8_bom():
     service = AdminService(None)  # type: ignore[arg-type]
     content, media_type, filename = service._build_export_file("ingredients", "csv", [{
         "id": 7, "code": "ING-007", "name": "Đậu phụ", "food_group": "protein",
-        "default_unit": "g", "grams_per_unit": 1, "calories": 76,
+        "default_unit": "g", "grams_per_unit": 1, "tags": "giàu đạm, chay", "calories": 76,
         "protein_g": 8, "carbs_g": 2, "fat_g": 4, "fiber_g": 1,
         "price": 30000, "price_unit": "kg", "price_per_default_unit": 30,
         "source": "Siêu thị", "is_active": True,
@@ -122,7 +136,7 @@ def test_ingredient_export_csv_uses_import_headers_and_utf8_bom():
     assert filename.startswith("smart-menu-ingredients-export-")
     assert rows == [{
         "id": "7", "code": "ING-007", "name": "Đậu phụ", "food_group": "protein",
-        "default_unit": "g", "grams_per_unit": "1", "calories": "76", "protein_g": "8",
+        "default_unit": "g", "grams_per_unit": "1", "tags": "giàu đạm, chay", "calories": "76", "protein_g": "8",
         "carbs_g": "2", "fat_g": "4", "fiber_g": "1", "price": "30000",
         "price_unit": "kg", "price_per_default_unit": "30", "source": "Siêu thị", "is_active": "True",
     }]

@@ -164,6 +164,15 @@ def set_ingredient_active(
     return service.set_ingredient_active(ingredient_id, data.is_active, current_user.id)
 
 
+@router.delete("/ingredients/{ingredient_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_ingredient(
+    ingredient_id: int,
+    service: AdminService = Depends(get_admin_service),
+    current_user: UserEntity = Depends(require_data_editor),
+):
+    service.delete_ingredient(ingredient_id, current_user.id)
+
+
 # -------------------------------------------------------------------------- dishes
 @router.get("/dishes", response_model=AdminDishPage)
 def list_dishes(
@@ -235,6 +244,15 @@ def set_dish_active(
     current_user: UserEntity = Depends(require_data_editor),
 ):
     return service.set_dish_active(dish_id, data.is_active, current_user.id)
+
+
+@router.delete("/dishes/{dish_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_dish(
+    dish_id: int,
+    service: AdminService = Depends(get_admin_service),
+    current_user: UserEntity = Depends(require_data_editor),
+):
+    service.delete_dish(dish_id, current_user.id)
 
 
 # ------------------------------------------------------------------------- quality

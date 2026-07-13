@@ -11,6 +11,7 @@ from app.dependencies import (
     get_create_user_use_case,
     get_delete_user_use_case,
     get_get_user_use_case,
+    get_google_login_use_case,
     get_list_users_use_case,
     get_login_use_case,
     get_update_user_use_case,
@@ -18,6 +19,7 @@ from app.dependencies import (
 from app.modules.identity.domain import UserEntity
 from app.modules.identity.schemas import (
     RegisterRequest,
+    GoogleLoginRequest,
     TokenResponse,
     UserCreate,
     UserResponse,
@@ -28,6 +30,7 @@ from app.modules.identity.use_cases import (
     CreateUserUseCase,
     DeleteUserUseCase,
     GetUserUseCase,
+    GoogleLoginUseCase,
     ListUsersUseCase,
     LoginUseCase,
     UpdateUserUseCase,
@@ -56,6 +59,18 @@ def login(
 ):
     token = use_case.execute(form.username, form.password)
     return TokenResponse(access_token=token)
+
+
+@auth_router.post("/google", response_model=TokenResponse)
+def google_login(
+    data: GoogleLoginRequest,
+    use_case: GoogleLoginUseCase = Depends(get_google_login_use_case),
+    profile_use_case: CreateEmptyProfileUseCase = Depends(get_create_empty_profile_use_case),
+):
+    result = use_case.execute(data.credential)
+    if result.is_new_user:
+        profile_use_case.execute(result.user_id, result.full_name)
+    return TokenResponse(access_token=result.access_token)
 
 
 @auth_router.post("/logout", status_code=status.HTTP_200_OK)

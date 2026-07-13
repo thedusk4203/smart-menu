@@ -2,11 +2,13 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { Button, TextField } from "../../components/ui";
 import { ApiError } from "../../lib/apiClient";
 import { isAdminRole } from "../../lib/roles";
 import type { User } from "../../types";
+import { GoogleLoginButton } from "../../components/auth/GoogleLoginButton";
 
 interface LocationState {
   from?: { pathname?: string };
@@ -18,6 +20,7 @@ export function Login() {
   const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const getRedirectTo = (user: User) => {
@@ -57,17 +60,33 @@ export function Login() {
         />
         <TextField
           label="Mật khẩu"
-          type="password"
+          type={showPassword ? "text" : "password"}
           autoComplete="current-password"
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="••••••••"
+          trailingAction={
+            <button
+              type="button"
+              onClick={() => setShowPassword((visible) => !visible)}
+              className="rounded-md p-1 text-gray-400 transition-colors hover:text-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+              aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+              title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          }
         />
         <Button type="submit" loading={loading} className="w-full">
           Đăng nhập
         </Button>
       </form>
+
+      <GoogleLoginButton onAuthenticated={(user) => {
+        toast.success("Đăng nhập thành công!");
+        navigate(getRedirectTo(user), { replace: true });
+      }} />
 
       <p className="mt-6 text-center text-sm text-gray-500">
         Chưa có tài khoản?{" "}

@@ -1,13 +1,14 @@
-import type { InputHTMLAttributes } from "react";
+import type { InputHTMLAttributes, ReactNode } from "react";
 import { useId } from "react";
 
 interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   hint?: string;
+  trailingAction?: ReactNode;
 }
 
-export function TextField({ label, error, hint, className = "", id, ...props }: TextFieldProps) {
+export function TextField({ label, error, hint, trailingAction, className = "", id, ...props }: TextFieldProps) {
   const autoId = useId();
   const fieldId = id ?? autoId;
   return (
@@ -17,13 +18,16 @@ export function TextField({ label, error, hint, className = "", id, ...props }: 
           {label}
         </label>
       )}
-      <input
-        id={fieldId}
-        className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:bg-sand-100 disabled:text-gray-500 ${
-          error ? "border-red-400 focus:ring-red-300" : "border-sand-200"
-        }`}
-        {...props}
-      />
+      <div className="relative">
+        <input
+          id={fieldId}
+          className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:bg-sand-100 disabled:text-gray-500 ${
+            error ? "border-red-400 focus:ring-red-300" : "border-sand-200"
+          } ${trailingAction ? "pr-11" : ""}`}
+          {...props}
+        />
+        {trailingAction && <div className="absolute inset-y-0 right-0 flex items-center pr-3">{trailingAction}</div>}
+      </div>
       {error ? (
         <p className="mt-1 text-xs text-red-600">{error}</p>
       ) : hint ? (

@@ -1,11 +1,12 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { UtensilsCrossed, RefreshCw, Save, ArrowLeft, Sparkles } from "lucide-react";
+import { UtensilsCrossed, RefreshCw, Save, ArrowLeft, Sparkles, CheckCircle2, CircleAlert, Lightbulb } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { mealPlanApi, isInfeasible } from "../../api/mealPlanApi";
 import { aiApi } from "../../api/aiApi";
-import type { SwapSuggestion } from "../../api/aiApi";
+import type { PlanExplanation, SwapSuggestion } from "../../api/aiApi";
 import { PageHeader, Button, Card, EmptyState, TextField, Textarea, Modal } from "../../components/ui";
 import { MealPlanView } from "../../components/domain/MealPlanView";
 import { ApiError } from "../../lib/apiClient";
@@ -28,7 +29,7 @@ export function MenuResult() {
   const [regenerating, setRegenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [explaining, setExplaining] = useState(false);
-  const [explanation, setExplanation] = useState("");
+  const [explanation, setExplanation] = useState<PlanExplanation | null>(null);
   const [swapping, setSwapping] = useState(false);
   const [swapSuggestions, setSwapSuggestions] = useState<SwapSuggestion[]>([]);
   const [swapTarget, setSwapTarget] = useState<{ day: number; mealType: MealType; dish: PlanDish } | null>(null);
@@ -71,6 +72,7 @@ export function MenuResult() {
       }
       setPlan(result);
       setName(defaultMealPlanName());
+      setExplanation(null);
       toast.success("Đã tạo thực đơn mới.");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
@@ -106,7 +108,7 @@ export function MenuResult() {
 
   const explain = async () => {
     setExplaining(true);
-    try { const result = await aiApi.explainPlan({ plan_data: plan.plan_data, total_cost: plan.total_cost, total_calories: plan.total_calories, budget_limit: plan.budget_limit }); setExplanation(result.reply); }
+    try { const result = await aiApi.explainPlan({ plan_data: plan.plan_data, total_cost: plan.total_cost, total_calories: plan.total_calories, budget_limit: plan.budget_limit }); setExplanation(result); }
     catch (err) { toast.error(err instanceof ApiError ? err.message : "AI đang tạm không khả dụng."); }
     finally { setExplaining(false); }
   };
@@ -156,12 +158,12 @@ export function MenuResult() {
           <Button onClick={save} loading={saving}>
             <Save className="h-4 w-4" /> Lưu thực đơn
           </Button>
-          <Button variant="secondary" onClick={explain} loading={explaining}><Sparkles className="h-4 w-4" /> AI giải thích</Button>
+          <Button variant="secondary" onClick={explain} loading={explaining}><Sparkles className="h-4 w-4" /> {explaining ? "Đang phân tích…" : "Phân tích thực đơn"}</Button>
         </div>
       </div>
 
-      {explanation && <Card title="AI giải thích thực đơn" icon={<Sparkles className="h-5 w-5" />} className="mb-5"><p className="whitespace-pre-wrap text-sm leading-6 text-gray-700">{explanation}</p><p className="mt-3 text-xs text-gray-500">Nội dung mang tính tham khảo và được lưu tối đa 30 ngày.</p></Card>}
-      {(swapping || swapSuggestions.length > 0) && <Card title="Phương án đổi món đã kiểm tra" className="mb-5"><div className="space-y-2">{swapping ? <p className="text-sm text-gray-500">Đang xếp hạng và kiểm tra toàn bộ thực đơn...</p> : swapSuggestions.map(item => <button key={item.dish_id} onClick={() => { setPlan(item.plan); setSwapSuggestions([]); toast.success(`Đã đổi sang ${item.name}.`); }} className="block w-full rounded-xl border border-sand-200 p-3 text-left hover:border-brand-300 hover:bg-brand-50"><span className="font-medium text-gray-800">{item.name}</span><span className="mt-1 block text-sm text-gray-500">{item.reason}</span><span className="mt-1 block text-xs font-medium text-brand-700">Chọn phương án này</span></button>)}</div></Card>}
+      {explanation && <Card title="Phân tích thực đơn" icon={<Sparkles className="h-5 w-5" />} className="mb-5"><div aria-live="polite"><p className="max-w-3xl text-sm leading-6 text-gray-700">{explanation.summary}</p><div className="mt-4 grid gap-4 border-y border-sand-200 py-4 md:grid-cols-2"><div><h4 className="text-sm font-semibold text-gray-900">Ngân sách</h4><p className="mt-1 text-sm leading-6 text-gray-600">{explanation.budget_assessment}</p></div><div><h4 className="text-sm font-semibold text-gray-900">Dinh dưỡng</h4><p className="mt-1 text-sm leading-6 text-gray-600">{explanation.nutrition_assessment}</p></div></div><div className="mt-4 grid gap-5 lg:grid-cols-3"><ExplanationList title="Điểm phù hợp" items={explanation.highlights} icon={<CheckCircle2 className="h-4 w-4 text-brand-600" />} /><ExplanationList title="Điểm cần lưu ý" items={explanation.cautions} icon={<CircleAlert className="h-4 w-4 text-accent-600" />} emptyText="Không có cảnh báo đáng chú ý." /><ExplanationList title="Gợi ý tiếp theo" items={explanation.recommendations} icon={<Lightbulb className="h-4 w-4 text-sky-600" />} /></div><p className="mt-4 text-xs leading-5 text-gray-500">Phân tích chỉ dùng số liệu của thực đơn đã kiểm tra và không thay thế tư vấn y tế. Yêu cầu AI được lưu tối đa 30 ngày để hỗ trợ vận hành.</p></div></Card>}
+      {(swapping || swapSuggestions.length > 0) && <Card title="Phương án đổi món đã kiểm tra" className="mb-5"><div className="space-y-2">{swapping ? <p className="text-sm text-gray-500">Đang xếp hạng và kiểm tra toàn bộ thực đơn...</p> : swapSuggestions.map(item => <button key={item.dish_id} onClick={() => { setPlan(item.plan); setExplanation(null); setSwapSuggestions([]); toast.success(`Đã đổi sang ${item.name}.`); }} className="block w-full rounded-xl border border-sand-200 p-3 text-left hover:border-brand-300 hover:bg-brand-50"><span className="font-medium text-gray-800">{item.name}</span><span className="mt-1 block text-sm text-gray-500">{item.reason}</span><span className="mt-1 block text-xs font-medium text-brand-700">Chọn phương án này</span></button>)}</div></Card>}
 
       <MealPlanView
         planData={plan.plan_data}
@@ -175,4 +177,8 @@ export function MenuResult() {
       </Modal>
     </div>
   );
+}
+
+function ExplanationList({ title, items, icon, emptyText }: { title: string; items: string[]; icon: ReactNode; emptyText?: string }) {
+  return <section><h4 className="flex items-center gap-2 text-sm font-semibold text-gray-900">{icon}{title}</h4>{items.length > 0 ? <ul className="mt-2 space-y-2 text-sm leading-5 text-gray-600">{items.map((item) => <li key={item} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sand-300" /> <span>{item}</span></li>)}</ul> : <p className="mt-2 text-sm leading-5 text-gray-500">{emptyText}</p>}</section>;
 }

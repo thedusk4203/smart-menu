@@ -12,8 +12,9 @@ from app.core.config import settings
 from app.modules.identity.repository import SqlUserRepository
 from app.modules.identity.use_cases import (
     CreateUserUseCase, DeleteUserUseCase, GetUserUseCase,
-    ListUsersUseCase, LoginUseCase, UpdateUserUseCase,
+    GoogleLoginUseCase, ListUsersUseCase, LoginUseCase, UpdateUserUseCase,
 )
+from app.modules.identity.google_verifier import GoogleTokenVerifier
 
 
 def get_list_users_use_case(s: Session = Depends(get_session)) -> ListUsersUseCase:
@@ -33,6 +34,10 @@ def get_delete_user_use_case(s: Session = Depends(get_session)) -> DeleteUserUse
 
 def get_login_use_case(s: Session = Depends(get_session)) -> LoginUseCase:
     return LoginUseCase(SqlUserRepository(s))
+
+
+def get_google_login_use_case(s: Session = Depends(get_session)) -> GoogleLoginUseCase:
+    return GoogleLoginUseCase(SqlUserRepository(s), GoogleTokenVerifier())
 
 
 # ── profiles ──────────────────────────────────────────────────────────────

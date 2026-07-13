@@ -23,6 +23,16 @@ from app.shared.enums import DishType, FoodGroup, UserRole
 
 PRIVILEGED_ROLES = {UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value}
 
+# 1 g/ml là hợp lệ với nước và nhiều chất lỏng gần nước, nhưng thường chỉ là
+# giá trị mặc định chưa được kiểm tra đối với dầu và sữa. Các đơn vị rời như
+# quả/hộp/muỗng vẫn luôn cần quy đổi nếu hệ số còn bằng 1.
+MISSING_CONVERSION_SQL = """i.grams_per_unit = 1
+    AND LOWER(BTRIM(i.default_unit)) NOT IN ('g', 'gram', 'grams')
+    AND (
+        LOWER(BTRIM(i.default_unit)) NOT IN ('ml', 'milliliter', 'milliliters')
+        OR i.food_group::text IN ('fat', 'dairy')
+    )"""
+
 
 def _row_dict(row) -> dict[str, Any]:
     return dict(row._mapping) if row is not None else {}
@@ -34,6 +44,23 @@ def _json(value: Any) -> str:
 
 def _normalized(value: str) -> str:
     return " ".join(value.casefold().split())
+
+
+def _normalized_tags(value: Any) -> list[str]:
+    raw_tags = value if isinstance(value, list) else str(value or "").split(",")
+    tags: list[str] = []
+    seen: set[str] = set()
+    for raw_tag in raw_tags:
+        tag = " ".join(str(raw_tag).split())
+        if not tag:
+            continue
+        if len(tag) > 64:
+            raise ValueError(f"Thẻ '{tag}' vượt quá 64 ký tự")
+        key = tag.casefold()
+        if key not in seen:
+            seen.add(key)
+            tags.append(tag)
+    return tags
 
 
 CODE_PATTERN = re.compile(r"^[A-Z0-9][A-Z0-9._-]{0,63}$")
@@ -137,18 +164,38 @@ class AdminService:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def _validate_catalog_tags(self, tags: list[str]) -> None:
-        names = [" ".join(str(tag).split()) for tag in tags if str(tag).strip()]
+    def _validate_catalog_tags(self, tags: list[str], entity_type: str = "dish") -> None:
+        names = _normalized_tags(tags)
         if not names:
             return
         rows = self.session.execute(
-            text("SELECT name FROM tag_catalog WHERE is_active=TRUE AND name = ANY(:names)"),
-            {"names": names},
+            text("""SELECT name FROM tag_catalog
+                    WHERE entity_type=:entity_type AND is_active=TRUE AND name = ANY(:names)"""),
+            {"entity_type": entity_type, "names": names},
         ).fetchall()
         found = {row.name for row in rows}
         missing = [name for name in names if name not in found]
         if missing:
             raise ValidationAppError("Thẻ chưa có trong danh mục hoặc đã ngừng dùng: " + ", ".join(missing))
+
+    def _ensure_catalog_tags(self, tags: list[str], entity_type: str) -> None:
+        for name in _normalized_tags(tags):
+            existing = self.session.execute(
+                text("""SELECT id FROM tag_catalog
+                        WHERE entity_type=:entity_type AND LOWER(name)=LOWER(:name)
+                        FOR UPDATE"""),
+                {"entity_type": entity_type, "name": name},
+            ).first()
+            if existing:
+                self.session.execute(
+                    text("UPDATE tag_catalog SET is_active=TRUE, updated_at=NOW() WHERE id=:id"),
+                    {"id": existing.id},
+                )
+            else:
+                self.session.execute(
+                    text("INSERT INTO tag_catalog (entity_type, name) VALUES (:entity_type, :name)"),
+                    {"entity_type": entity_type, "name": name},
+                )
 
     def _audit(
         self,
@@ -180,7 +227,7 @@ class AdminService:
     def dashboard(self) -> dict[str, Any]:
         row = self.session.execute(
             text(
-                """SELECT
+                f"""SELECT
                     (SELECT COUNT(*) FROM users) AS users_total,
                     (SELECT COUNT(*) FROM users WHERE is_active) AS users_active,
                     (SELECT COUNT(*) FROM users WHERE NOT is_active) AS users_locked,
@@ -200,8 +247,8 @@ class AdminService:
                     (SELECT COUNT(*) FROM ingredients i WHERE NOT EXISTS (
                         SELECT 1 FROM nutrition_facts n WHERE n.ingredient_id = i.id
                     )) AS missing_nutrition,
-                    (SELECT COUNT(*) FROM ingredients
-                     WHERE default_unit NOT IN ('g', 'gram') AND grams_per_unit = 1) AS missing_conversion,
+                    (SELECT COUNT(*) FROM ingredients i
+                     WHERE {MISSING_CONVERSION_SQL}) AS missing_conversion,
                     (SELECT COUNT(*) FROM dishes d WHERE
                         NOT EXISTS (SELECT 1 FROM dish_ingredients di WHERE di.dish_id = d.id)
                         OR EXISTS (
@@ -220,9 +267,14 @@ class AdminService:
                     ) AS incomplete_dishes,
                     (SELECT COALESCE(SUM(group_size - 1), 0) FROM (
                         SELECT COUNT(*) AS group_size FROM (
-                            SELECT LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g')) AS n FROM ingredients
-                            UNION ALL SELECT LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g')) FROM dishes
-                        ) names GROUP BY n HAVING COUNT(*) > 1
+                            SELECT 'ingredient'::text AS entity_type,
+                                   LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g')) AS n
+                            FROM ingredients
+                            UNION ALL
+                            SELECT 'dish'::text,
+                                   LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g'))
+                            FROM dishes
+                        ) names GROUP BY entity_type, n HAVING COUNT(*) > 1
                     ) duplicate_groups) AS duplicate_names,
                     (SELECT MAX(created_at) FROM import_jobs) AS last_import_at"""
             )
@@ -355,15 +407,15 @@ class AdminService:
     def _ingredient_from_db(self, ingredient_id: int) -> dict[str, Any]:
         row = self.session.execute(
             text(
-                """SELECT i.id, i.name, i.food_group, i.default_unit, i.grams_per_unit,
-                          i.is_active, n.calories, n.protein_g, n.carbs_g, n.fat_g,
+                f"""SELECT i.id, i.name, i.food_group, i.default_unit, i.grams_per_unit,
+                          i.tags, i.is_active, n.calories, n.protein_g, n.carbs_g, n.fat_g,
                           n.fiber_g, p.price AS latest_price, p.unit AS price_unit,
                           p.price_per_default_unit AS latest_price_per_unit,
                           p.source AS price_source, p.recorded_at AS price_recorded_at,
                           i.created_at, i.updated_at,
                           (p.id IS NULL OR p.price_per_default_unit IS NULL) AS missing_price,
                           (n.id IS NULL) AS missing_nutrition,
-                          (i.default_unit NOT IN ('g', 'gram') AND i.grams_per_unit = 1) AS missing_conversion
+                          ({MISSING_CONVERSION_SQL}) AS missing_conversion
                    FROM ingredients i
                    LEFT JOIN nutrition_facts n ON n.ingredient_id = i.id
                    LEFT JOIN LATERAL (
@@ -412,7 +464,7 @@ class AdminService:
         elif quality == "missing_nutrition":
             where.append("n.id IS NULL")
         elif quality == "missing_conversion":
-            where.append("i.default_unit NOT IN ('g', 'gram') AND i.grams_per_unit = 1")
+            where.append(MISSING_CONVERSION_SQL)
         clause = " AND ".join(where)
         joins = """LEFT JOIN nutrition_facts n ON n.ingredient_id = i.id
                    LEFT JOIN LATERAL (
@@ -426,14 +478,14 @@ class AdminService:
         rows = self.session.execute(
             text(
                 f"""SELECT i.id, i.name, i.food_group, i.default_unit, i.grams_per_unit,
-                           i.is_active, n.calories, n.protein_g, n.carbs_g, n.fat_g,
+                           i.tags, i.is_active, n.calories, n.protein_g, n.carbs_g, n.fat_g,
                            n.fiber_g, p.price AS latest_price, p.unit AS price_unit,
                            p.price_per_default_unit AS latest_price_per_unit,
                            p.source AS price_source, p.recorded_at AS price_recorded_at,
                            i.created_at, i.updated_at,
                            (p.id IS NULL OR p.price_per_default_unit IS NULL) AS missing_price,
                            (n.id IS NULL) AS missing_nutrition,
-                           (i.default_unit NOT IN ('g', 'gram') AND i.grams_per_unit = 1) AS missing_conversion
+                           ({MISSING_CONVERSION_SQL}) AS missing_conversion
                     FROM ingredients i {joins} WHERE {clause}
                     ORDER BY i.updated_at DESC, i.name
                     LIMIT :limit OFFSET :offset"""
@@ -477,7 +529,7 @@ class AdminService:
         elif quality == "missing_nutrition":
             where.append("n.id IS NULL")
         elif quality == "missing_conversion":
-            where.append("i.default_unit NOT IN ('g', 'gram') AND i.grams_per_unit = 1")
+            where.append(MISSING_CONVERSION_SQL)
         joins = """LEFT JOIN nutrition_facts n ON n.ingredient_id = i.id
                    LEFT JOIN LATERAL (
                        SELECT id, price, unit, price_per_default_unit, source, recorded_at
@@ -486,7 +538,7 @@ class AdminService:
                    ) p ON TRUE"""
         rows = self.session.execute(
             text(
-                f"""SELECT i.id, i.code, i.name, i.food_group, i.default_unit, i.grams_per_unit,
+                f"""SELECT i.id, i.code, i.name, i.food_group, i.default_unit, i.grams_per_unit, i.tags,
                            n.calories, n.protein_g, n.carbs_g, n.fat_g, n.fiber_g,
                            p.price, p.unit AS price_unit, p.price_per_default_unit, p.source, i.is_active
                     FROM ingredients i {joins}
@@ -502,6 +554,7 @@ class AdminService:
                 "id": data["id"], "code": data["code"], "name": data["name"],
                 "food_group": _enum_value(data["food_group"]), "default_unit": data["default_unit"],
                 "grams_per_unit": float(data["grams_per_unit"]),
+                "tags": ", ".join(str(tag).strip() for tag in (data.get("tags") or []) if str(tag).strip()),
                 "calories": float(data["calories"]) if data["calories"] is not None else None,
                 "protein_g": float(data["protein_g"]) if data["protein_g"] is not None else None,
                 "carbs_g": float(data["carbs_g"]) if data["carbs_g"] is not None else None,
@@ -603,6 +656,25 @@ class AdminService:
         self._audit(actor_id, "restore" if active else "deactivate", "ingredient", ingredient_id, before, after)
         self.session.commit()
         return after
+
+    def delete_ingredient(self, ingredient_id: int, actor_id: int) -> None:
+        before = self._ingredient_from_db(ingredient_id)
+        references = self.session.execute(
+            text(
+                """SELECT 'công thức món' AS label FROM dish_ingredients WHERE ingredient_id = :id LIMIT 1
+                   UNION ALL
+                   SELECT 'món ăn' AS label FROM meal_ingredients WHERE ingredient_id = :id LIMIT 1
+                   UNION ALL
+                   SELECT 'danh sách đi chợ' AS label FROM shopping_lists WHERE ingredient_id = :id LIMIT 1"""
+            ),
+            {"id": ingredient_id},
+        ).fetchall()
+        if references:
+            labels = ", ".join(row.label for row in references)
+            raise ConflictError(f"Không thể xóa nguyên liệu vì đang được dùng trong: {labels}. Hãy gỡ liên kết hoặc ẩn nguyên liệu.")
+        self.session.execute(text("DELETE FROM ingredients WHERE id = :id"), {"id": ingredient_id})
+        self._audit(actor_id, "delete", "ingredient", ingredient_id, before, None)
+        self.session.commit()
 
     # ------------------------------------------------------------------ dishes
     def _dish_base_query(self) -> str:
@@ -907,9 +979,15 @@ class AdminService:
         self.session.commit()
         return after
 
+    def delete_dish(self, dish_id: int, actor_id: int) -> None:
+        before = self._dish_from_db(dish_id)
+        self.session.execute(text("DELETE FROM dishes WHERE id = :id"), {"id": dish_id})
+        self._audit(actor_id, "delete", "dish", dish_id, before, None)
+        self.session.commit()
+
     # ------------------------------------------------------------------ quality
     def _quality_cte(self) -> str:
-        return """WITH issues AS (
+        return f"""WITH issues AS (
             SELECT 'ingredient'::text entity_type, i.id entity_id, i.name entity_name,
                    'missing_price'::text code, 'error'::text severity,
                    'Thiếu giá chuẩn hóa'::text title,
@@ -927,8 +1005,12 @@ class AdminService:
             UNION ALL
             SELECT 'ingredient', i.id, i.name, 'missing_conversion', 'warning',
                    'Cần kiểm tra quy đổi',
-                   'Đơn vị không phải gram nhưng hệ số quy đổi đang bằng 1.', i.updated_at
-            FROM ingredients i WHERE i.default_unit NOT IN ('g', 'gram') AND i.grams_per_unit = 1
+                   CASE
+                       WHEN LOWER(BTRIM(i.default_unit)) IN ('ml', 'milliliter', 'milliliters')
+                           THEN 'Dầu hoặc sữa đang dùng hệ số mặc định 1 g/ml; cần kiểm tra mật độ.'
+                       ELSE 'Đơn vị không phải gram nhưng hệ số quy đổi đang bằng 1.'
+                   END, i.updated_at
+            FROM ingredients i WHERE {MISSING_CONVERSION_SQL}
             UNION ALL
             SELECT 'dish', d.id, d.name, 'missing_recipe', 'error',
                    'Thiếu công thức', 'Món chưa có nguyên liệu trong công thức.', d.updated_at
@@ -959,11 +1041,15 @@ class AdminService:
                 UNION ALL SELECT 'dish', id, name, updated_at,
                        LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g')) FROM dishes
             ) src JOIN (
-                SELECT normalized FROM (
-                    SELECT LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g')) normalized FROM ingredients
-                    UNION ALL SELECT LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g')) FROM dishes
-                ) all_names GROUP BY normalized HAVING COUNT(*) > 1
-            ) duplicates USING (normalized)
+                SELECT entity_type, normalized FROM (
+                    SELECT 'ingredient'::text entity_type,
+                           LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g')) normalized
+                    FROM ingredients
+                    UNION ALL
+                    SELECT 'dish', LOWER(REGEXP_REPLACE(BTRIM(name), '\\s+', ' ', 'g'))
+                    FROM dishes
+                ) all_names GROUP BY entity_type, normalized HAVING COUNT(*) > 1
+            ) duplicates USING (entity_type, normalized)
         )"""
 
     def list_quality_issues(
@@ -1009,7 +1095,7 @@ class AdminService:
             "ingredients": {
                 "headers": [
                     "id", "code", "name", "food_group", "default_unit", "grams_per_unit",
-                    "calories", "protein_g", "carbs_g", "fat_g", "fiber_g", "price",
+                    "tags", "calories", "protein_g", "carbs_g", "fat_g", "fiber_g", "price",
                     "price_unit", "price_per_default_unit", "source", "is_active",
                 ],
                 "notes": [
@@ -1082,13 +1168,14 @@ class AdminService:
             "ingredients": {
                 "headers": [
                     "id", "code", "name", "food_group", "default_unit", "grams_per_unit",
-                    "calories", "protein_g", "carbs_g", "fat_g", "fiber_g", "price",
+                    "tags", "calories", "protein_g", "carbs_g", "fat_g", "fiber_g", "price",
                     "price_unit", "price_per_default_unit", "source", "is_active",
                 ],
                 "notes": [
                     "id: để trống khi tạo mới; điền ID hiện có khi muốn cập nhật đúng bản ghi.",
                     "code: mã riêng, duy nhất; để trống sẽ không thay đổi mã hiện có khi replace.",
                     "food_group: protein, vegetable, grain, dairy, fat, fruit hoặc other.",
+                    "tags: các thẻ nguyên liệu, cách nhau bằng dấu phẩy; thẻ mới sẽ được tự tạo khi commit.",
                     "is_active: true/false; các cột dinh dưỡng và giá có thể để trống.",
                 ],
             },
@@ -1101,6 +1188,7 @@ class AdminService:
                     "id: để trống khi tạo mới; điền ID hiện có khi muốn cập nhật đúng bản ghi.",
                     "code: mã riêng, duy nhất; để trống sẽ không thay đổi mã hiện có khi replace.",
                     "dish_type: staple, savory, soup, vegetable_side, side hoặc breakfast.",
+                    "tags: các thẻ món ăn, cách nhau bằng dấu phẩy; thẻ mới sẽ được tự tạo khi commit.",
                     "ingredients_json: mảng JSON với ingredient_id hoặc name, quantity và unit.",
                     "Import nguyên liệu trước, sau đó mới import món ăn để các thành phần được đối chiếu.",
                 ],
@@ -1335,6 +1423,7 @@ class AdminService:
                         "food_group": group,
                         "default_unit": str(raw.get("default_unit") or "g").strip(),
                         "grams_per_unit": _as_float(raw.get("grams_per_unit"), "grams_per_unit", index, default=1),
+                        "tags": _normalized_tags(raw.get("tags")),
                         "is_active": _as_bool(raw.get("is_active"), True),
                         "nutrition": nutrition,
                         "price": price,
@@ -1355,7 +1444,7 @@ class AdminService:
                         "cooking_method": str(raw.get("cooking_method") or "").strip() or None,
                         "description": str(raw.get("description") or "").strip() or None,
                         "instructions": str(raw.get("instructions") or "").strip() or None,
-                        "tags": [t.strip() for t in str(raw.get("tags") or "").split(",") if t.strip()],
+                        "tags": _normalized_tags(raw.get("tags")),
                         "is_active": _as_bool(raw.get("is_active"), True),
                         "ingredients": ingredients,
                     })
@@ -1427,21 +1516,27 @@ class AdminService:
                     continue
                 next_code = raw.get("code") if raw.get("code") is not None else (existing or {}).get("code")
                 if job_data["entity_type"] == "ingredients":
+                    tags = _normalized_tags(raw.get("tags"))
+                    self._ensure_catalog_tags(tags, "ingredient")
                     if existing:
                         ingredient_id = existing["id"]
                         self.session.execute(
                             text("""UPDATE ingredients SET code=:code, name=:name, food_group=CAST(:group AS food_group),
-                                   default_unit=:unit, grams_per_unit=:grams, is_active=:active WHERE id=:id"""),
+                                   default_unit=:unit, grams_per_unit=:grams, tags=CAST(:tags AS jsonb),
+                                   is_active=:active WHERE id=:id"""),
                             {"id": ingredient_id, "code": next_code, "name": raw["name"], "group": raw["food_group"],
-                             "unit": raw["default_unit"], "grams": raw["grams_per_unit"], "active": raw["is_active"]},
+                             "unit": raw["default_unit"], "grams": raw["grams_per_unit"], "tags": _json(tags),
+                             "active": raw["is_active"]},
                         )
                         updated += 1
                     else:
                         inserted = self.session.execute(
-                            text("""INSERT INTO ingredients (code, name, food_group, default_unit, grams_per_unit, is_active)
-                                   VALUES (:code, :name, CAST(:group AS food_group), :unit, :grams, :active) RETURNING id"""),
+                            text("""INSERT INTO ingredients
+                                   (code, name, food_group, default_unit, grams_per_unit, tags, is_active)
+                                   VALUES (:code, :name, CAST(:group AS food_group), :unit, :grams,
+                                           CAST(:tags AS jsonb), :active) RETURNING id"""),
                             {"code": next_code, "name": raw["name"], "group": raw["food_group"], "unit": raw["default_unit"],
-                             "grams": raw["grams_per_unit"], "active": raw["is_active"]},
+                             "grams": raw["grams_per_unit"], "tags": _json(tags), "active": raw["is_active"]},
                         ).first()
                         ingredient_id = inserted.id
                         created += 1
@@ -1463,6 +1558,8 @@ class AdminService:
                             {"ingredient_id": ingredient_id, **raw["price"]},
                         )
                 else:
+                    tags = _normalized_tags(raw.get("tags"))
+                    self._ensure_catalog_tags(tags, "dish")
                     ingredient_payload = []
                     for item in raw.get("ingredients", []):
                         ingredient_id = _as_optional_id(item.get("ingredient_id"))
@@ -1485,7 +1582,7 @@ class AdminService:
                                    WHERE id=:id"""),
                             {"id": dish_id, "code": next_code, "name": raw["name"], "dtype": raw["dish_type"],
                              "method": raw.get("cooking_method"), "description": raw.get("description"),
-                             "instructions": raw.get("instructions"), "tags": _json(raw.get("tags", [])),
+                             "instructions": raw.get("instructions"), "tags": _json(tags),
                              "active": raw.get("is_active", True)},
                         )
                         self.session.execute(text("DELETE FROM dish_ingredients WHERE dish_id=:id"), {"id": dish_id})
@@ -1498,7 +1595,7 @@ class AdminService:
                                    :description, :instructions, CAST(:tags AS jsonb), :active) RETURNING id"""),
                             {"code": next_code, "name": raw["name"], "dtype": raw["dish_type"], "method": raw.get("cooking_method"),
                              "description": raw.get("description"), "instructions": raw.get("instructions"),
-                             "tags": _json(raw.get("tags", [])), "active": raw.get("is_active", True)},
+                             "tags": _json(tags), "active": raw.get("is_active", True)},
                         ).first()
                         dish_id = inserted.id
                         created += 1

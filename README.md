@@ -11,3 +11,9 @@
 
 # Note:
     Các file hiện tại đều là file trống tạo sẵn để chuẩn cấu trúc thôi.
+
+# Cổng dịch vụ chuẩn
+
+- Chạy local: frontend `5173`, backend `8001`, PostgreSQL `5433`.
+- Chạy Docker demo: ứng dụng được mở qua `8080`; backend dùng `8000` chỉ trong mạng nội bộ Docker.
+- Không chạy một backend local khác ở `8000`. Vite luôn proxy `/api` sang `http://127.0.0.1:8001`.

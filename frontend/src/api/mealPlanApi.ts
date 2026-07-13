@@ -5,6 +5,8 @@ import type {
 
 type GenerateResult = GeneratedMealPlan | InfeasibleResult;
 
+const dayQuery = (day?: number): string => day ? `?day=${day}` : "";
+
 // Phan biet ket qua bat kha thi voi thuc don da sinh.
 export const isInfeasible = (r: GenerateResult): r is InfeasibleResult =>
   (r as InfeasibleResult).status === "infeasible";
@@ -45,12 +47,13 @@ export const mealPlanApi = {
 
   get: (id: number) => api.get<MealPlan>(`/api/meal-plans/${id}`),
 
-  shoppingList: (id: number) => api.get<ShoppingListResponse>(`/api/meal-plans/${id}/shopping-list`),
+  shoppingList: (id: number, day?: number) =>
+    api.get<ShoppingListResponse>(`/api/meal-plans/${id}/shopping-list${dayQuery(day)}`),
 
-  updateShoppingItem: (planId: number, itemId: number, is_purchased: boolean) =>
-    api.patch<ShoppingListResponse>(`/api/meal-plans/${planId}/shopping-list/items/${itemId}`, { is_purchased }),
-  shareShoppingList: (planId: number) =>
-    api.post<ShoppingShareResponse>(`/api/meal-plans/${planId}/shopping-list/share`),
+  updateShoppingItem: (planId: number, itemId: number, is_purchased: boolean, day?: number) =>
+    api.patch<ShoppingListResponse>(`/api/meal-plans/${planId}/shopping-list/items/${itemId}${dayQuery(day)}`, { is_purchased }),
+  shareShoppingList: (planId: number, day?: number) =>
+    api.post<ShoppingShareResponse>(`/api/meal-plans/${planId}/shopping-list/share${dayQuery(day)}`),
   revokeShoppingShare: (planId: number) => api.del<void>(`/api/meal-plans/${planId}/shopping-list/share`),
 
   remove: (id: number) => api.del<void>(`/api/meal-plans/${id}`),
@@ -67,8 +70,10 @@ export interface ShoppingListItem {
 }
 
 export interface ShoppingListResponse {
-    plan_id: number;
+  plan_id: number;
   plan_name?: string | null;
+  day?: number | null;
+  date?: string | null;
   schema_version: number;
   items: ShoppingListItem[];
   total_estimated_cost: number;
@@ -78,6 +83,7 @@ export interface ShoppingListResponse {
 export interface ShoppingShareResponse {
   token: string;
   expires_at: string;
+  day?: number | null;
 }
 
 export const publicShoppingListApi = {

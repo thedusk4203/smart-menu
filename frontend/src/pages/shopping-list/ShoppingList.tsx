@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import { ShoppingCart, Printer, History, Share2, Copy, X } from "lucide-react";
@@ -8,15 +8,18 @@ import type { ShoppingListItem } from "../../api/mealPlanApi";
 import {
   PageHeader, Card, SelectField, Spinner, EmptyState, Badge, Button, Modal, TextField,
 } from "../../components/ui";
-import { formatNumber, formatVND } from "../../lib/format";
+import { formatDate, formatNumber, formatVND } from "../../lib/format";
 import { ApiError } from "../../lib/apiClient";
 import type { MealPlan } from "../../types";
+
+const STALE_BACKEND_MESSAGE = "Backend local đang chạy sai phiên bản. Hãy dừng các backend cũ và chạy lại duy nhất cổng 8001.";
 
 export function ShoppingList() {
   const { user } = useAuth();
   const [plans, setPlans] = useState<MealPlan[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [selectedId, setSelectedId] = useState("");
+  const [selectedDay, setSelectedDay] = useState("all");
   const [items, setItems] = useState<ShoppingListItem[]>([]);
   const [warnings, setWarnings] = useState<Array<{ code: string; message: string }>>([]);
   const [totalEstimatedCost, setTotalEstimatedCost] = useState(0);
@@ -25,6 +28,7 @@ export function ShoppingList() {
   const [sharing, setSharing] = useState(false);
   const [shareLink, setShareLink] = useState("");
   const [shareExpiresAt, setShareExpiresAt] = useState("");
+  const buildRequest = useRef(0);
 
   useEffect(() => {
     if (!user) return;
@@ -40,27 +44,52 @@ export function ShoppingList() {
     })();
   }, [user]);
 
-  const buildList = async (planId: number) => {
+  const buildList = async (planId: number, day?: number) => {
+    const requestId = ++buildRequest.current;
     setBuilding(true);
     setItems([]);
     setWarnings([]);
     setTotalEstimatedCost(0);
     try {
-      const shoppingList = await mealPlanApi.shoppingList(planId);
+      const shoppingList = await mealPlanApi.shoppingList(planId, day);
+      if (requestId !== buildRequest.current) return;
+      if (day !== undefined && shoppingList.day !== day) {
+        throw new ApiError(409, STALE_BACKEND_MESSAGE);
+      }
       setItems(shoppingList.items);
       setChecked(Object.fromEntries(shoppingList.items.map((item) => [`${item.ingredient_id}__${item.unit}`, item.is_purchased])));
       setWarnings(shoppingList.warnings);
       setTotalEstimatedCost(shoppingList.total_estimated_cost);
     } catch (err) {
+      if (requestId !== buildRequest.current) return;
       toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
     } finally {
-      setBuilding(false);
+      if (requestId === buildRequest.current) setBuilding(false);
     }
   };
 
   const onSelect = (value: string) => {
     setSelectedId(value);
-    if (value) buildList(Number(value));
+    setSelectedDay("all");
+    setShareLink("");
+    setShareExpiresAt("");
+    if (value) {
+      buildList(Number(value));
+    } else {
+      buildRequest.current += 1;
+      setItems([]);
+      setWarnings([]);
+      setTotalEstimatedCost(0);
+      setChecked({});
+      setBuilding(false);
+    }
+  };
+
+  const onSelectDay = (value: string) => {
+    setSelectedDay(value);
+    setShareLink("");
+    setShareExpiresAt("");
+    if (selectedId) buildList(Number(selectedId), value === "all" ? undefined : Number(value));
   };
 
   const toggle = async (item: ShoppingListItem) => {
@@ -68,7 +97,7 @@ export function ShoppingList() {
     const key = `${item.ingredient_id}__${item.unit}`;
     const next = !checked[key];
     setChecked((current) => ({ ...current, [key]: next }));
-    try { await mealPlanApi.updateShoppingItem(Number(selectedId), item.id, next); }
+    try { await mealPlanApi.updateShoppingItem(Number(selectedId), item.id, next, selectedDay === "all" ? undefined : Number(selectedDay)); }
     catch (err) { setChecked((current) => ({ ...current, [key]: !next })); toast.error(err instanceof ApiError ? err.message : "Không thể cập nhật danh sách"); }
   };
 
@@ -76,7 +105,11 @@ export function ShoppingList() {
     if (!selectedId) return;
     setSharing(true);
     try {
-      const share = await mealPlanApi.shareShoppingList(Number(selectedId));
+      const day = selectedDay === "all" ? undefined : Number(selectedDay);
+      const share = await mealPlanApi.shareShoppingList(Number(selectedId), day);
+      if (day !== undefined && share.day !== day) {
+        throw new ApiError(409, STALE_BACKEND_MESSAGE);
+      }
       setShareLink(`${window.location.origin}/share/shopping-list/${share.token}`);
       setShareExpiresAt(share.expires_at);
     } catch (err) { toast.error(err instanceof ApiError ? err.message : "Không thể tạo liên kết chia sẻ"); }
@@ -94,6 +127,14 @@ export function ShoppingList() {
     catch (err) { toast.error(err instanceof ApiError ? err.message : "Không thể thu hồi liên kết"); }
   };
 
+  const selectedPlan = plans.find((plan) => String(plan.id) === selectedId);
+  const dayOptions = selectedPlan?.plan_data.days.map((day) => ({
+    value: String(day.day),
+    label: `Ngày ${day.day}${day.date ? ` · ${formatDate(day.date)}` : ""}`,
+  })) ?? [];
+  const selectedScopeLabel = selectedDay === "all"
+    ? `Tất cả ${selectedPlan?.plan_data.days.length ?? 0} ngày`
+    : dayOptions.find((option) => option.value === selectedDay)?.label ?? `Ngày ${selectedDay}`;
   const doneCount = items.filter((it) => checked[`${it.ingredient_id}__${it.unit}`]).length;
 
   if (loadingPlans) {
@@ -108,10 +149,10 @@ export function ShoppingList() {
     <div>
       <PageHeader
         title="Danh sách đi chợ"
-        description="Chọn một thực đơn đã lưu để tự động gom nguyên liệu cần mua."
+        description="Chọn thực đơn, sau đó xem nguyên liệu cho toàn bộ kế hoạch hoặc từng ngày."
         actions={
           items.length > 0 ? (
-            <div className="no-print flex gap-2"><Button variant="secondary" onClick={createShare}><Share2 className="h-4 w-4" /> Chia sẻ</Button><button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-700"><Printer className="h-4 w-4" /> In danh sách</button></div>
+            <div className="no-print flex flex-wrap gap-2"><Button variant="secondary" onClick={createShare}><Share2 className="h-4 w-4" /> Chia sẻ</Button><button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-700"><Printer className="h-4 w-4" /> In danh sách</button></div>
           ) : undefined
         }
       />
@@ -132,7 +173,7 @@ export function ShoppingList() {
         />
       ) : (
         <>
-          <div className="no-print mb-5 max-w-md">
+          <div className="no-print mb-5 grid max-w-3xl gap-3 sm:grid-cols-2">
             <SelectField
               label="Chọn thực đơn"
               value={selectedId}
@@ -140,6 +181,15 @@ export function ShoppingList() {
               options={plans.map((p) => ({ value: String(p.id), label: p.name }))}
               placeholder="— Chọn một thực đơn —"
             />
+            {selectedPlan && (
+              <SelectField
+                label="Chọn ngày đi chợ"
+                value={selectedDay}
+                onChange={(e) => onSelectDay(e.target.value)}
+                options={[{ value: "all", label: `Tất cả ${selectedPlan.plan_data.days.length} ngày` }, ...dayOptions]}
+                hint="Định lượng và chi phí sẽ được tính lại theo ngày đã chọn."
+              />
+            )}
           </div>
 
           {building ? (
@@ -147,12 +197,12 @@ export function ShoppingList() {
               <Spinner className="h-7 w-7" />
             </div>
           ) : selectedId && items.length === 0 ? (
-            <><>{warnings.map((warning) => <div key={warning.code} className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{warning.message}</div>)}</><EmptyState icon={ShoppingCart} title="Không có nguyên liệu" description="Thực đơn này chưa có nguyên liệu để gom." /></>
+            <><>{warnings.map((warning) => <div key={warning.code} className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{warning.message}</div>)}</><EmptyState icon={ShoppingCart} title="Không có nguyên liệu" description={`${selectedScopeLabel} chưa có nguyên liệu để gom.`} /></>
           ) : items.length > 0 ? (
             <>
             {warnings.length > 0 && <div className="mb-4 space-y-2">{warnings.map((warning) => <div key={warning.code} className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{warning.message}</div>)}</div>}
             <Card
-              title="Nguyên liệu cần mua"
+              title={`Nguyên liệu cần mua · ${selectedScopeLabel}`}
               icon={<ShoppingCart className="h-5 w-5" />}
               action={
                 <Badge className="bg-brand-100 text-brand-700">
@@ -195,7 +245,7 @@ export function ShoppingList() {
         </>
       )}
       <Modal open={!!shareLink || sharing} onClose={() => !sharing && setShareLink("")} title="Chia sẻ danh sách đi chợ" size="sm" footer={<Button variant="ghost" onClick={() => setShareLink("")}>Đóng</Button>}>
-        {sharing ? <div className="flex justify-center py-8"><Spinner className="h-6 w-6" /></div> : <div className="space-y-4"><p className="text-sm text-gray-700">Bất kỳ ai có liên kết đều có thể xem và tích các nguyên liệu đã mua. Liên kết hết hạn sau 7 ngày.</p><TextField label="Liên kết chia sẻ" value={shareLink} readOnly /><p className="text-xs text-gray-500">Hết hạn: {shareExpiresAt ? new Date(shareExpiresAt).toLocaleString("vi-VN") : "—"}</p><div className="flex flex-wrap gap-2"><Button onClick={copyShareLink}><Copy className="h-4 w-4" /> Sao chép link</Button><Button variant="danger" onClick={revokeShare}><X className="h-4 w-4" /> Thu hồi</Button></div></div>}
+        {sharing ? <div className="flex justify-center py-8"><Spinner className="h-6 w-6" /></div> : <div className="space-y-4"><p className="text-sm text-gray-700">Liên kết chỉ hiển thị phạm vi “{selectedScopeLabel}”. Bất kỳ ai có liên kết đều có thể xem và tích các nguyên liệu đã mua. Liên kết hết hạn sau 7 ngày.</p><TextField label="Liên kết chia sẻ" value={shareLink} readOnly /><p className="text-xs text-gray-500">Hết hạn: {shareExpiresAt ? new Date(shareExpiresAt).toLocaleString("vi-VN") : "—"}</p><p className="text-xs text-gray-500">Thu hồi sẽ vô hiệu hóa mọi liên kết đi chợ của thực đơn này.</p><div className="flex flex-wrap gap-2"><Button onClick={copyShareLink}><Copy className="h-4 w-4" /> Sao chép link</Button><Button variant="danger" onClick={revokeShare}><X className="h-4 w-4" /> Thu hồi</Button></div></div>}
       </Modal>
     </div>
   );

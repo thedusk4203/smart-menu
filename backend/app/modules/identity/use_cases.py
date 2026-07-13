@@ -1,10 +1,27 @@
 from __future__ import annotations
 
-from app.core.security import hash_password
+from dataclasses import dataclass
+import secrets
+
+from app.core.security import create_access_token, hash_password
 from app.modules.identity.domain import UserEntity
 from app.modules.identity.exceptions import EmailAlreadyExistsError, UserNotFoundError
 from app.modules.identity.ports import UserRepositoryPort
 from app.shared.enums import UserRole
+
+
+@dataclass(frozen=True)
+class GoogleIdentity:
+    email: str
+    full_name: str | None
+
+
+@dataclass(frozen=True)
+class GoogleLoginResult:
+    access_token: str
+    is_new_user: bool
+    user_id: int
+    full_name: str | None
 
 
 class ListUsersUseCase:
@@ -81,3 +98,38 @@ class LoginUseCase:
         if not user.is_active:
             raise _AuthError("Tài khoản đã bị khoá")
         return create_access_token(user.id, user.role.value)
+
+
+class GoogleLoginUseCase:
+    """Đăng nhập Google sau khi token đã được verifier xác minh."""
+
+    def __init__(self, repo: UserRepositoryPort, verifier) -> None:
+        self._repo = repo
+        self._verifier = verifier
+
+    def execute(self, credential: str) -> GoogleLoginResult:
+        identity: GoogleIdentity = self._verifier.verify(credential)
+        user = self._repo.get_by_email(identity.email)
+        is_new_user = user is None
+        if user is None:
+            user = self._repo.save(
+                UserEntity(
+                    id=None,
+                    email=identity.email,
+                    hashed_password=hash_password(secrets.token_urlsafe(32)),
+                    role=UserRole.USER,
+                )
+            )
+        if not user.is_active:
+            from app.core.exceptions import AppException
+
+            class _AuthError(AppException):
+                status_code = 401
+
+            raise _AuthError("Tài khoản đã bị khoá")
+        return GoogleLoginResult(
+            access_token=create_access_token(user.id, user.role.value),
+            is_new_user=is_new_user,
+            user_id=user.id,
+            full_name=identity.full_name,
+        )

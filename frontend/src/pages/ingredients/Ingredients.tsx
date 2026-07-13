@@ -213,7 +213,7 @@ export function Ingredients() {
                   <th className="px-5 py-3 font-medium">Nhóm</th>
                   <th className="px-5 py-3 text-right font-medium">Calo</th>
                   <th className="px-5 py-3 text-right font-medium">Đạm</th>
-                  <th className="px-5 py-3 text-right font-medium">Giá</th>
+                  <th className="px-5 py-3 text-right font-medium">Giá tham khảo</th>
                   {isAdmin && <th className="px-5 py-3 text-right font-medium">Thao tác</th>}
                 </tr>
               </thead>
@@ -233,8 +233,21 @@ export function Ingredients() {
                     </td>
                     <td className="px-5 py-3 text-right text-gray-600">{formatKcal(ing.calories)}</td>
                     <td className="px-5 py-3 text-right text-gray-600">{formatGram(ing.protein_g)}</td>
-                    <td className="px-5 py-3 text-right text-gray-600">
-                      {formatVND(ing.latest_price_per_unit ?? ing.latest_price)}
+                    <td className="px-5 py-3 text-right">
+                      {ing.latest_price == null ? (
+                        <span className="text-gray-500">—</span>
+                      ) : (
+                        <>
+                          <p className="font-medium tabular-nums text-gray-800">
+                            {formatVND(ing.latest_price)} / {ing.price_unit || ing.default_unit}
+                          </p>
+                          {ing.latest_price_per_unit != null && (
+                            <p className="mt-0.5 text-xs tabular-nums text-gray-500">
+                              Quy đổi {formatVND(ing.latest_price_per_unit)} / {ing.default_unit}
+                            </p>
+                          )}
+                        </>
+                      )}
                     </td>
                     {isAdmin && (
                       <td className="px-5 py-3">

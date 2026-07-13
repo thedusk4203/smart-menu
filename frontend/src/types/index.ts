@@ -178,6 +178,32 @@ export interface MealUpdate {
   is_active?: boolean;
 }
 
+// ── Planner-ready dish catalog ──────────────────────────────────────────
+export interface DishSummary {
+  id: number;
+  name: string;
+  dish_type: DishType;
+  cooking_method?: CookingMethod | null;
+  tags: string[];
+  total_calories: number;
+  total_protein_g: number;
+  total_carbs_g: number;
+  total_fat_g: number;
+  estimated_cost: number;
+}
+export interface DishIngredient {
+  ingredient_id: number;
+  name: string;
+  quantity: number;
+  unit: string;
+  estimated_cost: number;
+}
+export interface DishDetail extends DishSummary {
+  description?: string | null;
+  instructions?: string | null;
+  ingredients: DishIngredient[];
+}
+
 // ── Meal plans ──────────────────────────────────────────────────────────
 export interface PlanIngredientSnapshot {
   ingredient_id: number;

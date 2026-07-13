@@ -7,6 +7,7 @@ from app.modules.profiles.exceptions import (
     ProfileNotFoundError,
 )
 from app.modules.profiles.ports import ExclusionRepositoryPort, UserProfileRepositoryPort
+from app.modules.nutrition.calculator import NutritionCalculator
 
 
 class CreateEmptyProfileUseCase:
@@ -37,7 +38,29 @@ class UpdateProfileUseCase:
         profile = self._repo.get_by_user(user_id)
         if profile is None:
             raise ProfileNotFoundError(user_id)
-        updated = UserProfileEntity(**{**profile.__dict__, **changes})
+        # Calorie target is derived data. Never trust a client-provided value,
+        # and clear a stale target when the profile becomes incomplete.
+        changes.pop("daily_calorie_target", None)
+        values = {**profile.__dict__, **changes}
+        required = (
+            values["gender"],
+            values["age"],
+            values["height_cm"],
+            values["weight_kg"],
+        )
+        if all(value is not None for value in required):
+            target = NutritionCalculator.calculate_nutrition_target(
+                gender=values["gender"],
+                age=values["age"],
+                height_cm=values["height_cm"],
+                weight_kg=values["weight_kg"],
+                activity_level=values["activity_level"],
+                fitness_goal=values["goal"],
+            )
+            values["daily_calorie_target"] = float(target.target_calories)
+        else:
+            values["daily_calorie_target"] = None
+        updated = UserProfileEntity(**values)
         return self._repo.save(updated)
 
 

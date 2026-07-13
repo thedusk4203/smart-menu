@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Eye, EyeOff, Pencil, Plus, Search, Salad } from "lucide-react";
+import { Eye, EyeOff, Pencil, Plus, Search, Salad, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useSearchParams } from "react-router-dom";
 import { adminApi } from "../../api/adminApi";
 import { ApiError } from "../../lib/apiClient";
 import { FOOD_GROUP_LABELS, FOOD_GROUP_STYLES } from "../../lib/labels";
 import { formatDate, formatVND } from "../../lib/format";
-import { Badge, Button, Card, Modal, MoneyField, NumberField, PageHeader, SelectField, TextField } from "../../components/ui";
+import { Badge, Button, Card, ConfirmDialog, Modal, MoneyField, NumberField, PageHeader, SelectField, TextField } from "../../components/ui";
 import { AdminEmptyState, AdminErrorState, AdminTableSkeleton } from "../../components/admin/AdminStates";
 import { AdminExportDialog } from "../../components/admin/AdminExportDialog";
 import { AdminPagination } from "../../components/admin/AdminPagination";
@@ -66,6 +66,7 @@ function toPayload(form: IngredientForm): AdminIngredientWrite {
 
 export function AdminIngredients() {
   const [params, setParams] = useSearchParams();
+  const editId = params.get("edit");
   const [items, setItems] = useState<AdminIngredient[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
@@ -80,6 +81,8 @@ export function AdminIngredients() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingId, setSavingId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState<AdminIngredient | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -92,6 +95,35 @@ export function AdminIngredients() {
   }, [group, offset, quality, search, status]);
 
   useEffect(() => { const timer = window.setTimeout(load, 250); return () => window.clearTimeout(timer); }, [load]);
+
+  useEffect(() => {
+    if (!editId) return;
+    const id = Number(editId);
+    const clearEditParam = () => setParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("edit");
+      return next;
+    }, { replace: true });
+    if (!Number.isInteger(id) || id < 1) {
+      clearEditParam();
+      return;
+    }
+    let active = true;
+    adminApi.ingredient(id)
+      .then((detail) => {
+        if (!active) return;
+        setEditing(detail);
+        setForm(toForm(detail));
+        setOpen(true);
+      })
+      .catch((err) => {
+        if (active) toast.error(err instanceof ApiError ? err.message : "Không thể tải nguyên liệu.");
+      })
+      .finally(() => {
+        if (active) clearEditParam();
+      });
+    return () => { active = false; };
+  }, [editId, setParams]);
 
   const openCreate = () => { setEditing(null); setForm(EMPTY_FORM); setOpen(true); };
   const openEdit = async (item: AdminIngredient) => {
@@ -118,6 +150,18 @@ export function AdminIngredients() {
     } catch (err) { toast.error(err instanceof ApiError ? err.message : "Không thể đổi trạng thái."); }
     finally { setSavingId(null); }
   };
+  const deleteIngredient = async () => {
+    if (!deleting) return;
+    setDeletingId(deleting.id);
+    try {
+      await adminApi.deleteIngredient(deleting.id);
+      setItems((current) => current.filter((item) => item.id !== deleting.id));
+      setTotal((value) => Math.max(0, value - 1));
+      setOpen(false); setEditing(null); setDeleting(null);
+      toast.success("Đã xóa nguyên liệu.");
+    } catch (err) { toast.error(err instanceof ApiError ? err.message : "Không thể xóa nguyên liệu."); }
+    finally { setDeletingId(null); }
+  };
   const setQualityFilter = (value: string) => { setQuality(value); setOffset(0); setParams(value ? { quality: value } : {}); };
 
   return (
@@ -132,18 +176,19 @@ export function AdminIngredients() {
       <Card bodyClassName="p-0">
         {loading ? <AdminTableSkeleton /> : error ? <AdminErrorState message={error} onRetry={load} /> : items.length === 0 ? <AdminEmptyState icon={Salad} title="Không có nguyên liệu phù hợp" description="Thử đổi bộ lọc hoặc thêm nguyên liệu mới." action={<Button size="sm" onClick={openCreate}><Plus className="h-4 w-4" /> Thêm nguyên liệu</Button>} /> : (
           <div className="overflow-x-auto"><table className="min-w-[900px] w-full text-left text-sm"><thead className="bg-sand-50 text-xs text-gray-600"><tr className="border-b border-sand-200"><th className="px-5 py-3 font-semibold">Nguyên liệu</th><th className="px-5 py-3 font-semibold">Dữ liệu</th><th className="px-5 py-3 font-semibold">Giá mới nhất</th><th className="px-5 py-3 font-semibold">Cập nhật</th><th className="px-5 py-3 text-right font-semibold">Thao tác</th></tr></thead><tbody className="divide-y divide-sand-100">
-            {items.map((item) => <tr key={item.id} className="hover:bg-sand-50"><td className="px-5 py-3.5"><div className="flex items-center gap-2"><p className="font-semibold text-gray-900">{item.name}</p>{!item.is_active && <Badge className="bg-sand-200 text-gray-700">Đã ẩn</Badge>}</div><Badge className={`mt-1 ${FOOD_GROUP_STYLES[item.food_group]}`}>{FOOD_GROUP_LABELS[item.food_group]}</Badge></td><td className="px-5 py-3.5"><div className="flex flex-wrap gap-1.5">{item.missing_nutrition ? <DataStateBadge state="error" label="Thiếu dinh dưỡng" /> : <DataStateBadge state="ok" label="Dinh dưỡng" />}{item.missing_conversion && <DataStateBadge state="warning" label="Kiểm tra quy đổi" />}</div></td><td className="px-5 py-3.5"><p className="font-semibold tabular-nums text-gray-900">{item.missing_price ? "—" : formatVND(item.latest_price_per_unit)}</p><p className="mt-0.5 text-xs text-gray-600">{item.missing_price ? "Thiếu giá chuẩn hóa" : `${item.price_source || "Không rõ nguồn"} · / ${item.default_unit}`}</p></td><td className="px-5 py-3.5 text-gray-600">{formatDate(item.updated_at)}</td><td className="px-5 py-3.5"><div className="flex justify-end gap-1"><button type="button" onClick={() => openEdit(item)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" aria-label={`Sửa ${item.name}`}><Pencil className="h-4 w-4" /></button><button type="button" disabled={savingId === item.id} onClick={() => toggle(item)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition hover:bg-sand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50" aria-label={item.is_active ? `Ẩn ${item.name}` : `Khôi phục ${item.name}`}>{item.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div></td></tr>)}
+            {items.map((item) => <tr key={item.id} className="hover:bg-sand-50"><td className="px-5 py-3.5"><div className="flex items-center gap-2"><p className="font-semibold text-gray-900">{item.name}</p>{!item.is_active && <Badge className="bg-sand-200 text-gray-700">Đã ẩn</Badge>}</div><Badge className={`mt-1 ${FOOD_GROUP_STYLES[item.food_group]}`}>{FOOD_GROUP_LABELS[item.food_group]}</Badge></td><td className="px-5 py-3.5"><div className="flex flex-wrap gap-1.5">{item.missing_nutrition ? <DataStateBadge state="error" label="Thiếu dinh dưỡng" /> : <DataStateBadge state="ok" label="Dinh dưỡng" />}{item.missing_conversion && <DataStateBadge state="warning" label="Kiểm tra quy đổi" />}</div></td><td className="px-5 py-3.5">{item.missing_price ? <><p className="font-semibold text-gray-900">—</p><p className="mt-0.5 text-xs text-gray-600">Thiếu giá chuẩn hóa</p></> : <><p className="font-semibold tabular-nums text-gray-900">{formatVND(item.latest_price)} <span className="font-normal text-gray-600">/ {item.price_unit || item.default_unit}</span></p><p className="mt-0.5 text-xs text-gray-600">{item.price_source || "Không rõ nguồn"}</p><p className="mt-0.5 text-xs text-gray-500">Quy đổi để tính món: {formatVND(item.latest_price_per_unit)} / {item.default_unit}</p></>}</td><td className="px-5 py-3.5 text-gray-600">{formatDate(item.updated_at)}</td><td className="px-5 py-3.5"><div className="flex justify-end gap-1"><button type="button" onClick={() => openEdit(item)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" aria-label={`Sửa ${item.name}`}><Pencil className="h-4 w-4" /></button><button type="button" disabled={savingId === item.id} onClick={() => toggle(item)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition hover:bg-sand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50" aria-label={item.is_active ? `Ẩn ${item.name}` : `Khôi phục ${item.name}`}>{item.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div></td></tr>)}
           </tbody></table></div>
         )}
         {!loading && !error && <AdminPagination offset={offset} limit={LIMIT} total={total} onChange={setOffset} />}
       </Card>
-      <Modal open={open} onClose={() => setOpen(false)} title={editing ? `Sửa ${editing.name}` : "Thêm nguyên liệu"} size="lg" footer={<><Button variant="ghost" onClick={() => setOpen(false)}>Hủy</Button><Button form="admin-ingredient-form" type="submit" loading={saving}>Lưu nguyên liệu</Button></>}>
+      <Modal open={open} onClose={() => setOpen(false)} title={editing ? `Sửa ${editing.name}` : "Thêm nguyên liệu"} size="lg" footer={<>{editing && <Button type="button" variant="danger" onClick={() => setDeleting(editing)}><Trash2 className="h-4 w-4" /> Xóa nguyên liệu</Button>}<Button variant="ghost" onClick={() => setOpen(false)}>Hủy</Button><Button form="admin-ingredient-form" type="submit" loading={saving}>Lưu nguyên liệu</Button></>}>
         <form id="admin-ingredient-form" onSubmit={save} className="space-y-6">
           <section><h3 className="font-semibold text-gray-900">Thông tin cơ bản</h3><div className="mt-3 grid gap-4 sm:grid-cols-2"><TextField className="sm:col-span-2" label="Tên nguyên liệu" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /><SelectField label="Nhóm thực phẩm" value={form.food_group} options={GROUP_OPTIONS} onChange={(e) => setForm({ ...form, food_group: e.target.value as FoodGroup })} /><TextField label="Đơn vị mặc định" required value={form.default_unit} hint="Ví dụ: g, ml, quả" onChange={(e) => setForm({ ...form, default_unit: e.target.value })} /><NumberField label="Gram / đơn vị" required min="0.0001" step="0.01" value={form.grams_per_unit} hint="Dùng để quy đổi dinh dưỡng về gram." onChange={(e) => setForm({ ...form, grams_per_unit: e.target.value })} /></div></section>
           <section className="border-t border-sand-200 pt-5"><h3 className="font-semibold text-gray-900">Dinh dưỡng trên 100g</h3><p className="mt-1 text-sm text-gray-600">Để trống khi chưa có nguồn đáng tin cậy; trang Quality sẽ nhắc bổ sung.</p><div className="mt-3 grid gap-4 sm:grid-cols-3"><NumberField label="Calo" suffix="kcal" min="0" value={form.calories} onChange={(e) => setForm({ ...form, calories: e.target.value })} /><NumberField label="Đạm" suffix="g" min="0" value={form.protein_g} onChange={(e) => setForm({ ...form, protein_g: e.target.value })} /><NumberField label="Tinh bột" suffix="g" min="0" value={form.carbs_g} onChange={(e) => setForm({ ...form, carbs_g: e.target.value })} /><NumberField label="Chất béo" suffix="g" min="0" value={form.fat_g} onChange={(e) => setForm({ ...form, fat_g: e.target.value })} /><NumberField label="Chất xơ" suffix="g" min="0" value={form.fiber_g} onChange={(e) => setForm({ ...form, fiber_g: e.target.value })} /></div></section>
-          <section className="border-t border-sand-200 pt-5"><h3 className="font-semibold text-gray-900">Thêm mốc giá</h3><p className="mt-1 text-sm text-gray-600">Lưu một mốc mới, không ghi đè lịch sử giá trước đó.</p><div className="mt-3 grid gap-4 sm:grid-cols-2"><MoneyField label="Giá gốc" min="0" value={form.price} onValueChange={(price) => setForm({ ...form, price })} /><TextField label="Đơn vị giá" value={form.price_unit} onChange={(e) => setForm({ ...form, price_unit: e.target.value })} /><MoneyField label={`Giá / ${form.default_unit || "đơn vị"}`} min="0" value={form.price_per_default_unit} maxFractionDigits={4} hint="Bắt buộc khi nhập giá gốc." onValueChange={(price_per_default_unit) => setForm({ ...form, price_per_default_unit })} /><TextField label="Nguồn giá" value={form.price_source} placeholder="Chợ, siêu thị, khảo sát..." onChange={(e) => setForm({ ...form, price_source: e.target.value })} /></div></section>
+          <section className="border-t border-sand-200 pt-5"><h3 className="font-semibold text-gray-900">Thêm mốc giá</h3><p className="mt-1 text-sm text-gray-600">Lưu một mốc mới, không ghi đè lịch sử giá trước đó.</p><div className="mt-3 grid gap-4 sm:grid-cols-2"><MoneyField label="Giá gốc" min="0" value={form.price} onValueChange={(price) => setForm({ ...form, price })} /><TextField label="Đơn vị giá" value={form.price_unit} onChange={(e) => setForm({ ...form, price_unit: e.target.value })} /><MoneyField label={`Giá quy đổi / ${form.default_unit || "đơn vị"}`} min="0" value={form.price_per_default_unit} maxFractionDigits={4} hint="Dùng để tính chi phí món; không phải giá niêm yết." onValueChange={(price_per_default_unit) => setForm({ ...form, price_per_default_unit })} /><TextField label="Nguồn giá" value={form.price_source} placeholder="Chợ, siêu thị, khảo sát..." onChange={(e) => setForm({ ...form, price_source: e.target.value })} /></div></section>
         </form>
       </Modal>
+      <ConfirmDialog open={!!deleting} onClose={() => setDeleting(null)} onConfirm={deleteIngredient} loading={deletingId === deleting?.id} title="Xóa nguyên liệu" message={deleting ? `Xóa vĩnh viễn “${deleting.name}”? Không thể hoàn tác.` : ""} confirmLabel="Xóa nguyên liệu" />
     </div>
   );
 }
