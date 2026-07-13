@@ -1,12 +1,58 @@
 from __future__ import annotations
 
 from sqlalchemy import text
+import pytest
 
 from app.modules.meal_planning.dish_candidate_repository import SqlDishCandidateProvider
 from app.shared.enums import DishType
 
 
-def test_seed_has_planner_ready_pool_for_every_required_role(db_session):
+@pytest.fixture
+def planner_catalog(db_session):
+    """Dữ liệu tối thiểu, tự tạo cho từng test thay vì phụ thuộc DB seed."""
+    savepoint = db_session.begin_nested()
+    try:
+        ingredient_ids: list[int] = []
+        for index, dish_type in enumerate((
+            DishType.BREAKFAST,
+            DishType.STAPLE,
+            DishType.SAVORY,
+            DishType.VEGETABLE_SIDE,
+        ), start=1):
+            ingredient_id = db_session.execute(
+                text("""INSERT INTO ingredients (name, food_group, default_unit, grams_per_unit, is_active)
+                        VALUES (:name, 'protein', 'g', 1, TRUE) RETURNING id"""),
+                {"name": f"Test planner ingredient {dish_type.value}"},
+            ).scalar_one()
+            ingredient_ids.append(ingredient_id)
+            db_session.execute(
+                text("""INSERT INTO nutrition_facts
+                        (ingredient_id, calories, protein_g, carbs_g, fat_g, fiber_g)
+                        VALUES (:id, 100, 10, 10, 5, 1)"""),
+                {"id": ingredient_id},
+            )
+            db_session.execute(
+                text("""INSERT INTO price_snapshots
+                        (ingredient_id, price, unit, price_per_default_unit, source)
+                        VALUES (:id, 10000, 'g', 100, 'test')"""),
+                {"id": ingredient_id},
+            )
+            dish_id = db_session.execute(
+                text("""INSERT INTO dishes (name, dish_type, tags, is_active)
+                        VALUES (:name, CAST(:dish_type AS dish_type), '[]'::jsonb, TRUE) RETURNING id"""),
+                {"name": f"Test planner dish {dish_type.value}", "dish_type": dish_type.value},
+            ).scalar_one()
+            db_session.execute(
+                text("""INSERT INTO dish_ingredients (dish_id, ingredient_id, quantity, unit)
+                        VALUES (:dish_id, :ingredient_id, 100, 'g')"""),
+                {"dish_id": dish_id, "ingredient_id": ingredient_id},
+            )
+        yield
+    finally:
+        savepoint.rollback()
+
+
+def test_fixture_has_planner_ready_pool_for_every_required_role(db_session, planner_catalog):
     rows = db_session.execute(
         text("SELECT dish_type, COUNT(*) FROM v_dish_candidates GROUP BY dish_type")
     ).fetchall()
@@ -17,7 +63,7 @@ def test_seed_has_planner_ready_pool_for_every_required_role(db_session):
     assert counts[DishType.VEGETABLE_SIDE.value] + counts[DishType.SOUP.value] >= 1
 
 
-def test_candidate_view_only_returns_complete_dishes(db_session):
+def test_candidate_view_only_returns_complete_dishes(db_session, planner_catalog):
     invalid = db_session.execute(
         text(
             """SELECT id FROM v_dish_candidates
@@ -32,7 +78,7 @@ def test_candidate_view_only_returns_complete_dishes(db_session):
     assert invalid == []
 
 
-def test_dish_provider_exclusion_and_batch_mapping(db_session):
+def test_dish_provider_exclusion_and_batch_mapping(db_session, planner_catalog):
     provider = SqlDishCandidateProvider(db_session)
     all_candidates = provider.load_candidates([])
     assert all_candidates == sorted(all_candidates, key=lambda candidate: candidate.dish_id)
@@ -45,7 +91,7 @@ def test_dish_provider_exclusion_and_batch_mapping(db_session):
     assert all(candidate.ingredients for candidate in by_id.values())
 
 
-def test_inactive_ingredient_removes_related_dish_from_candidate_view(db_session):
+def test_inactive_ingredient_removes_related_dish_from_candidate_view(db_session, planner_catalog):
     row = db_session.execute(
         text("SELECT dish_id, ingredient_id FROM dish_ingredients ORDER BY dish_id, ingredient_id LIMIT 1")
     ).first()

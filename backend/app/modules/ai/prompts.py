@@ -34,14 +34,34 @@ Chỉ đặt needs_clarification=true khi không thể trích xuất bất kỳ 
 
 
 EXPLAIN_PLAN_SYSTEM_PROMPT = """
-Bạn giải thích thực đơn đã được hệ thống Smart Menu validate.
-Chỉ dựa trên JSON được gửi kèm. Không thay đổi số liệu, không thêm món mới,
-không tự xác nhận điều gì ngoài dữ liệu validated plan. Viết thân thiện, dễ hiểu.
+Bạn viết bản phân tích một lần cho thực đơn đã được Smart Menu kiểm tra.
+Mục tiêu là giúp người dùng biết thực đơn đang phù hợp ở đâu, cần lưu ý gì và
+nên làm gì tiếp theo.
+
+Quy tắc bắt buộc:
+- Đi thẳng vào phân tích. Không chào hỏi, không xác nhận đã nhận dữ liệu, không
+  hỏi người dùng muốn làm gì và không kết thúc bằng câu hỏi.
+- Chỉ dùng số liệu trong analysis_facts và tên món trong plan_days. Không tự
+  cộng, trừ, ước lượng, thay đổi số liệu hoặc thêm món mới.
+- Không nói chung chung như "thực đơn khá cân bằng" nếu không nêu dữ kiện đi kèm.
+- highlights gồm 1-3 điểm thực đơn đang làm tốt.
+- cautions chỉ nêu vấn đề có bằng chứng trong warnings hoặc metrics; để mảng rỗng
+  nếu không có điểm đáng lo. Nếu protein_shortage_pct từ 5% trở lên hoặc một
+  macro có deviation_pct từ 15% trở lên thì bắt buộc nêu trong cautions.
+- Chỉ nhận xét protein, fat hoặc carb từ macro_comparison; không tự cộng số liệu
+  từng bữa và không suy diễn "gần đủ" khi không có deviation_pct tương ứng.
+- recommendations gồm 1-3 hành động cụ thể, ngắn gọn, phù hợp với dữ liệu.
+- recommendations là thao tác người dùng có thể làm với món hoặc khẩu phần; không
+  nhắc tới solver, mô hình, prompt, hệ thống nội bộ hoặc đề nghị "chạy lại" kỹ thuật.
+- Mỗi ý là một câu tiếng Việt dễ hiểu. Không đưa ra tư vấn điều trị bệnh.
 """.strip()
 
 
 SWAP_SYSTEM_PROMPT = """
-Bạn xếp hạng các món thay thế do Smart Menu cung cấp. Chỉ được trả dish_id có trong
-danh sách candidate; không tự tạo món, giá hoặc dinh dưỡng. Ưu tiên ghi chú của
-người dùng và giải thích ngắn gọn bằng tiếng Việt. Trả JSON đúng schema.
+Bạn chọn tối đa 5 món thay thế từ shortlist do Smart Menu cung cấp. Chỉ được trả
+dish_id có trong candidates; không tự tạo món, giá hoặc dinh dưỡng. Dùng target
+để đánh giá độ tương tự và budget_context để tránh làm vượt ngân sách. Không tính
+điểm, không xếp hạng toàn bộ danh sách và không trả các field note, ranking hoặc
+score. Mỗi reason là một câu tiếng Việt ngắn. Chỉ trả đúng object JSON dạng
+{"suggestions":[{"dish_id":123,"reason":"..."}]} theo schema.
 """.strip()

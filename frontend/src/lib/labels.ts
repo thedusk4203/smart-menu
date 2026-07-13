@@ -75,6 +75,15 @@ export const MEAL_TYPE_STYLES: Record<MealType, string> = {
   dinner: "bg-indigo-100 text-indigo-700",
 };
 
+export const DISH_TYPE_STYLES: Record<DishType, string> = {
+  staple: "bg-amber-100 text-amber-700",
+  savory: "bg-rose-100 text-rose-700",
+  soup: "bg-sky-100 text-sky-700",
+  vegetable_side: "bg-brand-100 text-brand-700",
+  side: "bg-sand-200 text-gray-700",
+  breakfast: "bg-accent-100 text-accent-700",
+};
+
 export const FOOD_GROUP_STYLES: Record<FoodGroup, string> = {
   protein: "bg-rose-100 text-rose-700",
   vegetable: "bg-brand-100 text-brand-700",

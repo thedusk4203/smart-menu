@@ -1,12 +1,16 @@
 // Gom cac provider toan cuc: xac thuc + thong bao toast.
 import type { ReactNode } from "react";
 import { Toaster } from "react-hot-toast";
+import { GoogleOAuthProvider } from "@react-oauth/google";
 import { AuthProvider } from "../context/AuthContext";
 
 export function Providers({ children }: { children: ReactNode }) {
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
+  const app = <AuthProvider>{children}</AuthProvider>;
+
   return (
-    <AuthProvider>
-      {children}
+    <>
+      {googleClientId ? <GoogleOAuthProvider clientId={googleClientId}>{app}</GoogleOAuthProvider> : app}
       <Toaster
         position="top-right"
         toastOptions={{
@@ -21,6 +25,6 @@ export function Providers({ children }: { children: ReactNode }) {
           error: { iconTheme: { primary: "#ef4444", secondary: "#fff" } },
         }}
       />
-    </AuthProvider>
+    </>
   );
 }

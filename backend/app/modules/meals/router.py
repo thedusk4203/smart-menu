@@ -33,7 +33,13 @@ def _validate_tags(tags: list, session: Session) -> None:
     names = [" ".join(str(tag).split()) for tag in tags if str(tag).strip()]
     if not names:
         return
-    found = {row.name for row in session.execute(text("SELECT name FROM tag_catalog WHERE is_active=TRUE AND name=ANY(:names)"), {"names": names})}
+    found = {
+        row.name for row in session.execute(
+            text("""SELECT name FROM tag_catalog
+                    WHERE entity_type='dish' AND is_active=TRUE AND name=ANY(:names)"""),
+            {"names": names},
+        )
+    }
     missing = [name for name in names if name not in found]
     if missing:
         from fastapi import HTTPException

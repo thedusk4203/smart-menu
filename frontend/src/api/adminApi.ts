@@ -28,6 +28,7 @@ export const adminApi = {
     api.put<AdminIngredient>(`/api/admin/ingredients/${id}`, data),
   setIngredientActive: (id: number, is_active: boolean) =>
     api.patch<AdminIngredient>(`/api/admin/ingredients/${id}/active`, { is_active }),
+  deleteIngredient: (id: number) => api.del<void>(`/api/admin/ingredients/${id}`),
   exportIngredients: (format: "csv" | "xlsx", params: Record<string, unknown> = {}) =>
     api.getDownload(`/api/admin/ingredients/export${qs({ format, ...params })}`),
 
@@ -39,6 +40,7 @@ export const adminApi = {
     api.put<AdminDish>(`/api/admin/dishes/${id}`, data),
   setDishActive: (id: number, is_active: boolean) =>
     api.patch<AdminDish>(`/api/admin/dishes/${id}/active`, { is_active }),
+  deleteDish: (id: number) => api.del<void>(`/api/admin/dishes/${id}`),
   exportDishes: (format: "csv" | "xlsx", params: Record<string, unknown> = {}) =>
     api.getDownload(`/api/admin/dishes/export${qs({ format, ...params })}`),
 

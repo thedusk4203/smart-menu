@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
+from sqlalchemy.engine import URL
 
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 load_dotenv()
 
 
@@ -17,6 +20,25 @@ def _env_bool(name: str, default: bool = False) -> bool:
 
 def _env_list(name: str, default: str) -> list[str]:
     return [value.strip() for value in os.getenv(name, default).split(",") if value.strip()]
+
+
+def _database_url() -> str:
+    explicit_url = os.getenv("DATABASE_URL")
+    has_postgres_settings = any(
+        os.getenv(name)
+        for name in ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB", "POSTGRES_HOST", "POSTGRES_PORT", "DB_PORT")
+    )
+    if explicit_url and not has_postgres_settings:
+        return explicit_url
+    return URL.create(
+        drivername="postgresql+psycopg2",
+        username=os.getenv("POSTGRES_USER", "postgres"),
+        password=os.getenv("POSTGRES_PASSWORD", "postgres"),
+        host=os.getenv("POSTGRES_HOST", "localhost"),
+        # DB_PORT is retained for compatibility with the local .env convention.
+        port=int(os.getenv("POSTGRES_PORT") or os.getenv("DB_PORT", "5432")),
+        database=os.getenv("POSTGRES_DB", "DATN"),
+    ).render_as_string(hide_password=False)
 
 
 def _default_ai_base_url(provider: str) -> str:
@@ -33,13 +55,11 @@ def _default_ai_base_url(provider: str) -> str:
 
 class Settings:
     app_env: str = os.getenv("APP_ENV", "development").strip().lower()
-    database_url: str = os.getenv(
-        "DATABASE_URL",
-        "postgresql+psycopg2://postgres:postgres@localhost:5432/DATN",
-    )
+    database_url: str = _database_url()
     secret_key: str = os.getenv("SECRET_KEY", "change-me-in-env")
     algorithm: str = os.getenv("ALGORITHM", "HS256")
     access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+    google_client_id: str | None = os.getenv("GOOGLE_CLIENT_ID", "").strip() or None
     ai_provider: str = os.getenv("AI_PROVIDER", "disabled").strip().lower()
     ai_enabled: bool = _env_bool("AI_ENABLED", ai_provider not in {"", "disabled", "none", "off"})
     ai_base_url: str = os.getenv("AI_BASE_URL", _default_ai_base_url(ai_provider)).rstrip("/")

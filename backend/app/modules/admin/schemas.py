@@ -103,6 +103,7 @@ class AdminIngredientItem(BaseModel):
     food_group: FoodGroup
     default_unit: str
     grams_per_unit: float
+    tags: list[str] = []
     is_active: bool
     calories: float | None = None
     protein_g: float | None = None

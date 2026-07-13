@@ -90,6 +90,35 @@ class ExplainPlanRequest(BaseModel):
     budget_limit: float | None = None
 
 
+class PlanExplanationContent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    summary: str = Field(min_length=20, max_length=500)
+    budget_assessment: str = Field(min_length=10, max_length=400)
+    nutrition_assessment: str = Field(min_length=10, max_length=400)
+    highlights: list[str] = Field(min_length=1, max_length=3)
+    cautions: list[str] = Field(default_factory=list, max_length=3)
+    recommendations: list[str] = Field(min_length=1, max_length=3)
+
+    @field_validator("summary", "budget_assessment", "nutrition_assessment")
+    @classmethod
+    def normalize_explanation_text(cls, value: str) -> str:
+        return " ".join(value.split())
+
+    @field_validator("highlights", "cautions", "recommendations")
+    @classmethod
+    def normalize_explanation_items(cls, value: list[str]) -> list[str]:
+        normalized = [" ".join(item.split()) for item in value if item.strip()]
+        if len(normalized) != len(value):
+            raise ValueError("các ý phân tích không được để trống")
+        return normalized
+
+
+class ExplainPlanResponse(PlanExplanationContent):
+    # Giữ reply để client cũ vẫn hiển thị được bản phân tích dạng văn bản.
+    reply: str
+
+
 class SwapSuggestionRequest(BaseModel):
     day: int = Field(ge=1, le=7)
     meal_type: Literal["breakfast", "lunch", "dinner"]

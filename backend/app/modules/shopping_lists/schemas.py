@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date as Date
 from datetime import datetime
 
 from pydantic import BaseModel, Field
@@ -23,6 +24,8 @@ class ShoppingListWarning(BaseModel):
 class ShoppingListResponse(BaseModel):
     plan_id: int
     plan_name: str | None = None
+    day: int | None = None
+    date: Date | None = None
     schema_version: int
     items: list[ShoppingListItem] = Field(default_factory=list)
     total_estimated_cost: float
@@ -36,6 +39,7 @@ class PurchaseUpdate(BaseModel):
 class ShoppingShareResponse(BaseModel):
     token: str
     expires_at: datetime
+    day: int | None = None
 
 
 class PublicShoppingListResponse(ShoppingListResponse):

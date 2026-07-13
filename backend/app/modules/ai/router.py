@@ -18,10 +18,9 @@ from app.dependencies import (
 )
 from app.modules.ai.schemas import (
     ChatRequest,
-    ChatResponse,
-    ConversationChatResponse,
     ConversationDetail,
     ConversationSummary,
+    ExplainPlanResponse,
     ExplainPlanRequest,
     ParsedMenuRequest,
     ParseMenuRequest,
@@ -142,7 +141,7 @@ def parse_menu_request(
     return use_case.execute(data)
 
 
-@router.post("/explain-plan", response_model=ChatResponse)
+@router.post("/explain-plan", response_model=ExplainPlanResponse)
 def explain_plan(
     data: ExplainPlanRequest,
     current_user: UserEntity = Depends(get_current_user),

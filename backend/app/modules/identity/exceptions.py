@@ -1,7 +1,7 @@
 # Domain exceptions for the identity module.
 from __future__ import annotations
 
-from app.core.exceptions import ConflictError, NotFoundError
+from app.core.exceptions import AppException, ConflictError, NotFoundError
 
 
 class UserNotFoundError(NotFoundError):
@@ -12,3 +12,11 @@ class UserNotFoundError(NotFoundError):
 class EmailAlreadyExistsError(ConflictError):
     def __init__(self, email: str) -> None:
         super().__init__(f"Email '{email}' đã được sử dụng")
+
+
+class GoogleAuthenticationError(AppException):
+    status_code = 401
+
+
+class GoogleAuthenticationNotConfiguredError(AppException):
+    status_code = 503

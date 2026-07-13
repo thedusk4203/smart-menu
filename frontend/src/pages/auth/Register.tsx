@@ -2,9 +2,11 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { Button, TextField } from "../../components/ui";
 import { ApiError } from "../../lib/apiClient";
+import { GoogleLoginButton } from "../../components/auth/GoogleLoginButton";
 
 export function Register() {
   const { register } = useAuth();
@@ -13,6 +15,8 @@ export function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const passwordError = confirm && confirm !== password ? "Mật khẩu xác nhận không khớp" : undefined;
@@ -63,27 +67,54 @@ export function Register() {
         />
         <TextField
           label="Mật khẩu"
-          type="password"
+          type={showPassword ? "text" : "password"}
           autoComplete="new-password"
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Tối thiểu 8 ký tự"
+          trailingAction={
+            <button
+              type="button"
+              onClick={() => setShowPassword((visible) => !visible)}
+              className="rounded-md p-1 text-gray-400 transition-colors hover:text-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+              aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+              title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          }
         />
         <TextField
           label="Xác nhận mật khẩu"
-          type="password"
+          type={showConfirm ? "text" : "password"}
           autoComplete="new-password"
           required
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
           error={passwordError}
           placeholder="Nhập lại mật khẩu"
+          trailingAction={
+            <button
+              type="button"
+              onClick={() => setShowConfirm((visible) => !visible)}
+              className="rounded-md p-1 text-gray-400 transition-colors hover:text-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+              aria-label={showConfirm ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+              title={showConfirm ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+            >
+              {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          }
         />
         <Button type="submit" loading={loading} className="w-full">
           Đăng ký
         </Button>
       </form>
+
+      <GoogleLoginButton onAuthenticated={() => {
+        toast.success("Tạo tài khoản thành công!");
+        navigate("/dashboard", { replace: true });
+      }} />
 
       <p className="mt-6 text-center text-sm text-gray-500">
         Đã có tài khoản?{" "}
