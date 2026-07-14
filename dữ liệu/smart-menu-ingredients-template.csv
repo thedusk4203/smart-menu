@@ -1,0 +1,351 @@
+﻿id,code,name,food_group,default_unit,grams_per_unit,tags,calories,protein_g,carbs_g,fat_g,fiber_g,price,price_unit,price_per_default_unit,source,is_active
+,ING-0001,Ức gà,protein,g,1,"giàu đạm, nguyên liệu đạm",165,31,0,3.6,0,105000,kg,105,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0002,Đùi gà,protein,g,1,"giàu đạm, nguyên liệu đạm",209,26,0,10.9,0,85000,kg,85,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0003,Cánh gà,protein,g,1,"giàu đạm, nguyên liệu đạm",203,30.5,0,8.1,0,95000,kg,95,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0004,Thịt heo nạc,protein,g,1,"giàu đạm, nguyên liệu đạm",143,21,0,5,0,135000,kg,135,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0005,Thịt ba chỉ,protein,g,1,"giàu đạm, nguyên liệu đạm",518,9.3,0,53,0,165000,kg,165,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0006,Sườn non heo,protein,g,1,"giàu đạm, nguyên liệu đạm",277,18,0,22,0,190000,kg,190,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0007,Thịt bò,protein,g,1,"giàu đạm, nguyên liệu đạm",250,26,0,15,0,255000,kg,255,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0008,Thịt bò xay,protein,g,1,"giàu đạm, nguyên liệu đạm",254,25,0,17,0,225000,kg,225,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0009,Cá thu,protein,g,1,"giàu đạm, nguyên liệu đạm",205,19,0,13.9,0,175000,kg,175,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0010,Cá rô phi,protein,g,1,"giàu đạm, nguyên liệu đạm",128,26,0,2.7,0,78000,kg,78,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0011,Cá basa,protein,g,1,"giàu đạm, nguyên liệu đạm",170,18,0,10,0,68000,kg,68,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0012,Cá hồi,protein,g,1,"giàu đạm, nguyên liệu đạm",208,20,0,13,0,360000,kg,360,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0013,Cá lóc,protein,g,1,"giàu đạm, nguyên liệu đạm",97,18.2,0,2.7,0,115000,kg,115,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0014,Cá ngừ,protein,g,1,"giàu đạm, nguyên liệu đạm",144,23.3,0,4.9,0,145000,kg,145,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0015,Tôm,protein,g,1,"giàu đạm, nguyên liệu đạm",99,24,0.2,0.3,0,205000,kg,205,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0016,Mực,protein,g,1,"giàu đạm, nguyên liệu đạm",92,15.6,3.1,1.4,0,190000,kg,190,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0017,Cua đồng,protein,g,1,"giàu đạm, nguyên liệu đạm",87,12.3,2,3.3,0,140000,kg,140,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0018,Nghêu,protein,g,1,"giàu đạm, nguyên liệu đạm",86,14.7,3.6,1,0,75000,kg,75,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0019,Trứng gà,protein,quả,55,"giàu đạm, nguyên liệu đạm",155,13,1.1,11,0,38000,10 quả,3800,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0020,Trứng cút,protein,quả,12,"giàu đạm, nguyên liệu đạm",158,13.1,0.4,11.1,0,26000,30 quả,866.6667,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0021,Đậu phụ,protein,g,1,"giàu đạm, nguyên liệu đạm",76,8,1.9,4.8,0.3,32000,kg,32,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0022,Đậu phụ non,protein,g,1,"giàu đạm, nguyên liệu đạm",61,6.5,1.8,3.7,0.2,42000,kg,42,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0023,Đậu đen,protein,g,1,"giàu đạm, nguyên liệu đạm",341,21.6,62.4,1.4,15.5,52000,kg,52,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0024,Đậu đỏ,protein,g,1,"giàu đạm, nguyên liệu đạm",333,22.5,60.3,0.8,15.2,62000,kg,62,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0025,Đậu xanh,protein,g,1,"giàu đạm, nguyên liệu đạm",347,23.9,62.6,1.2,16.3,58000,kg,58,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0026,Đậu gà,protein,g,1,"giàu đạm, nguyên liệu đạm",364,19.3,60.7,6,17.4,98000,kg,98,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0027,Đậu lăng,protein,g,1,"giàu đạm, nguyên liệu đạm",352,24.6,63.4,1.1,10.7,105000,kg,105,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0028,Thịt vịt,protein,g,1,"giàu đạm, nguyên liệu đạm",337,19,0,28,0,115000,kg,115,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0029,Cá trích,protein,g,1,"giàu đạm, nguyên liệu đạm",158,18,0,9,0,120000,kg,120,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0030,Cá nục,protein,g,1,"giàu đạm, nguyên liệu đạm",167,20,0,9.4,0,85000,kg,85,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0031,Cá chép,protein,g,1,"giàu đạm, nguyên liệu đạm",127,17.8,0,5.6,0,95000,kg,95,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0032,Lươn,protein,g,1,"giàu đạm, nguyên liệu đạm",184,18.4,0,11.7,0,230000,kg,230,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0033,Thịt dê,protein,g,1,"giàu đạm, nguyên liệu đạm",143,27.1,0,3,0,290000,kg,290,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0034,Ếch,protein,g,1,"giàu đạm, nguyên liệu đạm",73,16.4,0,0.3,0,135000,kg,135,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0035,Tép khô,protein,g,1,"giàu đạm, nguyên liệu đạm",269,59.8,1.8,3,0,420000,kg,420,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0036,Cải ngọt,vegetable,g,1,"rau củ, giàu chất xơ",13,1.5,2.2,0.2,1.2,24000,kg,24,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0037,Rau muống,vegetable,g,1,"rau củ, giàu chất xơ",19,2.6,3.1,0.2,2.1,22000,kg,22,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0038,Bông cải xanh,vegetable,g,1,"rau củ, giàu chất xơ",34,2.8,6.6,0.4,2.6,65000,kg,65,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0039,Súp lơ trắng,vegetable,g,1,"rau củ, giàu chất xơ",25,1.9,5,0.3,2,56000,kg,56,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0040,Cà rốt,vegetable,g,1,"rau củ, giàu chất xơ",41,0.9,9.6,0.2,2.8,32000,kg,32,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0041,Bí đỏ,vegetable,g,1,"rau củ, giàu chất xơ",26,1,6.5,0.1,0.5,26000,kg,26,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0042,Cà chua,vegetable,g,1,"rau củ, giàu chất xơ",18,0.9,3.9,0.2,1.2,38000,kg,38,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0043,Dưa leo,vegetable,g,1,"rau củ, giàu chất xơ",15,0.7,3.6,0.1,0.5,28000,kg,28,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0044,Xà lách,vegetable,g,1,"rau củ, giàu chất xơ",15,1.4,2.9,0.2,1.3,52000,kg,52,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0045,Nấm rơm,vegetable,g,1,"rau củ, giàu chất xơ",22,3.1,3.3,0.3,1,95000,kg,95,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0046,Nấm hương tươi,vegetable,g,1,"rau củ, giàu chất xơ",34,2.2,6.8,0.5,2.5,145000,kg,145,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0047,Nấm bào ngư,vegetable,g,1,"rau củ, giàu chất xơ",33,3.3,6.1,0.4,2.3,72000,kg,72,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0048,Hành lá,vegetable,g,1,"rau củ, giàu chất xơ",32,1.8,7.3,0.2,2.6,65000,kg,65,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0049,Hành tây,vegetable,g,1,"rau củ, giàu chất xơ",40,1.1,9.3,0.1,1.7,36000,kg,36,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0050,Tỏi,vegetable,g,1,"rau củ, giàu chất xơ",149,6.4,33.1,0.5,2.1,105000,kg,105,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0051,Gừng,vegetable,g,1,"rau củ, giàu chất xơ",80,1.8,17.8,0.8,2,72000,kg,72,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0052,Hành tím,vegetable,g,1,"rau củ, giàu chất xơ",72,2.5,16.8,0.1,3.2,78000,kg,78,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0053,Su su,vegetable,g,1,"rau củ, giàu chất xơ",19,0.8,4.5,0.1,1.7,28000,kg,28,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0054,Bí ngòi,vegetable,g,1,"rau củ, giàu chất xơ",17,1.2,3.1,0.3,1,55000,kg,55,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0055,Mướp,vegetable,g,1,"rau củ, giàu chất xơ",20,1.2,4.4,0.2,1.1,32000,kg,32,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0056,Bí đao,vegetable,g,1,"rau củ, giàu chất xơ",13,0.4,3,0.2,2.9,25000,kg,25,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0057,Khổ qua,vegetable,g,1,"rau củ, giàu chất xơ",17,1,3.7,0.2,2.8,42000,kg,42,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0058,Mồng tơi,vegetable,g,1,"rau củ, giàu chất xơ",19,1.8,3.4,0.3,2.1,26000,kg,26,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0059,Rau đay,vegetable,g,1,"rau củ, giàu chất xơ",34,4.6,5.8,0.3,1.5,28000,kg,28,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0060,Bắp cải,vegetable,g,1,"rau củ, giàu chất xơ",25,1.3,5.8,0.1,2.5,26000,kg,26,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0061,Cải thảo,vegetable,g,1,"rau củ, giàu chất xơ",16,1.2,3.2,0.2,1.2,30000,kg,30,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0062,Giá đỗ,vegetable,g,1,"rau củ, giàu chất xơ",30,3,5.9,0.2,1.8,30000,kg,30,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0063,Đậu que,vegetable,g,1,"rau củ, giàu chất xơ",31,1.8,7,0.2,2.7,48000,kg,48,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0064,Đậu bắp,vegetable,g,1,"rau củ, giàu chất xơ",33,1.9,7.5,0.2,3.2,48000,kg,48,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0065,Cải bó xôi,vegetable,g,1,"rau củ, giàu chất xơ",23,2.9,3.6,0.4,2.2,78000,kg,78,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0066,Cải xoong,vegetable,g,1,"rau củ, giàu chất xơ",11,2.3,1.3,0.1,0.5,65000,kg,65,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0067,Cần tây,vegetable,g,1,"rau củ, giàu chất xơ",16,0.7,3,0.2,1.6,62000,kg,62,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0068,Ớt chuông,vegetable,g,1,"rau củ, giàu chất xơ",31,1,6,0.3,2.1,88000,kg,88,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0069,Cà tím,vegetable,g,1,"rau củ, giàu chất xơ",25,1,5.9,0.2,3,38000,kg,38,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0070,Ngó sen,vegetable,g,1,"rau củ, giàu chất xơ",74,2.6,17.2,0.1,4.9,85000,kg,85,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0071,Măng tươi,vegetable,g,1,"rau củ, giàu chất xơ",27,2.6,5.2,0.3,2.2,52000,kg,52,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0072,Ngô ngọt,vegetable,g,1,"rau củ, giàu chất xơ",86,3.3,19,1.4,2.7,42000,kg,42,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0073,Rau mùi,vegetable,g,1,"rau củ, giàu chất xơ",23,2.1,3.7,0.5,2.8,110000,kg,110,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0074,Húng quế,vegetable,g,1,"rau củ, giàu chất xơ",23,3.2,2.7,0.6,1.6,120000,kg,120,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0075,Tía tô,vegetable,g,1,"rau củ, giàu chất xơ",37,3.9,7.5,0.5,7.3,115000,kg,115,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0076,Gạo trắng,grain,g,1,"tinh bột, no lâu",360,6.8,79.3,0.6,1.3,26000,kg,26,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0077,Gạo lứt,grain,g,1,"tinh bột, no lâu",370,7.9,77.2,2.9,3.5,43000,kg,43,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0078,Gạo nếp,grain,g,1,"tinh bột, no lâu",344,6.3,78.4,0.6,1,42000,kg,42,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0079,Bún tươi,grain,g,1,"tinh bột, no lâu",110,1.7,25.7,0.2,0.5,24000,kg,24,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0080,Phở tươi,grain,g,1,"tinh bột, no lâu",110,2,24.9,0.2,0.9,30000,kg,30,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0081,Mì gạo,grain,g,1,"tinh bột, no lâu",364,6,80.2,0.6,2.4,52000,kg,52,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0082,Miến dong,grain,g,1,"tinh bột, no lâu",351,0.2,86.6,0.1,0.5,90000,kg,90,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0083,Yến mạch,grain,g,1,"tinh bột, no lâu",389,16.9,66.3,6.9,10.6,98000,kg,98,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0084,Khoai lang,grain,g,1,"tinh bột, no lâu",86,1.6,20.1,0.1,3,32000,kg,32,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0085,Khoai tây,grain,g,1,"tinh bột, no lâu",77,2,17.5,0.1,2.2,36000,kg,36,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0086,Bánh mì,grain,g,1,"tinh bột, no lâu",265,9,49,3.2,2.7,45000,kg,45,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0087,Nui,grain,g,1,"tinh bột, no lâu",371,13,74.7,1.5,3.2,62000,kg,62,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0088,Mì trứng,grain,g,1,"tinh bột, no lâu",384,14.2,71.3,4.4,3.3,72000,kg,72,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0089,Bột mì,grain,g,1,"tinh bột, no lâu",364,10.3,76.3,1,2.7,36000,kg,36,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0090,Bột gạo,grain,g,1,"tinh bột, no lâu",366,6,80.1,1.4,2.4,38000,kg,38,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0091,Hạt quinoa,grain,g,1,"tinh bột, no lâu",368,14.1,64.2,6.1,7,185000,kg,185,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0092,Ngô hạt,grain,g,1,"tinh bột, no lâu",365,9.4,74.3,4.7,7.3,48000,kg,48,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0093,Khoai môn,grain,g,1,"tinh bột, no lâu",112,1.5,26.5,0.2,4.1,48000,kg,48,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0094,Sắn,grain,g,1,"tinh bột, no lâu",160,1.4,38.1,0.3,1.8,26000,kg,26,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0095,Bánh đa,grain,g,1,"tinh bột, no lâu",350,5.5,80,0.5,1.5,65000,kg,65,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0096,Chuối,fruit,g,1,"trái cây, giàu vitamin",89,1.1,22.8,0.3,2.6,32000,kg,32,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0097,Táo,fruit,g,1,"trái cây, giàu vitamin",52,0.3,13.8,0.2,2.4,78000,kg,78,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0098,Cam,fruit,g,1,"trái cây, giàu vitamin",47,0.9,11.8,0.1,2.4,48000,kg,48,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0099,Bưởi,fruit,g,1,"trái cây, giàu vitamin",42,0.8,10.7,0.1,1.6,52000,kg,52,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0100,Đu đủ,fruit,g,1,"trái cây, giàu vitamin",43,0.5,10.8,0.3,1.7,35000,kg,35,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0101,Dứa,fruit,g,1,"trái cây, giàu vitamin",50,0.5,13.1,0.1,1.4,38000,kg,38,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0102,Dưa hấu,fruit,g,1,"trái cây, giàu vitamin",30,0.6,7.6,0.2,0.4,28000,kg,28,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0103,Xoài,fruit,g,1,"trái cây, giàu vitamin",60,0.8,15,0.4,1.6,52000,kg,52,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0104,Ổi,fruit,g,1,"trái cây, giàu vitamin",68,2.6,14.3,1,5.4,42000,kg,42,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0105,Thanh long,fruit,g,1,"trái cây, giàu vitamin",57,1.2,13,0.1,3,45000,kg,45,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0106,Lê,fruit,g,1,"trái cây, giàu vitamin",57,0.4,15.2,0.1,3.1,85000,kg,85,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0107,Bơ,fruit,g,1,"trái cây, giàu vitamin",160,2,8.5,14.7,6.7,75000,kg,75,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0108,Nho,fruit,g,1,"trái cây, giàu vitamin",69,0.7,18.1,0.2,0.9,105000,kg,105,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0109,Dâu tây,fruit,g,1,"trái cây, giàu vitamin",32,0.7,7.7,0.3,2,165000,kg,165,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0110,Chanh dây,fruit,g,1,"trái cây, giàu vitamin",97,2.2,23.4,0.7,10.4,58000,kg,58,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0111,Vải,fruit,g,1,"trái cây, giàu vitamin",66,0.8,16.5,0.4,1.3,85000,kg,85,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0112,Nhãn,fruit,g,1,"trái cây, giàu vitamin",60,1.3,15.1,0.1,1.1,78000,kg,78,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0113,Dừa nạo,fruit,g,1,"trái cây, giàu vitamin",354,3.3,15.2,33.5,9,95000,kg,95,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0114,Sữa tươi,dairy,ml,1.03,sữa và chế phẩm,61,3.2,4.8,3.3,0,38000,lít,38,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0115,Sữa tươi tách béo,dairy,ml,1.03,sữa và chế phẩm,42,3.4,5,1,0,43000,lít,43,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0116,Sữa chua,dairy,g,1,sữa và chế phẩm,59,3.5,4.7,3.3,0,42000,kg,42,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0117,Sữa chua Hy Lạp,dairy,g,1,sữa và chế phẩm,97,9,3.9,5,0,165000,kg,165,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0118,Phô mai lát,dairy,g,1,sữa và chế phẩm,310,20,4,24,0,260000,kg,260,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0119,Phô mai mozzarella,dairy,g,1,sữa và chế phẩm,280,28,3.1,17,0,330000,kg,330,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0120,Sữa đặc có đường,dairy,g,1,sữa và chế phẩm,321,7.9,54.4,8.7,0,85000,kg,85,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0121,Sữa bột nguyên kem,dairy,g,1,sữa và chế phẩm,496,26,38,27,0,290000,kg,290,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0122,Bơ lạt,dairy,g,1,sữa và chế phẩm,717,0.9,0.1,81.1,0,285000,kg,285,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0123,Kem tươi,dairy,ml,0.99,sữa và chế phẩm,340,2.8,2.9,36,0,250000,lít,250,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0124,Dầu ăn,fat,ml,0.92,chất béo,884,0,0,100,0,52000,lít,52,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0125,Dầu olive,fat,ml,0.91,chất béo,884,0,0,100,0,235000,lít,235,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0126,Dầu mè,fat,ml,0.92,chất béo,884,0,0,100,0,210000,lít,210,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0127,Đậu phộng,fat,g,1,chất béo,567,25.8,16.1,49.2,8.5,82000,kg,82,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0128,Hạt điều,fat,g,1,chất béo,553,18.2,30.2,43.9,3.3,260000,kg,260,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0129,Hạnh nhân,fat,g,1,chất béo,579,21.2,21.6,49.9,12.5,390000,kg,390,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0130,Mè trắng,fat,g,1,chất béo,573,17.7,23.4,49.7,11.8,145000,kg,145,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0131,Mè đen,fat,g,1,chất béo,573,17.7,23.4,49.7,11.8,165000,kg,165,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0132,Hạt chia,fat,g,1,chất béo,486,16.5,42.1,30.7,34.4,280000,kg,280,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0133,Bơ đậu phộng,fat,g,1,chất béo,588,25,20,50,6,190000,kg,190,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0134,Nước mắm,other,ml,1.2,gia vị và phụ liệu,35,5,3.6,0,0,72000,lít,72,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0135,Muối,other,g,1,gia vị và phụ liệu,0,0,0,0,0,14000,kg,14,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0136,Đường,other,g,1,gia vị và phụ liệu,387,0,100,0,0,28000,kg,28,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0137,Xì dầu,other,ml,1.16,gia vị và phụ liệu,53,8.1,4.9,0.6,0.8,65000,lít,65,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0138,Dầu hào,other,ml,1.2,gia vị và phụ liệu,51,1.4,11,0.2,0.3,78000,lít,78,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0139,Giấm gạo,other,ml,1.01,gia vị và phụ liệu,18,0,0.4,0,0,45000,lít,45,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0140,Bột ngọt,other,g,1,gia vị và phụ liệu,0,0,0,0,0,85000,kg,85,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0141,Tiêu đen,other,g,1,gia vị và phụ liệu,251,10.4,64,3.3,25.3,260000,kg,260,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0142,Ớt tươi,other,g,1,gia vị và phụ liệu,40,1.9,8.8,0.4,1.5,85000,kg,85,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0143,Sả,other,g,1,gia vị và phụ liệu,99,1.8,25.3,0.5,0,48000,kg,48,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0144,Nghệ tươi,other,g,1,gia vị và phụ liệu,312,9.7,67.1,3.3,22.7,65000,kg,65,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0145,Nước cốt dừa,other,ml,1.01,gia vị và phụ liệu,230,2.3,5.5,23.8,2.2,78000,lít,78,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0146,Nước dừa,other,ml,1,gia vị và phụ liệu,19,0.7,3.7,0.2,1.1,35000,lít,35,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0147,Mật ong,other,g,1,gia vị và phụ liệu,304,0.3,82.4,0,0.2,180000,kg,180,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0148,Tương ớt,other,g,1,gia vị và phụ liệu,93,1.3,21.3,0.9,2.2,65000,kg,65,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0149,Bột cà ri,other,g,1,gia vị và phụ liệu,325,14.3,55.8,14,53.2,230000,kg,230,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0150,Mắm tôm,other,g,1,gia vị và phụ liệu,73,14.8,2.2,0.6,0,120000,kg,120,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0151,Gà ta,protein,g,1,"giàu đạm, nguyên liệu đạm",175,21,0,10,0,132000,kg,132,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0152,Má đùi gà,protein,g,1,"giàu đạm, nguyên liệu đạm",175,21,0,10,0,125000,kg,125,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0153,Chân gà,protein,g,1,"giàu đạm, nguyên liệu đạm",190,18,0,13,0,119000,kg,119,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0154,Mề gà,protein,g,1,"giàu đạm, nguyên liệu đạm",135,19,3,5,0,171000,kg,171,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0155,Gan gà,protein,g,1,"giàu đạm, nguyên liệu đạm",135,19,3,5,0,165000,kg,165,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0156,Tim gà,protein,g,1,"giàu đạm, nguyên liệu đạm",135,19,3,5,0,158000,kg,158,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0157,Thịt gà xay,protein,g,1,"giàu đạm, nguyên liệu đạm",175,21,0,10,0,152000,kg,152,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0158,Xương gà,protein,g,1,"giàu đạm, nguyên liệu đạm",190,18,0,13,0,145000,kg,145,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0159,Thịt heo xay,protein,g,1,"giàu đạm, nguyên liệu đạm",220,20,0,15,0,138000,kg,138,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0160,Nạc vai heo,protein,g,1,"giàu đạm, nguyên liệu đạm",220,20,0,15,0,132000,kg,132,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0161,Nạc dăm heo,protein,g,1,"giàu đạm, nguyên liệu đạm",220,20,0,15,0,125000,kg,125,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0162,Chân giò heo,protein,g,1,"giàu đạm, nguyên liệu đạm",190,18,0,13,0,119000,kg,119,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0163,Giò sống,protein,g,1,"giàu đạm, nguyên liệu đạm",175,21,0,10,0,171000,kg,171,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0164,Xương ống heo,protein,g,1,"giàu đạm, nguyên liệu đạm",190,18,0,13,0,165000,kg,165,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0165,Gan heo,protein,g,1,"giàu đạm, nguyên liệu đạm",135,19,3,5,0,158000,kg,158,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0166,Tim heo,protein,g,1,"giàu đạm, nguyên liệu đạm",135,19,3,5,0,152000,kg,152,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0167,Tai heo,protein,g,1,"giàu đạm, nguyên liệu đạm",190,18,0,13,0,145000,kg,145,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0168,Lưỡi heo,protein,g,1,"giàu đạm, nguyên liệu đạm",190,18,0,13,0,138000,kg,138,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0169,Thịt bò thăn,protein,g,1,"giàu đạm, nguyên liệu đạm",220,20,0,15,0,132000,kg,132,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0170,Bắp bò,protein,g,1,"giàu đạm, nguyên liệu đạm",220,20,0,15,0,125000,kg,125,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0171,Gân bò,protein,g,1,"giàu đạm, nguyên liệu đạm",190,18,0,13,0,119000,kg,119,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0172,Nạm bò,protein,g,1,"giàu đạm, nguyên liệu đạm",220,20,0,15,0,171000,kg,171,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0173,Sườn bò,protein,g,1,"giàu đạm, nguyên liệu đạm",220,20,0,15,0,165000,kg,165,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0174,Xương bò,protein,g,1,"giàu đạm, nguyên liệu đạm",190,18,0,13,0,158000,kg,158,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0175,Thịt trâu,protein,g,1,"giàu đạm, nguyên liệu đạm",220,20,0,15,0,152000,kg,152,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0176,Thịt cừu,protein,g,1,"giàu đạm, nguyên liệu đạm",220,20,0,15,0,145000,kg,145,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0177,Thịt thỏ,protein,g,1,"giàu đạm, nguyên liệu đạm",175,21,0,10,0,138000,kg,138,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0178,Chim cút,protein,g,1,"giàu đạm, nguyên liệu đạm",175,21,0,10,0,132000,kg,132,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0179,Bồ câu,protein,g,1,"giàu đạm, nguyên liệu đạm",175,21,0,10,0,125000,kg,125,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0180,Cá diêu hồng,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,119000,kg,119,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0181,Cá bống,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,171000,kg,171,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0182,Cá kèo,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,165000,kg,165,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0183,Cá cơm,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,158000,kg,158,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0184,Cá hú,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,152000,kg,152,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0185,Cá đuối,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,145000,kg,145,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0186,Cá chim,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,138000,kg,138,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0187,Cá bạc má,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,132000,kg,132,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0188,Cá mòi,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,125000,kg,125,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0189,Cá linh,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,119000,kg,119,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0190,Cá thác lác,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,171000,kg,171,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0191,Cá trê,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,165000,kg,165,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0192,Cá sặc,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,158000,kg,158,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0193,Cá mú,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,318000,kg,318,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0194,Cá chẽm,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,145000,kg,145,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0195,Cá đối,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,138000,kg,138,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0196,Cá ngừ hộp,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,132000,kg,132,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0197,Tôm sú,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,125000,kg,125,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0198,Tôm thẻ,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,119000,kg,119,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0199,Tôm khô,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,359000,kg,359,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0200,Ruốc tôm,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,346000,kg,346,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0201,Ốc bươu,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,158000,kg,158,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0202,Ốc hương,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,318000,kg,318,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0203,Sò huyết,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,305000,kg,305,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0204,Sò lông,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,138000,kg,138,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0205,Hàu,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,132000,kg,132,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0206,Bạch tuộc,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,125000,kg,125,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0207,Ghẹ,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,250000,kg,250,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0208,Cua biển,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,359000,kg,359,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0209,Chả cá,protein,g,1,"giàu đạm, nguyên liệu đạm",112,20.2,1.2,3.1,0,165000,kg,165,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0210,Đậu nành,protein,g,1,"giàu đạm, nguyên liệu đạm",446,36.5,30.2,19.9,9.3,158000,kg,158,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0211,Cải cúc,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,44000,kg,44,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0212,Cải thìa,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,42000,kg,42,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0213,Cải bẹ xanh,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,40000,kg,40,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0214,Cải bẹ dún,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,38000,kg,38,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0215,Cải làn,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,36000,kg,36,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0216,Cải kale,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,34000,kg,34,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0217,Rau dền,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,50000,kg,50,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0218,Rau ngót,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,48000,kg,48,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0219,Rau lang,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,46000,kg,46,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0220,Rau sam,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,44000,kg,44,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0221,Rau má,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,42000,kg,42,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0222,Rau cần nước,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,40000,kg,40,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0223,Rau nhút,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,38000,kg,38,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0224,Rau om,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,36000,kg,36,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0225,Ngò gai,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,34000,kg,34,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0226,Kinh giới,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,50000,kg,50,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0227,Húng lủi,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,48000,kg,48,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0228,Húng cây,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,46000,kg,46,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0229,Diếp cá,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,44000,kg,44,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0230,Lá lốt,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,42000,kg,42,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0231,Thì là,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,40000,kg,40,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0232,Bạc hà dọc mùng,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,38000,kg,38,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0233,Bông súng,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,36000,kg,36,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0234,Bông điên điển,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,34000,kg,34,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0235,Bông thiên lý,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,50000,kg,50,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0236,Bắp chuối,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,48000,kg,48,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0237,Củ sen,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,46000,kg,46,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0238,Củ cải trắng,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,44000,kg,44,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0239,Củ cải đỏ,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,42000,kg,42,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0240,Củ dền,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,40000,kg,40,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0241,Củ kiệu,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,38000,kg,38,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0242,Củ năng,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,36000,kg,36,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0243,Củ sắn,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,34000,kg,34,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0244,Củ hủ dừa,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,50000,kg,50,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0245,Bí hồ lô,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,48000,kg,48,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0246,Dưa cải chua,vegetable,g,1,"rau củ, giàu chất xơ",22,1.2,4.1,0.2,2.1,46000,kg,46,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0247,Cải bẹ muối,vegetable,g,1,"rau củ, giàu chất xơ",22,1.2,4.1,0.2,2.1,44000,kg,44,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0248,Cà pháo,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,42000,kg,42,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0249,Cà chua bi,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,40000,kg,40,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0250,Cà chua xanh,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,38000,kg,38,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0251,Ớt hiểm,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,36000,kg,36,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0252,Ớt sừng,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,34000,kg,34,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0253,Măng tây,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,50000,kg,50,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0254,Măng tre,vegetable,g,1,"rau củ, giàu chất xơ",32,2,6,0.4,2.5,48000,kg,48,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0255,Măng chua,vegetable,g,1,"rau củ, giàu chất xơ",22,1.2,4.1,0.2,2.1,46000,kg,46,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0256,Nấm kim châm,vegetable,g,1,"rau củ, giàu chất xơ",30,3.1,4.5,0.4,2.2,44000,kg,44,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0257,Nấm mèo,vegetable,g,1,"rau củ, giàu chất xơ",30,3.1,4.5,0.4,2.2,42000,kg,42,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0258,Nấm đùi gà,vegetable,g,1,"rau củ, giàu chất xơ",30,3.1,4.5,0.4,2.2,40000,kg,40,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0259,Nấm mối,vegetable,g,1,"rau củ, giàu chất xơ",30,3.1,4.5,0.4,2.2,38000,kg,38,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0260,Nấm tràm,vegetable,g,1,"rau củ, giàu chất xơ",30,3.1,4.5,0.4,2.2,36000,kg,36,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0261,Gạo tám,grain,g,1,"tinh bột, no lâu",345,8,74,2.5,3,43000,kg,43,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0262,Gạo jasmine,grain,g,1,"tinh bột, no lâu",345,8,74,2.5,3,61000,kg,61,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0263,Gạo ST25,grain,g,1,"tinh bột, no lâu",345,8,74,2.5,3,59000,kg,59,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0264,Gạo tấm,grain,g,1,"tinh bột, no lâu",345,8,74,2.5,3,57000,kg,57,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0265,Gạo lứt đỏ,grain,g,1,"tinh bột, no lâu",345,8,74,2.5,3,54000,kg,54,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0266,Nếp cẩm,grain,g,1,"tinh bột, no lâu",345,8,74,2.5,3,52000,kg,52,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0267,Nếp than,grain,g,1,"tinh bột, no lâu",345,8,74,2.5,3,50000,kg,50,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0268,Khoai lang tím,grain,g,1,"tinh bột, no lâu",118,1.5,27.5,0.2,3.5,47000,kg,47,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0269,Khoai lang mật,grain,g,1,"tinh bột, no lâu",118,1.5,27.5,0.2,3.5,45000,kg,45,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0270,Bắp nếp,grain,g,1,"tinh bột, no lâu",345,8,74,2.5,3,43000,kg,43,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0271,Bánh mì nguyên cám,grain,g,1,"tinh bột, no lâu",215,4.5,45,1.2,1.2,61000,kg,61,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0272,Bánh phở khô,grain,g,1,"tinh bột, no lâu",345,8,74,2.5,3,59000,kg,59,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0273,Bún gạo khô,grain,g,1,"tinh bột, no lâu",345,8,74,2.5,3,57000,kg,57,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0274,Bánh canh,grain,g,1,"tinh bột, no lâu",215,4.5,45,1.2,1.2,54000,kg,54,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0275,Hủ tiếu,grain,g,1,"tinh bột, no lâu",215,4.5,45,1.2,1.2,52000,kg,52,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0276,Mì Quảng,grain,g,1,"tinh bột, no lâu",215,4.5,45,1.2,1.2,50000,kg,50,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0277,Mì vắt,grain,g,1,"tinh bột, no lâu",215,4.5,45,1.2,1.2,47000,kg,47,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0278,Bánh hỏi,grain,g,1,"tinh bột, no lâu",215,4.5,45,1.2,1.2,45000,kg,45,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0279,Bánh cuốn,grain,g,1,"tinh bột, no lâu",215,4.5,45,1.2,1.2,43000,kg,43,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0280,Bánh ướt,grain,g,1,"tinh bột, no lâu",215,4.5,45,1.2,1.2,61000,kg,61,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0281,Bánh tráng,grain,g,1,"tinh bột, no lâu",345,8,74,2.5,3,59000,kg,59,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0282,Bo bo,grain,g,1,"tinh bột, no lâu",345,8,74,2.5,3,57000,kg,57,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0283,Hạt kê,grain,g,1,"tinh bột, no lâu",345,8,74,2.5,3,54000,kg,54,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0284,Khoai mỡ,grain,g,1,"tinh bột, no lâu",118,1.5,27.5,0.2,3.5,52000,kg,52,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0285,Khoai sọ,grain,g,1,"tinh bột, no lâu",118,1.5,27.5,0.2,3.5,50000,kg,50,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0286,Quýt,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,59000,kg,59,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0287,Chanh,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,56000,kg,56,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0288,Tắc,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,53000,kg,53,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0289,Sầu riêng,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,77000,kg,77,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0290,Măng cụt,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,74000,kg,74,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0291,Mít,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,71000,kg,71,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0292,Chôm chôm,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,68000,kg,68,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0293,Mãng cầu ta,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,65000,kg,65,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0294,Mãng cầu xiêm,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,62000,kg,62,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0295,Hồng xiêm,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,59000,kg,59,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0296,Dâu tằm,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,56000,kg,56,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0297,Mận An Phước,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,53000,kg,53,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0298,Mận Hà Nội,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,77000,kg,77,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0299,Đào,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,74000,kg,74,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0300,Hồng giòn,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,71000,kg,71,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0301,Kiwi,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,68000,kg,68,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0302,Dưa lưới,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,65000,kg,65,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0303,Dưa gang,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,62000,kg,62,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0304,Cóc,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,59000,kg,59,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0305,Me chín,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,56000,kg,56,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0306,Khế,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,53000,kg,53,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0307,Sơ ri,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,77000,kg,77,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0308,Thanh trà,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,74000,kg,74,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0309,Bòn bon,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,71000,kg,71,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0310,Vú sữa,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,68000,kg,68,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0311,Sung,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,65000,kg,65,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0312,Cam sành,fruit,g,1,"trái cây, giàu vitamin",58,0.8,14,0.3,2,62000,kg,62,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0313,Sữa chua không đường,dairy,ml,1,sữa và chế phẩm,95,4.5,8,5,0,82000,l,82,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0314,Sữa chua uống,dairy,ml,1,sữa và chế phẩm,95,4.5,8,5,0,78000,l,78,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0315,Phô mai kem,dairy,ml,1,sữa và chế phẩm,95,4.5,8,5,0,74000,l,74,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0316,Sữa dê tươi,dairy,ml,1,sữa và chế phẩm,95,4.5,8,5,0,106000,l,106,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0317,Sữa bay hơi,dairy,ml,1,sữa và chế phẩm,95,4.5,8,5,0,102000,l,102,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0318,Mỡ heo,fat,g,1,chất béo,880,0,0,99,0,120000,kg,120,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0319,Mỡ gà,fat,g,1,chất béo,880,0,0,99,0,115000,kg,115,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0320,Dầu đậu nành,fat,ml,1,chất béo,880,0,0,99,0,110000,l,110,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0321,Dầu đậu phộng,fat,ml,1,chất béo,880,0,0,99,0,105000,l,105,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0322,Dầu hướng dương,fat,ml,1,chất béo,880,0,0,99,0,100000,l,100,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0323,Dầu cám gạo,fat,ml,1,chất béo,880,0,0,99,0,95000,l,95,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0324,Dầu dừa,fat,ml,1,chất béo,880,0,0,99,0,90000,l,90,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0325,Dầu hạt cải,fat,ml,1,chất béo,880,0,0,99,0,130000,l,130,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0326,Shortening,fat,g,1,chất béo,880,0,0,99,0,125000,kg,125,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0327,Bơ thực vật,fat,g,1,chất béo,880,0,0,99,0,120000,kg,120,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0328,Nước lọc,other,ml,1,gia vị và phụ liệu,0,0,0,0,0,6000,l,6,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0329,Nước màu,other,g,1,gia vị và phụ liệu,45,1,10,0.5,0.5,75000,kg,75,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0330,Tương đen,other,g,1,gia vị và phụ liệu,45,1,10,0.5,0.5,72000,kg,72,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0331,Tương hột,other,g,1,gia vị và phụ liệu,45,1,10,0.5,0.5,68000,kg,68,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0332,Tương Bần,other,g,1,gia vị và phụ liệu,45,1,10,0.5,0.5,65000,kg,65,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0333,Chao,other,g,1,gia vị và phụ liệu,45,1,10,0.5,0.5,62000,kg,62,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0334,Mắm nêm,other,g,1,gia vị và phụ liệu,45,1,10,0.5,0.5,89000,kg,89,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0335,Mắm ruốc,other,g,1,gia vị và phụ liệu,45,1,10,0.5,0.5,179000,kg,179,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0336,Mắm cá linh,other,g,1,gia vị và phụ liệu,45,1,10,0.5,0.5,82000,kg,82,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0337,Mẻ,other,g,1,gia vị và phụ liệu,45,1,10,0.5,0.5,78000,kg,78,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0338,Cơm rượu,other,g,1,gia vị và phụ liệu,45,1,10,0.5,0.5,75000,kg,75,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0339,Giấm nuôi,other,g,1,gia vị và phụ liệu,45,1,10,0.5,0.5,72000,kg,72,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0340,Giấm táo,other,g,1,gia vị và phụ liệu,45,1,10,0.5,0.5,68000,kg,68,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0341,Đường phèn,other,g,1,gia vị và phụ liệu,387,0,100,0,0,65000,kg,65,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0342,Đường thốt nốt,other,g,1,gia vị và phụ liệu,387,0,100,0,0,62000,kg,62,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0343,Đường nâu,other,g,1,gia vị và phụ liệu,387,0,100,0,0,89000,kg,89,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0344,Bột nêm,other,g,1,gia vị và phụ liệu,45,1,10,0.5,0.5,85000,kg,85,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0345,Bột nghệ,other,g,1,gia vị và phụ liệu,300,8,58,10,25,82000,kg,82,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0346,Ngũ vị hương,other,g,1,gia vị và phụ liệu,300,8,58,10,25,188000,kg,188,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0347,Quế,other,g,1,gia vị và phụ liệu,300,8,58,10,25,180000,kg,180,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0348,Hoa hồi,other,g,1,gia vị và phụ liệu,300,8,58,10,25,172000,kg,172,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0349,Đinh hương,other,g,1,gia vị và phụ liệu,300,8,58,10,25,164000,kg,164,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
+,ING-0350,Muối hột,other,g,1,gia vị và phụ liệu,45,1,10,0.5,0.5,65000,kg,65,Giá tham khảo tổng hợp BHX/Co.op Online/WinMart - TP.HCM - 2026-07-13,true
