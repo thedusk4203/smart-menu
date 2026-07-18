@@ -15,7 +15,7 @@ Docker demo dùng `docker compose --profile demo up --build -d`; frontend mặc 
 ## Tài liệu
 
 - [Bộ tài liệu đồ án](docs/README.md): slide, demo và hướng dẫn non-tech.
-- [Handbook kỹ thuật](docs/code/README.md): code architecture, database, planner, AI, API 97 operation, test và vận hành.
+- [Handbook kỹ thuật](docs/code/README.md): code architecture, database và 16 bài học chuyên sâu về Meal Plan, Nutrition, AI, Shopping List, kèm quiz có đáp án.
 - [API reference](docs/code/api/README.md): schema đầy đủ theo domain; Swagger runtime ở `/docs`.
 - [ADR](docs/code/adr/README.md): quyết định kiến trúc retrospective.
 

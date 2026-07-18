@@ -353,6 +353,16 @@ CREATE TABLE llm_provider_configs (
 CREATE UNIQUE INDEX uq_llm_provider_one_active
     ON llm_provider_configs ((is_active)) WHERE is_active = TRUE;
 
+-- Chỉ lưu override; khi không có dòng tương ứng backend dùng prompt mặc định trong code.
+CREATE TABLE ai_system_prompts (
+    feature     VARCHAR(40)     PRIMARY KEY
+                                CHECK (feature IN ('chat', 'parse_menu', 'explain_plan', 'suggest_swap')),
+    content     TEXT            NOT NULL
+                                CHECK (CHAR_LENGTH(BTRIM(content)) BETWEEN 1 AND 20000),
+    updated_by  INTEGER         NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    updated_at  TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE ai_request_logs (
     id                  BIGSERIAL       PRIMARY KEY,
     user_id             INTEGER         REFERENCES users(id) ON DELETE SET NULL,

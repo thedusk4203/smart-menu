@@ -84,7 +84,7 @@ Bạn chuẩn bị demo có seed. Hãy nêu các nguyên tắc dữ liệu/secre
 1. **B.** Readiness thực hiện query kiểm DB.
 2. **A.** Entrypoint init chỉ chạy lúc volume/database mới.
 3. **B.** AI là optional assistance, không phải planner authority.
-4. Kiểm backend container started/health, `/health/ready` trong network Docker, env DB/secret/CORS, frontend dependency URL/proxy rồi container logs có redaction.
+4. Kiểm backend container started/health, `/health/ready` trong network Docker, env DB/secret/CORS, frontend dependency URL/proxy, rồi kiểm container logs không lộ secret hoặc dữ liệu nhạy cảm trước khi chia sẻ.
 5. Dùng account/dữ liệu giả, env riêng, không commit hay chiếu password/token/API key, thu hồi public share sau demo.
 
 

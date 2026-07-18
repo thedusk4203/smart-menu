@@ -12,6 +12,15 @@ __pycache__/
 .venv/
 .uv-cache/
 AGENTS.md
-PRODUCT.md
+/PRODUCT.md
 .impeccable/
 duc-tasks.md
+docs/
+docs/guides/03-tao-va-quan-ly-thuc-don.md
+docs/guides/09-admin-ai.md
+docs/guides/04-danh-sach-mua-sam-va-chia-se.md
+docs/code/api/planner-shopping.md
+docs/code/api/ai.md
+docs/code/adr/0011-shopping-share-capability.md
+docs/code/adr/0009-retention-logs-conversations.md
+docs/code/adr/0007-ai-provider-abstraction.md

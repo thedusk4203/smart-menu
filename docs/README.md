@@ -9,7 +9,7 @@
 - [Phụ lục kỹ thuật](presentation/technical-appendix.md) và [code walkthrough](presentation/code-walkthrough.md): nội dung dự phòng khi hội đồng hỏi về code.
 - [Mục lục 9 hướng dẫn sử dụng](guides/README.md): hướng dẫn tiếng Việt, ảnh minh họa và bài kiểm tra ở cuối từng bài.
 - [Tổng quan kỹ thuật](technical-overview.md): kiến trúc, dữ liệu, planner, AI và phân quyền.
-- [Handbook kỹ thuật cho developer](code/README.md): architecture, code map, API đầy đủ, database, ADR, test và vận hành.
+- [Handbook kỹ thuật cho developer](code/README.md): architecture, code map, API/ADR và 16 bài học dễ hiểu về Meal Plan, Nutrition, AI, Shopping List, mỗi bài có quiz.
 - [Trạng thái sẵn sàng trình diễn](launch-readiness.md): bằng chứng kiểm thử mới nhất và giới hạn còn lại.
 
 ## Tài liệu nguồn trong repository

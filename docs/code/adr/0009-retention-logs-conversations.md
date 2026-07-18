@@ -14,9 +14,8 @@ Giữ hai lifecycle độc lập, giới hạn 10 conversation/User và 20 turns
 
 ## Consequences
 
-Không dùng request log làm lịch sử UI. Retention phải test và không làm readiness fail nếu cleanup lỗi.
+Không dùng request log làm lịch sử UI. Xóa conversation không xóa request log cùng nội dung; quyền xem log và privacy notice phải phản ánh điều này. Retention phải test và không làm readiness fail nếu cleanup lỗi.
 
 ## Verification and revisit trigger
 
 Kiểm conversation retention/tests/main lifespan. Xem lại khi chính sách privacy, legal retention hoặc storage model đổi.
-

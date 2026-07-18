@@ -7,9 +7,11 @@ from app.core.database import get_session
 from app.core.deps import require_super_admin
 from app.modules.ai.admin_schemas import (
     AILogDetail, AILogPage, ProviderItem, ProviderTestResult, ProviderWrite,
-    PurgeLogsRequest, PurgeLogsResponse,
+    PromptFeature, PurgeLogsRequest, PurgeLogsResponse, SystemPromptItem,
+    SystemPromptWrite,
 )
 from app.modules.ai.client import OpenAICompatibleAIClient
+from app.modules.ai.prompt_store import SystemPromptStore
 from app.modules.ai.provider_store import AIRequestLogStore, ProviderConfigStore
 from app.modules.identity.domain import UserEntity
 
@@ -19,6 +21,10 @@ router = APIRouter(prefix="/api/admin/ai", tags=["admin-ai"])
 
 def get_store(session: Session = Depends(get_session)) -> ProviderConfigStore:
     return ProviderConfigStore(session)
+
+
+def get_prompt_store(session: Session = Depends(get_session)) -> SystemPromptStore:
+    return SystemPromptStore(session)
 
 
 @router.get("/providers", response_model=list[ProviderItem])
@@ -107,6 +113,26 @@ def activate_provider(config_id: int, store: ProviderConfigStore = Depends(get_s
 def deactivate_provider(config_id: int, store: ProviderConfigStore = Depends(get_store),
                         user: UserEntity = Depends(require_super_admin)):
     return store.deactivate(config_id, user.id)
+
+
+@router.get("/prompts", response_model=list[SystemPromptItem])
+def list_system_prompts(store: SystemPromptStore = Depends(get_prompt_store),
+                        _: UserEntity = Depends(require_super_admin)):
+    return store.list()
+
+
+@router.put("/prompts/{feature}", response_model=SystemPromptItem)
+def update_system_prompt(feature: PromptFeature, data: SystemPromptWrite,
+                         store: SystemPromptStore = Depends(get_prompt_store),
+                         user: UserEntity = Depends(require_super_admin)):
+    return store.update(feature, data.content, user.id)
+
+
+@router.delete("/prompts/{feature}", response_model=SystemPromptItem)
+def reset_system_prompt(feature: PromptFeature,
+                        store: SystemPromptStore = Depends(get_prompt_store),
+                        user: UserEntity = Depends(require_super_admin)):
+    return store.reset(feature, user.id)
 
 
 @router.get("/logs", response_model=AILogPage)

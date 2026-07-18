@@ -42,9 +42,11 @@ from app.shared.enums import MealType
 
 
 class ChatUseCase:
-    def __init__(self, client: AIClientPort, conversations: ConversationStore) -> None:
+    def __init__(self, client: AIClientPort, conversations: ConversationStore,
+                 system_prompt: str = CHAT_SYSTEM_PROMPT) -> None:
         self._client = client
         self._conversations = conversations
+        self._system_prompt = system_prompt
 
     def open_chat_stream(self, data: ChatRequest, *, user_id: int) -> "ChatStream":
         conversation_id, turn = self._conversations.start_turn(
@@ -60,7 +62,7 @@ class ChatUseCase:
         if data.context is not None:
             user_content += "\n\nNgữ cảnh ứng dụng:\n" + _compact_json(data.context)
 
-        messages = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}]
+        messages = [{"role": "system", "content": self._system_prompt}]
         messages.extend(_recent_chat_history(history))
         messages.append({"role": "user", "content": user_content})
         return ChatStream(
@@ -83,7 +85,7 @@ class ChatUseCase:
             conversation_id=conversation_id,
             turn_number=int(turn["turn_number"]),
         )
-        messages = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}]
+        messages = [{"role": "system", "content": self._system_prompt}]
         messages.extend(_recent_chat_history(history))
         messages.append({"role": "user", "content": str(turn["user_content"])})
         return ChatStream(
@@ -185,15 +187,17 @@ class ConversationHistoryUseCase:
 
 
 class ParseMenuRequestUseCase:
-    def __init__(self, client: AIClientPort) -> None:
+    def __init__(self, client: AIClientPort,
+                 system_prompt: str = PARSE_MENU_SYSTEM_PROMPT) -> None:
         self._client = client
+        self._system_prompt = system_prompt
 
     def execute(self, data: ParseMenuRequest) -> ParsedMenuRequest:
         deterministic = extract_menu_fields(data.message)
         try:
             raw = self._client.complete_json(
                 [
-                    {"role": "system", "content": PARSE_MENU_SYSTEM_PROMPT},
+                    {"role": "system", "content": self._system_prompt},
                     {"role": "user", "content": data.message},
                 ],
                 schema_name="smart_menu_plan_request",
@@ -245,14 +249,16 @@ class ParseMenuRequestUseCase:
 
 
 class ExplainPlanUseCase:
-    def __init__(self, client: AIClientPort) -> None:
+    def __init__(self, client: AIClientPort,
+                 system_prompt: str = EXPLAIN_PLAN_SYSTEM_PROMPT) -> None:
         self._client = client
+        self._system_prompt = system_prompt
 
     def execute(self, data: ExplainPlanRequest) -> ExplainPlanResponse:
         payload = _plan_explanation_payload(data)
         raw = self._client.complete_json(
             [
-                {"role": "system", "content": EXPLAIN_PLAN_SYSTEM_PROMPT},
+                {"role": "system", "content": self._system_prompt},
                 {"role": "user", "content": json.dumps(
                     payload, ensure_ascii=False, default=str, separators=(",", ":")
                 )},
@@ -277,10 +283,12 @@ class SuggestSwapUseCase:
     _DEFAULT_NOTE = "món tương tự, phù hợp ngân sách"
 
     def __init__(self, client: AIClientPort, candidates: DishCandidateProviderPort,
-                 build_request: BuildPlanRequestUseCase) -> None:
+                 build_request: BuildPlanRequestUseCase,
+                 system_prompt: str = SWAP_SYSTEM_PROMPT) -> None:
         self._client = client
         self._candidates = candidates
         self._build_request = build_request
+        self._system_prompt = system_prompt
         self._planner = DishPlanner()
 
     def execute(self, data: SwapSuggestionRequest, *, user_id: int) -> list[SwapSuggestion]:
@@ -339,7 +347,7 @@ class SuggestSwapUseCase:
             current_total = float(data.plan.get("total_cost") or 0)
             try:
                 raw = self._client.complete_json(
-                    [{"role": "system", "content": SWAP_SYSTEM_PROMPT},
+                    [{"role": "system", "content": self._system_prompt},
                      {"role": "user", "content": _compact_json({
                          "note": data.note,
                          "target": {

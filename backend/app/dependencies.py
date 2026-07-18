@@ -177,6 +177,7 @@ def get_calculate_nutrition_target_use_case() -> CalculateNutritionTargetUseCase
 from app.modules.ai.client import DisabledAIClient, LoggedAIClient, OpenAICompatibleAIClient
 from app.modules.ai.conversation_store import ConversationStore
 from app.modules.ai.ports import AIClientPort
+from app.modules.ai.prompt_store import SystemPromptStore
 from app.modules.ai.provider_store import AIRequestLogStore, ProviderConfigStore
 from app.modules.identity.domain import UserEntity
 from app.modules.ai.use_cases import (
@@ -204,7 +205,10 @@ def _get_ai_client(session: Session, user: UserEntity, feature: str) -> AIClient
 
 def get_ai_chat_use_case(s: Session = Depends(get_session),
                          user: UserEntity = Depends(get_current_user)) -> ChatUseCase:
-    return ChatUseCase(_get_ai_client(s, user, "chat"), ConversationStore(s))
+    return ChatUseCase(
+        _get_ai_client(s, user, "chat"), ConversationStore(s),
+        SystemPromptStore(s).get_effective("chat"),
+    )
 
 
 def get_ai_conversation_history_use_case(
@@ -215,12 +219,18 @@ def get_ai_conversation_history_use_case(
 
 def get_ai_parse_menu_request_use_case(s: Session = Depends(get_session),
                                        user: UserEntity = Depends(get_current_user)) -> ParseMenuRequestUseCase:
-    return ParseMenuRequestUseCase(_get_ai_client(s, user, "parse_menu"))
+    return ParseMenuRequestUseCase(
+        _get_ai_client(s, user, "parse_menu"),
+        SystemPromptStore(s).get_effective("parse_menu"),
+    )
 
 
 def get_ai_explain_plan_use_case(s: Session = Depends(get_session),
                                  user: UserEntity = Depends(get_current_user)) -> ExplainPlanUseCase:
-    return ExplainPlanUseCase(_get_ai_client(s, user, "explain_plan"))
+    return ExplainPlanUseCase(
+        _get_ai_client(s, user, "explain_plan"),
+        SystemPromptStore(s).get_effective("explain_plan"),
+    )
 
 
 def get_ai_suggest_swap_use_case(s: Session = Depends(get_session),
@@ -229,4 +239,5 @@ def get_ai_suggest_swap_use_case(s: Session = Depends(get_session),
         _get_ai_client(s, user, "suggest_swap"),
         SqlDishCandidateProvider(s),
         BuildPlanRequestUseCase(SqlUserProfileRepository(s), SqlExclusionRepository(s)),
+        SystemPromptStore(s).get_effective("suggest_swap"),
     )

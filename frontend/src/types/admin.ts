@@ -208,6 +208,15 @@ export interface LLMProviderWrite {
   timeout_seconds: number;
 }
 
+export type AISystemPromptFeature = "chat" | "parse_menu" | "explain_plan" | "suggest_swap";
+
+export interface AISystemPrompt {
+  feature: AISystemPromptFeature;
+  content: string;
+  is_custom: boolean;
+  updated_at: string | null;
+}
+
 export interface AIRequestLog {
   id: number;
   user_id: number | null;

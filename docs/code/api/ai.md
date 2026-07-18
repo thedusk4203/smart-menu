@@ -9,6 +9,9 @@
 | GET | `/api/admin/ai/logs` |  | 200: AILogPage<br>422: HTTPValidationError |
 | GET | `/api/admin/ai/logs/{log_id}` |  | 200: AILogDetail<br>422: HTTPValidationError |
 | POST | `/api/admin/ai/logs/purge` | PurgeLogsRequest | 200: PurgeLogsResponse<br>422: HTTPValidationError |
+| GET | `/api/admin/ai/prompts` |  | 200: array<SystemPromptItem> |
+| PUT | `/api/admin/ai/prompts/{feature}` | SystemPromptWrite | 200: SystemPromptItem<br>422: HTTPValidationError |
+| DELETE | `/api/admin/ai/prompts/{feature}` |  | 200: SystemPromptItem<br>422: HTTPValidationError |
 | GET | `/api/admin/ai/providers` |  | 200: array<ProviderItem> |
 | POST | `/api/admin/ai/providers` | ProviderWrite | 201: ProviderItem<br>422: HTTPValidationError |
 | DELETE | `/api/admin/ai/providers/{config_id}` |  | 204: no body<br>422: HTTPValidationError |
@@ -46,6 +49,23 @@
 ### `POST /api/admin/ai/logs/purge`
 No path/query parameter.
 Request content type: `application/json`
+
+### `GET /api/admin/ai/prompts`
+No path/query parameter. Chỉ Super Admin; trả đủ bốn feature theo thứ tự ổn định.
+
+### `PUT /api/admin/ai/prompts/{feature}`
+| Parameter | In | Required | Schema |
+| --- | --- | --- | --- |
+| `feature` | path | True | `chat`, `parse_menu`, `explain_plan`, `suggest_swap` |
+
+Request content type: `application/json`; `content` sau trim dài từ 1 đến 20.000 ký tự. Override áp dụng từ request kế tiếp và không thay đổi provider version/test status.
+
+### `DELETE /api/admin/ai/prompts/{feature}`
+| Parameter | In | Required | Schema |
+| --- | --- | --- | --- |
+| `feature` | path | True | `chat`, `parse_menu`, `explain_plan`, `suggest_swap` |
+
+Xóa override và trả prompt mặc định đang có hiệu lực.
 
 ### `GET /api/admin/ai/providers`
 No path/query parameter.
@@ -127,6 +147,12 @@ No path/query parameter.
 ### `POST /api/ai/suggest-swap`
 No path/query parameter.
 Request content type: `application/json`
+
+## System prompt contracts
+
+`SystemPromptItem` gồm `feature`, `content`, `is_custom`, `updated_at`. `SystemPromptWrite` chỉ gồm `content`.
+
+Prompt được quản lý toàn cục, tách khỏi provider. Backend vẫn giữ JSON schema, deterministic parser/fallback và constraint checker làm nguồn kiểm chứng; chỉnh prompt không được phép thay thế các rào chắn này.
 
 ## Schema catalog
 ### `AILogDetail`
@@ -1413,10 +1439,10 @@ Provider active nhưng request explain-plan lỗi. Hãy nêu contract/error và 
 ## Đáp án, giải thích và bằng chứng mong đợi
 
 1. **A.** Consumer phải parse event stream, không JSON một lần.
-2. **A.** Secret được mã hóa server-side và redacted.
+2. **A.** Secret được mã hóa server-side và API chỉ trả masked metadata; nội dung request/response hiện không có cơ chế redaction tổng quát.
 3. **A.** Product history khác operational audit.
 4. `POST /api/ai/conversations/{conversation_id}/turns/{turn_id}/retry`; đọc SSE events qua `aiApi` centralized consumer.
-5. Trả AI unavailable/validation/business detail theo status, log có redaction; không trả API key, encrypted secret hay raw provider internals.
+5. Trả AI unavailable/validation/business detail theo status; log không được chứa provider secret/header nhưng hiện có thể chứa prompt, context và response. API không trả API key, encrypted secret hay raw provider internals.
 
 
 Tự chấm mỗi câu đúng/hoàn thành là 1 điểm: **5/5 = hiểu tốt; 4/5 = đạt; 3/5 = xem lại; 0–2/5 = đọc lại tài liệu và thực hành lại.**

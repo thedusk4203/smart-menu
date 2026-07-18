@@ -10,7 +10,7 @@ from app.modules.ai.client import OpenAICompatibleAIClient
 from app.modules.ai.exceptions import AIResponseValidationError
 from app.modules.ai.provider_store import decrypt_secret, encrypt_secret, validate_base_url
 from app.modules.ai.schemas import ChatRequest
-from app.modules.ai.admin_schemas import ProviderWrite
+from app.modules.ai.admin_schemas import ProviderWrite, SystemPromptWrite
 
 
 def test_api_key_round_trip_and_mask(monkeypatch):
@@ -34,6 +34,15 @@ def test_google_provider_is_supported():
         model="gemini-test", api_key="secret",
     )
     assert provider.provider_type == "google"
+
+
+def test_system_prompt_content_is_trimmed_and_bounded():
+    assert SystemPromptWrite(content="  Prompt mới  ").content == "Prompt mới"
+
+    with pytest.raises(ValidationError):
+        SystemPromptWrite(content="   ")
+    with pytest.raises(ValidationError):
+        SystemPromptWrite(content="x" * 20_001)
 
 
 def test_chat_history_total_is_limited():

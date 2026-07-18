@@ -65,12 +65,13 @@ def test_explain_plan_requires_actionable_structured_analysis():
         "recommendations": ["Xem từng ngày và đổi món nếu muốn tăng độ đa dạng."],
     })
 
-    result = ExplainPlanUseCase(client).execute(_request())
+    result = ExplainPlanUseCase(client, "Prompt giải thích tùy chỉnh").execute(_request())
 
     assert result.summary.startswith("Thực đơn 7 ngày")
     assert "Ngân sách" in result.reply
     assert "Gợi ý tiếp theo" in result.reply
     assert client.schema_name == "smart_menu_plan_explanation"
+    assert client.messages[0]["content"] == "Prompt giải thích tùy chỉnh"
     payload = json.loads(client.messages[1]["content"])
     assert payload["analysis_facts"]["remaining_budget"] == 145_418
     assert payload["analysis_facts"]["average_calories_per_day"] == 2499.9

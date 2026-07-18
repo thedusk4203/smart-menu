@@ -14,7 +14,7 @@
 | PATCH | `/api/meal-plans/{plan_id}/shopping-list/items/{item_id}` | PurchaseUpdate | 200: ShoppingListResponse<br>422: HTTPValidationError |
 | DELETE | `/api/meal-plans/{plan_id}/shopping-list/share` |  | 204: no body<br>422: HTTPValidationError |
 | POST | `/api/meal-plans/{plan_id}/shopping-list/share` |  | 200: ShoppingShareResponse<br>422: HTTPValidationError |
-| POST | `/api/meal-plans/generate` | GenerateMealPlanRequest | 200: <br>422: HTTPValidationError |
+| POST | `/api/meal-plans/generate` | GenerateMealPlanRequest | 200: GeneratedMealPlanResponse **hoặc** InfeasiblePlanResponse<br>422: HTTPValidationError |
 | GET | `/api/public/shopping-lists/{token}` |  | 200: PublicShoppingListResponse<br>422: HTTPValidationError |
 | PATCH | `/api/public/shopping-lists/{token}/items/{item_id}` | PurchaseUpdate | 200: PublicShoppingListResponse<br>422: HTTPValidationError |
 
@@ -40,14 +40,14 @@ Request content type: `application/json`
 | Parameter | In | Required | Schema |
 | --- | --- | --- | --- |
 | `plan_id` | path | True | integer |
-| `day` | query | False |  |
+| `day` | query | False | integer 1–7 hoặc null |
 
 ### `PATCH /api/meal-plans/{plan_id}/shopping-list/items/{item_id}`
 | Parameter | In | Required | Schema |
 | --- | --- | --- | --- |
 | `plan_id` | path | True | integer |
 | `item_id` | path | True | integer |
-| `day` | query | False |  |
+| `day` | query | False | integer 1–7 hoặc null |
 Request content type: `application/json`
 
 ### `DELETE /api/meal-plans/{plan_id}/shopping-list/share`
@@ -59,11 +59,13 @@ Request content type: `application/json`
 | Parameter | In | Required | Schema |
 | --- | --- | --- | --- |
 | `plan_id` | path | True | integer |
-| `day` | query | False |  |
+| `day` | query | False | integer 1–7 hoặc null |
 
 ### `POST /api/meal-plans/generate`
 No path/query parameter.
 Request content type: `application/json`
+
+Response `200` là union: body thành công dùng `GeneratedMealPlanResponse`; bài toán hợp lệ về request nhưng không có nghiệm hard-valid dùng `InfeasiblePlanResponse` với `status="infeasible"`. Client phải phân nhánh theo shape/status, không chỉ theo HTTP code.
 
 ### `GET /api/public/shopping-lists/{token}`
 | Parameter | In | Required | Schema |
