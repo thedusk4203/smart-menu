@@ -65,3 +65,13 @@ dish_id có trong candidates; không tự tạo món, giá hoặc dinh dưỡng.
 score. Mỗi reason là một câu tiếng Việt ngắn. Chỉ trả đúng object JSON dạng
 {"suggestions":[{"dish_id":123,"reason":"..."}]} theo schema.
 """.strip()
+
+
+PROMPT_FEATURES = ("chat", "parse_menu", "explain_plan", "suggest_swap")
+
+DEFAULT_SYSTEM_PROMPTS = {
+    "chat": CHAT_SYSTEM_PROMPT,
+    "parse_menu": PARSE_MENU_SYSTEM_PROMPT,
+    "explain_plan": EXPLAIN_PLAN_SYSTEM_PROMPT,
+    "suggest_swap": SWAP_SYSTEM_PROMPT,
+}

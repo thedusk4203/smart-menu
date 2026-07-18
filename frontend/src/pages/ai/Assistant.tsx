@@ -21,6 +21,7 @@ import type {
   ConversationSummary,
   ConversationTurn,
 } from "../../api/aiApi";
+import { ChatMarkdown } from "../../components/domain/ChatMarkdown";
 import { ApiError } from "../../lib/apiClient";
 import { ConfirmDialog, PageHeader, Spinner } from "../../components/ui";
 
@@ -138,7 +139,7 @@ function ConversationRail({
                     onClick={() => onDelete(conversation.id)}
                     disabled={disabled || deletingId === conversation.id}
                     aria-label={`Xóa cuộc trò chuyện ${conversation.title}`}
-                    className="mt-1 rounded-lg p-2 text-gray-500 opacity-70 transition hover:bg-red-50 hover:text-red-700 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 group-hover:opacity-100 disabled:cursor-wait"
+                    className="mt-1 rounded-lg p-2 text-red-700 opacity-60 transition hover:bg-red-50 hover:text-red-800 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 group-hover:opacity-100 disabled:cursor-wait"
                   >
                     {deletingId === conversation.id ? (
                       <Spinner className="h-4 w-4" />
@@ -766,12 +767,16 @@ function MessageBubble({
         {isUser ? <User className="h-4 w-4" /> : <Leaf className="h-4 w-4" />}
       </div>
       <div
-        className={`max-w-[84%] rounded-2xl px-4 py-2.5 text-sm leading-6 sm:max-w-[78%] ${
+        className={`min-w-0 max-w-[84%] rounded-2xl px-4 py-2.5 text-sm leading-6 sm:max-w-[78%] ${
           isUser ? "bg-brand-600 text-white" : "bg-sand-100 text-gray-800"
         }`}
       >
         {content ? (
-          <p className="whitespace-pre-wrap break-words">{content}</p>
+          isUser ? (
+            <p className="whitespace-pre-wrap break-words">{content}</p>
+          ) : (
+            <ChatMarkdown content={content} streaming={streaming} />
+          )
         ) : streaming ? (
           <span className="inline-flex items-center gap-2 text-gray-600" role="status">
             <Spinner className="h-4 w-4" /> Menuto đang trả lời...

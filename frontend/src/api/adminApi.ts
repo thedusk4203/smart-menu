@@ -4,7 +4,7 @@ import type {
   AdminDashboardSummary, AdminDish, AdminDishWrite, AdminIngredient,
   AdminIngredientWrite, AdminUser,
   ImportJob, ImportPreview, Page, QualityIssue,
-  AIRequestLog, LLMProvider, LLMProviderWrite,
+  AIRequestLog, AISystemPrompt, AISystemPromptFeature, LLMProvider, LLMProviderWrite,
 } from "../types/admin";
 
 export const adminApi = {
@@ -77,6 +77,11 @@ export const adminApi = {
   deactivateAIProvider: (id: number) =>
     api.post<LLMProvider>(`/api/admin/ai/providers/${id}/deactivate`),
   deleteAIProvider: (id: number) => api.del<void>(`/api/admin/ai/providers/${id}`),
+  aiSystemPrompts: () => api.get<AISystemPrompt[]>("/api/admin/ai/prompts"),
+  updateAISystemPrompt: (feature: AISystemPromptFeature, content: string) =>
+    api.put<AISystemPrompt>(`/api/admin/ai/prompts/${feature}`, { content }),
+  resetAISystemPrompt: (feature: AISystemPromptFeature) =>
+    api.del<AISystemPrompt>(`/api/admin/ai/prompts/${feature}`),
   aiLogs: (params: Record<string, unknown> = {}) =>
     api.get<Page<AIRequestLog>>(`/api/admin/ai/logs${qs(params)}`),
   aiLog: (id: number) => api.get<AIRequestLog>(`/api/admin/ai/logs/${id}`),

@@ -10,13 +10,12 @@ AI dùng `AIClientPort`, OpenAI-compatible adapter, disabled adapter và logged 
 
 ## Decision
 
-Use case phụ thuộc port; provider active được resolve qua dependency factory, output có cấu trúc qua Pydantic validation và request được log có redaction.
+Use case phụ thuộc port; provider active được resolve qua dependency factory và output có cấu trúc qua Pydantic validation. Provider secret/header không đi vào log, nhưng content request/response hiện chưa có redaction tổng quát.
 
 ## Consequences
 
-Provider mới cần adapter/test/fallback, không gọi HTTP rải rác từ router. Secret không đi vào response/log/docs.
+Provider mới cần adapter/test/fallback, không gọi HTTP rải rác từ router. Secret không đi vào response/audit/docs; prompt, context và response log phải được coi là dữ liệu nhạy cảm có quyền truy cập hẹp.
 
 ## Verification and revisit trigger
 
 Kiểm provider config/use case/tests. Xem lại khi thêm non-compatible provider hoặc queue/async execution.
-

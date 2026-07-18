@@ -17,7 +17,7 @@ Gom nguyên liệu từ thực đơn đã lưu, theo dõi món đã mua, in danh
 
 1. Mở **Đi chợ** và chọn một thực đơn đã lưu.
 2. Ở **Chọn ngày đi chợ**, chọn **Tất cả** hoặc một ngày cụ thể. Hệ thống gộp cùng nguyên liệu/đơn vị, tính lại định lượng và chi phí theo phạm vi.
-3. Tích ô trước nguyên liệu đã mua. Bộ đếm “đã mua” cập nhật và trạng thái được lưu, không chỉ đổi màu tạm thời trên trình duyệt.
+3. Tích ô trước nguyên liệu đã mua. Bộ đếm cập nhật và trạng thái được lưu theo **nguyên liệu của toàn thực đơn**: tích ở một ngày cũng làm nguyên liệu đó hiện đã mua ở ngày khác/toàn bộ.
 4. Chọn **In danh sách** nếu cần bản giấy.
 5. Chọn **Chia sẻ**. Kiểm tra câu mô tả phạm vi, thời điểm hết hạn và lưu ý quyền của người có link; chọn **Sao chép link**.
 6. Gửi link bằng kênh phù hợp. Người nhận mở public page, xem phạm vi và có thể tích/bỏ tích nguyên liệu; thay đổi này dùng chung với danh sách của chủ sở hữu.
@@ -55,6 +55,7 @@ Chú thích đọc ảnh: (1) tên thực đơn/phạm vi; (2) số đã mua; (3
 
 - Link là một “chìa khóa”: bất kỳ ai có link đều xem và tích đã mua. Không đăng link công khai ngoài nhóm cần dùng.
 - Không chụp màn hình ô link hoặc đưa token vào slide/tài liệu.
+- Link theo ngày giới hạn danh sách hiển thị, nhưng backend hiện chưa kiểm `item_id` thuộc đúng ngày khi public PATCH. Không coi đây là write-scope tuyệt đối; thu hồi ngay nếu link bị lộ.
 - AI không tham gia gộp danh sách; hệ thống tính chi phí, dinh dưỡng, dị ứng, ngân sách và tính hợp lệ.
 
 ## Kiểm tra mức độ hiểu
@@ -100,4 +101,3 @@ Bạn đã gửi nhầm link vào nhóm công khai. Hãy nêu hành động cầ
 5. Mở Đi chợ → chọn đúng thực đơn → **Chia sẻ** → **Thu hồi** ngay → tạo link mới → chỉ gửi qua kênh riêng cho người cần dùng.
 
 Tự chấm mỗi câu đúng/hoàn thành là 1 điểm: **5/5 = hiểu tốt; 4/5 = đạt; 3/5 = xem lại; 0–2/5 = đọc lại và thực hành lại.**
-

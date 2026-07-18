@@ -148,7 +148,7 @@ export function Ingredients() {
     <div>
       <PageHeader
         title="Nguyên liệu"
-        description="Tra cứu kho nguyên liệu và thông tin dinh dưỡng."
+        description="Tra cứu kho nguyên liệu, giá tham khảo và dinh dưỡng trên 100g."
         actions={
           isAdmin ? (
             <Button onClick={openCreate}>
@@ -206,34 +206,40 @@ export function Ingredients() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className={`${isAdmin ? "min-w-[930px]" : "min-w-[850px]"} w-full text-sm`}>
               <thead>
                 <tr className="border-b border-sand-200 text-left text-xs uppercase tracking-wide text-gray-400">
-                  <th className="px-5 py-3 font-medium">Tên</th>
-                  <th className="px-5 py-3 font-medium">Nhóm</th>
-                  <th className="px-5 py-3 text-right font-medium">Calo</th>
-                  <th className="px-5 py-3 text-right font-medium">Đạm</th>
-                  <th className="px-5 py-3 text-right font-medium">Giá tham khảo</th>
-                  {isAdmin && <th className="px-5 py-3 text-right font-medium">Thao tác</th>}
+                  <th className="w-[22%] px-3 py-2.5 font-medium">Tên</th>
+                  <th className="w-[11%] px-3 py-2.5 font-medium">Nhóm</th>
+                  <th className="w-[8%] px-2 py-2.5 text-right font-medium">Calo</th>
+                  <th className="w-[8%] px-2 py-2.5 text-right font-medium">Đạm</th>
+                  <th className="w-[9%] whitespace-nowrap px-2 py-2.5 text-right font-medium">Tinh bột</th>
+                  <th className="w-[9%] whitespace-nowrap px-2 py-2.5 text-right font-medium">Chất béo</th>
+                  <th className="w-[8%] whitespace-nowrap px-2 py-2.5 text-right font-medium">Chất xơ</th>
+                  <th className="w-[18%] whitespace-nowrap px-3 py-2.5 text-right font-medium">Giá tham khảo</th>
+                  {isAdmin && <th className="w-20 px-3 py-2.5 text-right font-medium">Thao tác</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-sand-100">
                 {items.map((ing) => (
                   <tr key={ing.id} className="hover:bg-sand-50">
-                    <td className="px-5 py-3">
+                    <td className="px-3 py-2.5">
                       <span className="font-medium text-gray-800">{ing.name}</span>
                       {!ing.is_active && (
                         <Badge className="ml-2 bg-sand-200 text-gray-500">Đã ẩn</Badge>
                       )}
                     </td>
-                    <td className="px-5 py-3">
+                    <td className="px-3 py-2.5">
                       <Badge className={FOOD_GROUP_STYLES[ing.food_group]}>
                         {FOOD_GROUP_LABELS[ing.food_group]}
                       </Badge>
                     </td>
-                    <td className="px-5 py-3 text-right text-gray-600">{formatKcal(ing.calories)}</td>
-                    <td className="px-5 py-3 text-right text-gray-600">{formatGram(ing.protein_g)}</td>
-                    <td className="px-5 py-3 text-right">
+                    <td className="whitespace-nowrap px-2 py-2.5 text-right tabular-nums text-gray-600">{formatKcal(ing.calories)}</td>
+                    <td className="whitespace-nowrap px-2 py-2.5 text-right tabular-nums text-gray-600">{formatGram(ing.protein_g)}</td>
+                    <td className="whitespace-nowrap px-2 py-2.5 text-right tabular-nums text-gray-600">{formatGram(ing.carbs_g)}</td>
+                    <td className="whitespace-nowrap px-2 py-2.5 text-right tabular-nums text-gray-600">{formatGram(ing.fat_g)}</td>
+                    <td className="whitespace-nowrap px-2 py-2.5 text-right tabular-nums text-gray-600">{formatGram(ing.fiber_g)}</td>
+                    <td className="px-3 py-2.5 text-right">
                       {ing.latest_price == null ? (
                         <span className="text-gray-500">—</span>
                       ) : (
@@ -250,18 +256,18 @@ export function Ingredients() {
                       )}
                     </td>
                     {isAdmin && (
-                      <td className="px-5 py-3">
+                      <td className="px-3 py-2.5">
                         <div className="flex justify-end gap-1">
                           <button
                             onClick={() => openEdit(ing)}
-                            className="rounded-lg p-1.5 text-gray-400 transition hover:bg-brand-50 hover:text-brand-600"
+                            className="rounded-lg p-1.5 text-gray-600 transition hover:bg-brand-50 hover:text-brand-700"
                             aria-label="Sửa"
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => setConfirming(ing)}
-                            className="rounded-lg p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+                            className="rounded-lg p-1.5 text-red-600 transition hover:bg-red-50 hover:text-red-700"
                             aria-label="Ẩn"
                           >
                             <EyeOff className="h-4 w-4" />

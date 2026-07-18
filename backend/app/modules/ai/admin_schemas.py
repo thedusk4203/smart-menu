@@ -51,6 +51,28 @@ class ProviderTestResult(BaseModel):
     models: list[str] = Field(default_factory=list)
 
 
+PromptFeature = Literal["chat", "parse_menu", "explain_plan", "suggest_swap"]
+
+
+class SystemPromptWrite(BaseModel):
+    content: str = Field(min_length=1, max_length=20_000)
+
+    @field_validator("content")
+    @classmethod
+    def strip_content(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("không được để trống")
+        return value
+
+
+class SystemPromptItem(BaseModel):
+    feature: PromptFeature
+    content: str
+    is_custom: bool
+    updated_at: datetime | None = None
+
+
 class AIStatus(BaseModel):
     enabled: bool
     source: str | None = None

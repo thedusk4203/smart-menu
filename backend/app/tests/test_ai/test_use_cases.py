@@ -84,7 +84,7 @@ class _FakeConversationStore:
 
 def test_chat_stream_returns_deltas_then_completes_turn():
     client = _FakeAIClient(text="Chào bạn")
-    events = list(ChatUseCase(client, _FakeConversationStore()).open_chat_stream(
+    events = list(ChatUseCase(client, _FakeConversationStore(), "Prompt chat tùy chỉnh").open_chat_stream(
         ChatRequest(message="Xin chào"), user_id=1
     ).events())
 
@@ -94,6 +94,7 @@ def test_chat_stream_returns_deltas_then_completes_turn():
     assert events[-1]["data"]["turn"]["status"] == "completed"
     assert client.messages is not None
     assert client.messages[0]["role"] == "system"
+    assert client.messages[0]["content"] == "Prompt chat tùy chỉnh"
 
 
 def test_parse_menu_request_validates_structured_output():
@@ -108,7 +109,7 @@ def test_parse_menu_request_validates_structured_output():
         }
     )
 
-    result = ParseMenuRequestUseCase(client).execute(
+    result = ParseMenuRequestUseCase(client, "Prompt parse tùy chỉnh").execute(
         ParseMenuRequest(message="7 ngày 3 bữa ngân sách 500k")
     )
 
@@ -116,6 +117,8 @@ def test_parse_menu_request_validates_structured_output():
     assert result.meals_per_day == 3
     assert result.budget_limit == 500000
     assert result.preferred_tags == ["healthy", "ít dầu mỡ"]
+    assert client.messages is not None
+    assert client.messages[0]["content"] == "Prompt parse tùy chỉnh"
 
 
 def test_parse_menu_request_rejects_invalid_ai_shape():
@@ -246,7 +249,7 @@ def _swap_request(note: str) -> SwapSuggestionRequest:
     )
 
 
-def _swap_use_case(client):
+def _swap_use_case(client, system_prompt="Prompt đổi món mặc định trong test"):
     target = _dish(1, "Gà kho", cost=20_000, calories=300)
     replacements = [
         _dish(2, "Gà hấp", cost=18_000, calories=280),
@@ -256,6 +259,7 @@ def _swap_use_case(client):
         client,
         _FakeCandidateProvider(target, replacements),
         _FakeBuildPlanRequest(),
+        system_prompt,
     )
 
 
@@ -304,6 +308,7 @@ def test_custom_swap_note_sends_target_and_budget_context_to_llm(monkeypatch):
 
     assert [item.dish_id for item in result] == [2, 3]
     assert client.messages is not None
+    assert client.messages[0]["content"] == "Prompt đổi món mặc định trong test"
     payload = json.loads(client.messages[1]["content"])
     assert payload["target"]["dish_id"] == 1
     assert payload["budget_context"] == {

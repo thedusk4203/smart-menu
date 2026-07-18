@@ -19,7 +19,7 @@ Tạo thực đơn từ form hoặc mô tả tiếng Việt, đọc kết quả,
 1. Mở **Tạo thực đơn**. Có thể nhập mô tả như “3 ngày, 3 bữa, ngân sách 360 nghìn, ưu tiên giàu đạm”, rồi chọn **Phân tích yêu cầu**. Kiểm tra lại form vì AI chỉ chuyển câu chữ thành trường dữ liệu.
 2. Chọn **Số ngày** từ 1–7 và **Số bữa/ngày**: 2 bữa là trưa+tối; 3 bữa thêm bữa sáng. Nhập **ngân sách tổng** cho toàn bộ số ngày hoặc để trống để dùng ngân sách/ngày trong hồ sơ nhân số ngày.
 3. Chọn tag ưu tiên từ danh mục có sẵn, rồi nhấn **Sinh thực đơn**.
-4. Nếu hệ thống báo **Không thể tạo thực đơn**, đọc lý do. Với ngân sách dưới mức tối thiểu, tăng ngân sách; nếu thiếu candidate, bớt loại trừ/tag hoặc nhờ Admin bổ sung dữ liệu. Không xem `infeasible` là lỗi máy chủ.
+4. Nếu hệ thống báo **Không thể tạo thực đơn**, đọc lý do. Với ngân sách dưới mức tối thiểu, tăng ngân sách hoặc giảm số ngày. Nếu thiếu candidate, chỉ xem lại các mục **không thích** không còn cần thiết hoặc nhờ Admin bổ sung dữ liệu; không bỏ dị ứng thật. Tag là ưu tiên mềm nên bớt tag không chữa lỗi thiếu loại món/budget. Không xem `infeasible` là lỗi máy chủ.
 5. Ở **Kết quả thực đơn**, kiểm tra tổng chi phí, ngân sách, calo/macro, cảnh báo và cấu trúc: sáng 1 món; trưa/tối gồm tinh bột + mặn + rau hoặc canh.
 6. Chọn **Tạo lại** để yêu cầu một signature khác. Chọn **Phân tích thực đơn** để AI diễn giải đúng số liệu đã kiểm tra.
 7. Chọn nút **Đổi** cạnh một món, mô tả mong muốn rồi **Tìm món thay thế**. Chỉ các phương án giữ được toàn bộ ràng buộc mới xuất hiện; chọn một phương án để áp dụng vào kết quả đang xem.
@@ -56,7 +56,7 @@ Chú thích đọc ảnh: (1) tên/ngày; (2) chi phí/calo; (3) Chi tiết; (4)
 
 ## Lưu ý an toàn
 
-- Không bỏ nguyên liệu dị ứng chỉ để làm request khả thi; hãy điều chỉnh ngân sách/tag hoặc dữ liệu.
+- Không bỏ nguyên liệu dị ứng chỉ để làm request khả thi; hãy điều chỉnh ngân sách, số ngày hoặc dữ liệu candidate. Tag là ưu tiên mềm, không phải cách chữa hard-infeasible.
 - Kiểm tra lại đơn vị ngân sách: đây là **tổng cho toàn bộ số ngày**.
 - AI chỉ phân tích/giải thích/xếp hạng; hệ thống tính chi phí, dinh dưỡng, lọc dị ứng, kiểm tra ngân sách và xác nhận plan hợp lệ.
 
@@ -99,8 +99,7 @@ AI đang tắt trước buổi demo. Hãy mô tả cách vẫn tạo, lưu và t
 1. **B.** Nếu để trống, backend mới suy ra từ ngân sách/ngày trong hồ sơ.
 2. **B.** Đây là cấu trúc cứng của mỗi bữa chính.
 3. **B.** AI chỉ đề xuất/xếp hạng; hệ thống kiểm tra lại.
-4. Tăng ngân sách tổng; giảm số ngày; giảm tag ưu tiên/không thích không bắt buộc hoặc nhờ Admin bổ sung candidate rẻ hơn. Không xóa dị ứng thật.
+4. Tăng ngân sách tổng; giảm số ngày; xem lại exclusion loại “không thích” nếu thực sự không còn cần hoặc nhờ Admin bổ sung candidate rẻ/đúng loại. Không xóa dị ứng thật; giảm tag không chữa hard-infeasible.
 5. Bỏ mô tả tiếng Việt → chọn số ngày/bữa/ngân sách/tag trực tiếp → **Sinh thực đơn** → đọc số liệu/cảnh báo → đặt tên và **Lưu thực đơn** → mở Lịch sử; nói rõ phần AI là lớp tùy chọn.
 
 Tự chấm mỗi câu đúng/hoàn thành là 1 điểm: **5/5 = hiểu tốt; 4/5 = đạt; 3/5 = xem lại; 0–2/5 = đọc lại và thực hành lại.**
-
