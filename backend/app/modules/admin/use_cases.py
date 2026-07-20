@@ -3,8 +3,9 @@ from __future__ import annotations
 import csv
 import io
 import json
+import math
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,14 @@ MISSING_CONVERSION_SQL = """i.grams_per_unit = 1
         LOWER(BTRIM(i.default_unit)) NOT IN ('ml', 'milliliter', 'milliliters')
         OR i.food_group::text IN ('fat', 'dairy')
     )"""
+
+MISSING_PURCHASE_RULE_SQL = """i.purchase_mode = 'regular'
+    AND (i.purchase_increment IS NULL OR p.price_per_default_unit IS NULL)"""
+
+MISSING_STORAGE_RULE_SQL = """i.purchase_mode = 'regular'
+    AND i.room_shelf_life_days IS NULL
+    AND i.fridge_shelf_life_days IS NULL
+    AND i.freezer_shelf_life_days IS NULL"""
 
 
 def _row_dict(row) -> dict[str, Any]:
@@ -408,14 +417,22 @@ class AdminService:
         row = self.session.execute(
             text(
                 f"""SELECT i.id, i.name, i.food_group, i.default_unit, i.grams_per_unit,
-                          i.tags, i.is_active, n.calories, n.protein_g, n.carbs_g, n.fat_g,
+                           i.purchase_mode, i.purchase_increment, i.room_shelf_life_days,
+                           i.fridge_shelf_life_days, i.freezer_shelf_life_days,
+                           i.shelf_life_source, i.shelf_life_reviewed_at,
+                           i.tags, i.is_active, n.calories, n.protein_g, n.carbs_g, n.fat_g,
                           n.fiber_g, p.price AS latest_price, p.unit AS price_unit,
                           p.price_per_default_unit AS latest_price_per_unit,
                           p.source AS price_source, p.recorded_at AS price_recorded_at,
                           i.created_at, i.updated_at,
-                          (p.id IS NULL OR p.price_per_default_unit IS NULL) AS missing_price,
-                          (n.id IS NULL) AS missing_nutrition,
-                          ({MISSING_CONVERSION_SQL}) AS missing_conversion
+                           (i.purchase_mode = 'regular' AND (p.id IS NULL OR p.price_per_default_unit IS NULL)) AS missing_price,
+                           (n.id IS NULL) AS missing_nutrition,
+                           ({MISSING_CONVERSION_SQL}) AS missing_conversion,
+                           ({MISSING_PURCHASE_RULE_SQL}) AS missing_purchase_rule,
+                           ({MISSING_STORAGE_RULE_SQL}) AS missing_storage_rule,
+                           CASE WHEN i.purchase_mode = 'regular' AND i.purchase_increment IS NOT NULL
+                                     AND p.price_per_default_unit IS NOT NULL
+                                THEN i.purchase_increment * p.price_per_default_unit END AS purchase_block_cost
                    FROM ingredients i
                    LEFT JOIN nutrition_facts n ON n.ingredient_id = i.id
                    LEFT JOIN LATERAL (
@@ -432,7 +449,8 @@ class AdminService:
         data = _row_dict(row)
         for key in (
             "grams_per_unit", "calories", "protein_g", "carbs_g", "fat_g",
-            "fiber_g", "latest_price", "latest_price_per_unit",
+            "fiber_g", "latest_price", "latest_price_per_unit", "purchase_increment",
+            "purchase_block_cost",
         ):
             if data.get(key) is not None:
                 data[key] = float(data[key])
@@ -460,11 +478,15 @@ class AdminService:
         elif status == "inactive":
             where.append("NOT i.is_active")
         if quality == "missing_price":
-            where.append("(p.id IS NULL OR p.price_per_default_unit IS NULL)")
+            where.append("i.purchase_mode = 'regular' AND (p.id IS NULL OR p.price_per_default_unit IS NULL)")
         elif quality == "missing_nutrition":
             where.append("n.id IS NULL")
         elif quality == "missing_conversion":
             where.append(MISSING_CONVERSION_SQL)
+        elif quality == "missing_purchase_rule":
+            where.append(MISSING_PURCHASE_RULE_SQL)
+        elif quality == "missing_storage_rule":
+            where.append(MISSING_STORAGE_RULE_SQL)
         clause = " AND ".join(where)
         joins = """LEFT JOIN nutrition_facts n ON n.ingredient_id = i.id
                    LEFT JOIN LATERAL (
@@ -478,14 +500,22 @@ class AdminService:
         rows = self.session.execute(
             text(
                 f"""SELECT i.id, i.name, i.food_group, i.default_unit, i.grams_per_unit,
+                           i.purchase_mode, i.purchase_increment, i.room_shelf_life_days,
+                           i.fridge_shelf_life_days, i.freezer_shelf_life_days,
+                           i.shelf_life_source, i.shelf_life_reviewed_at,
                            i.tags, i.is_active, n.calories, n.protein_g, n.carbs_g, n.fat_g,
                            n.fiber_g, p.price AS latest_price, p.unit AS price_unit,
                            p.price_per_default_unit AS latest_price_per_unit,
                            p.source AS price_source, p.recorded_at AS price_recorded_at,
                            i.created_at, i.updated_at,
-                           (p.id IS NULL OR p.price_per_default_unit IS NULL) AS missing_price,
+                           (i.purchase_mode = 'regular' AND (p.id IS NULL OR p.price_per_default_unit IS NULL)) AS missing_price,
                            (n.id IS NULL) AS missing_nutrition,
-                           ({MISSING_CONVERSION_SQL}) AS missing_conversion
+                           ({MISSING_CONVERSION_SQL}) AS missing_conversion,
+                           ({MISSING_PURCHASE_RULE_SQL}) AS missing_purchase_rule,
+                           ({MISSING_STORAGE_RULE_SQL}) AS missing_storage_rule,
+                           CASE WHEN i.purchase_mode = 'regular' AND i.purchase_increment IS NOT NULL
+                                     AND p.price_per_default_unit IS NOT NULL
+                                THEN i.purchase_increment * p.price_per_default_unit END AS purchase_block_cost
                     FROM ingredients i {joins} WHERE {clause}
                     ORDER BY i.updated_at DESC, i.name
                     LIMIT :limit OFFSET :offset"""
@@ -497,7 +527,8 @@ class AdminService:
             data = _row_dict(row)
             for key in (
                 "grams_per_unit", "calories", "protein_g", "carbs_g", "fat_g",
-                "fiber_g", "latest_price", "latest_price_per_unit",
+                "fiber_g", "latest_price", "latest_price_per_unit", "purchase_increment",
+                "purchase_block_cost",
             ):
                 if data.get(key) is not None:
                     data[key] = float(data[key])
@@ -525,11 +556,15 @@ class AdminService:
         elif status == "inactive":
             where.append("NOT i.is_active")
         if quality == "missing_price":
-            where.append("(p.id IS NULL OR p.price_per_default_unit IS NULL)")
+            where.append("i.purchase_mode = 'regular' AND (p.id IS NULL OR p.price_per_default_unit IS NULL)")
         elif quality == "missing_nutrition":
             where.append("n.id IS NULL")
         elif quality == "missing_conversion":
             where.append(MISSING_CONVERSION_SQL)
+        elif quality == "missing_purchase_rule":
+            where.append(MISSING_PURCHASE_RULE_SQL)
+        elif quality == "missing_storage_rule":
+            where.append(MISSING_STORAGE_RULE_SQL)
         joins = """LEFT JOIN nutrition_facts n ON n.ingredient_id = i.id
                    LEFT JOIN LATERAL (
                        SELECT id, price, unit, price_per_default_unit, source, recorded_at
@@ -539,6 +574,9 @@ class AdminService:
         rows = self.session.execute(
             text(
                 f"""SELECT i.id, i.code, i.name, i.food_group, i.default_unit, i.grams_per_unit, i.tags,
+                           i.purchase_mode, i.purchase_increment, i.room_shelf_life_days,
+                           i.fridge_shelf_life_days, i.freezer_shelf_life_days,
+                           i.shelf_life_source, i.shelf_life_reviewed_at,
                            n.calories, n.protein_g, n.carbs_g, n.fat_g, n.fiber_g,
                            p.price, p.unit AS price_unit, p.price_per_default_unit, p.source, i.is_active
                     FROM ingredients i {joins}
@@ -565,6 +603,14 @@ class AdminService:
                 "price_per_default_unit": float(data["price_per_default_unit"])
                 if data["price_per_default_unit"] is not None else None,
                 "source": data["source"], "is_active": data["is_active"],
+                "purchase_mode": _enum_value(data["purchase_mode"]),
+                "purchase_increment": float(data["purchase_increment"])
+                if data["purchase_increment"] is not None else None,
+                "room_shelf_life_days": data["room_shelf_life_days"],
+                "fridge_shelf_life_days": data["fridge_shelf_life_days"],
+                "freezer_shelf_life_days": data["freezer_shelf_life_days"],
+                "shelf_life_source": data["shelf_life_source"],
+                "shelf_life_reviewed_at": data["shelf_life_reviewed_at"],
             })
         return self._build_export_file("ingredients", output_format, records)
 
@@ -585,18 +631,48 @@ class AdminService:
         if duplicate:
             raise ConflictError("Tên nguyên liệu đã tồn tại")
         before = self._ingredient_from_db(ingredient_id) if ingredient_id else None
+        if before and before["default_unit"] != data.default_unit:
+            referenced = self.session.execute(
+                text(
+                    """SELECT 1 FROM dish_ingredients WHERE ingredient_id = :id
+                       UNION ALL SELECT 1 FROM meal_ingredients WHERE ingredient_id = :id
+                       UNION ALL SELECT 1 FROM shopping_lists WHERE ingredient_id = :id
+                       LIMIT 1"""
+                ),
+                {"id": ingredient_id},
+            ).first()
+            if referenced:
+                raise ValidationAppError(
+                    "Không thể đổi đơn vị chuẩn của nguyên liệu đã được công thức hoặc danh sách mua tham chiếu"
+                )
+        procurement = {
+            "purchase_mode": data.purchase_mode,
+            "purchase_increment": data.purchase_increment,
+            "room_shelf_life_days": data.room_shelf_life_days,
+            "fridge_shelf_life_days": data.fridge_shelf_life_days,
+            "freezer_shelf_life_days": data.freezer_shelf_life_days,
+            "shelf_life_source": data.shelf_life_source.strip() if data.shelf_life_source else None,
+            "shelf_life_reviewed_at": data.shelf_life_reviewed_at,
+        }
         if ingredient_id is None:
             row = self.session.execute(
                 text(
                     """INSERT INTO ingredients
-                       (name, food_group, default_unit, grams_per_unit, is_active)
-                       VALUES (:name, CAST(:group AS food_group), :unit, :grams, :active)
+                       (name, food_group, default_unit, grams_per_unit, is_active,
+                        purchase_mode, purchase_increment, room_shelf_life_days,
+                        fridge_shelf_life_days, freezer_shelf_life_days,
+                        shelf_life_source, shelf_life_reviewed_at)
+                       VALUES (:name, CAST(:group AS food_group), :unit, :grams, :active,
+                               CAST(:purchase_mode AS ingredient_purchase_mode), :purchase_increment,
+                               :room_shelf_life_days, :fridge_shelf_life_days,
+                               :freezer_shelf_life_days, :shelf_life_source,
+                               :shelf_life_reviewed_at)
                        RETURNING id"""
                 ),
                 {
                     "name": data.name, "group": data.food_group.value,
                     "unit": data.default_unit, "grams": data.grams_per_unit,
-                    "active": data.is_active,
+                    "active": data.is_active, **procurement,
                 },
             ).first()
             ingredient_id = row.id
@@ -606,13 +682,20 @@ class AdminService:
                 text(
                     """UPDATE ingredients SET name = :name,
                            food_group = CAST(:group AS food_group), default_unit = :unit,
-                           grams_per_unit = :grams, is_active = :active
+                           grams_per_unit = :grams, is_active = :active,
+                           purchase_mode = CAST(:purchase_mode AS ingredient_purchase_mode),
+                           purchase_increment = :purchase_increment,
+                           room_shelf_life_days = :room_shelf_life_days,
+                           fridge_shelf_life_days = :fridge_shelf_life_days,
+                           freezer_shelf_life_days = :freezer_shelf_life_days,
+                           shelf_life_source = :shelf_life_source,
+                           shelf_life_reviewed_at = :shelf_life_reviewed_at
                        WHERE id = :id"""
                 ),
                 {
                     "id": ingredient_id, "name": data.name, "group": data.food_group.value,
                     "unit": data.default_unit, "grams": data.grams_per_unit,
-                    "active": data.is_active,
+                    "active": data.is_active, **procurement,
                 },
             )
             action = "update"
@@ -687,14 +770,15 @@ class AdminService:
                          COALESCE(v.estimated_cost, 0) AS estimated_cost,
                          COALESCE(v.ingredient_count, 0) AS ingredient_count,
                          (COALESCE(v.ingredient_count, 0) = 0) AS missing_recipe,
-                         EXISTS (
-                           SELECT 1 FROM dish_ingredients di
-                           WHERE di.dish_id = d.id AND NOT EXISTS (
-                             SELECT 1 FROM price_snapshots p
-                             WHERE p.ingredient_id = di.ingredient_id
-                               AND p.price_per_default_unit IS NOT NULL
-                           )
-                         ) AS missing_price,
+                          EXISTS (
+                            SELECT 1 FROM dish_ingredients di JOIN ingredients i ON i.id = di.ingredient_id
+                            WHERE di.dish_id = d.id AND NOT EXISTS (
+                              SELECT 1 FROM price_snapshots p
+                              WHERE p.ingredient_id = di.ingredient_id
+                                AND p.price_per_default_unit IS NOT NULL
+                            )
+                            AND i.purchase_mode = 'regular'
+                          ) AS missing_price,
                          EXISTS (
                            SELECT 1 FROM dish_ingredients di
                            LEFT JOIN nutrition_facts n ON n.ingredient_id = di.ingredient_id
@@ -720,9 +804,11 @@ class AdminService:
             rows = self.session.execute(
                 text(
                     """SELECT di.ingredient_id, i.name, di.quantity, di.unit,
+                              di.max_extra_quantity, di.extra_step_quantity,
                               NOT EXISTS (SELECT 1 FROM price_snapshots p
                                   WHERE p.ingredient_id = i.id
-                                    AND p.price_per_default_unit IS NOT NULL) AS missing_price,
+                                    AND p.price_per_default_unit IS NOT NULL)
+                                  AND i.purchase_mode = 'regular' AS missing_price,
                               NOT EXISTS (SELECT 1 FROM nutrition_facts n
                                   WHERE n.ingredient_id = i.id) AS missing_nutrition
                        FROM dish_ingredients di JOIN ingredients i ON i.id = di.ingredient_id
@@ -731,7 +817,14 @@ class AdminService:
                 {"id": dish_id},
             ).fetchall()
             data["ingredients"] = [
-                {**_row_dict(r), "quantity": float(r.quantity)} for r in rows
+                {
+                    **_row_dict(r),
+                    "quantity": float(r.quantity),
+                    "max_extra_quantity": float(r.max_extra_quantity),
+                    "extra_step_quantity": float(r.extra_step_quantity)
+                    if r.extra_step_quantity is not None else None,
+                }
+                for r in rows
             ]
         return data
 
@@ -759,7 +852,7 @@ class AdminService:
         if quality == "missing_recipe":
             where.append("COALESCE(v.ingredient_count, 0) = 0")
         elif quality == "missing_price":
-            where.append("EXISTS (SELECT 1 FROM dish_ingredients di WHERE di.dish_id = d.id AND NOT EXISTS (SELECT 1 FROM price_snapshots p WHERE p.ingredient_id = di.ingredient_id AND p.price_per_default_unit IS NOT NULL))")
+            where.append("EXISTS (SELECT 1 FROM dish_ingredients di JOIN ingredients i ON i.id = di.ingredient_id WHERE di.dish_id = d.id AND i.purchase_mode = 'regular' AND NOT EXISTS (SELECT 1 FROM price_snapshots p WHERE p.ingredient_id = di.ingredient_id AND p.price_per_default_unit IS NOT NULL))")
         elif quality == "missing_nutrition":
             where.append("EXISTS (SELECT 1 FROM dish_ingredients di LEFT JOIN nutrition_facts n ON n.ingredient_id = di.ingredient_id WHERE di.dish_id = d.id AND n.id IS NULL)")
         clause = " AND ".join(where)
@@ -803,7 +896,7 @@ class AdminService:
         if quality == "missing_recipe":
             where.append("NOT EXISTS (SELECT 1 FROM dish_ingredients di WHERE di.dish_id = d.id)")
         elif quality == "missing_price":
-            where.append("EXISTS (SELECT 1 FROM dish_ingredients di WHERE di.dish_id = d.id AND NOT EXISTS (SELECT 1 FROM price_snapshots p WHERE p.ingredient_id = di.ingredient_id AND p.price_per_default_unit IS NOT NULL))")
+            where.append("EXISTS (SELECT 1 FROM dish_ingredients di JOIN ingredients i ON i.id = di.ingredient_id WHERE di.dish_id = d.id AND i.purchase_mode = 'regular' AND NOT EXISTS (SELECT 1 FROM price_snapshots p WHERE p.ingredient_id = di.ingredient_id AND p.price_per_default_unit IS NOT NULL))")
         elif quality == "missing_nutrition":
             where.append("EXISTS (SELECT 1 FROM dish_ingredients di LEFT JOIN nutrition_facts n ON n.ingredient_id = di.ingredient_id WHERE di.dish_id = d.id AND n.id IS NULL)")
         rows = self.session.execute(
@@ -813,7 +906,9 @@ class AdminService:
                            COALESCE(
                                jsonb_agg(jsonb_build_object(
                                    'ingredient_id', di.ingredient_id, 'name', i.name,
-                                   'quantity', di.quantity, 'unit', di.unit
+                                    'quantity', di.quantity, 'unit', di.unit,
+                                    'max_extra_quantity', di.max_extra_quantity,
+                                    'extra_step_quantity', di.extra_step_quantity
                                ) ORDER BY i.name) FILTER (WHERE di.ingredient_id IS NOT NULL),
                                '[]'::jsonb
                            ) AS ingredients
@@ -845,12 +940,96 @@ class AdminService:
                     {
                         "ingredient_id": item["ingredient_id"], "name": item["name"],
                         "quantity": float(item["quantity"]), "unit": item["unit"],
+                        "max_extra_quantity": float(item.get("max_extra_quantity") or 0),
+                        "extra_step_quantity": float(item["extra_step_quantity"])
+                        if item.get("extra_step_quantity") is not None else None,
                     }
                     for item in ingredients
                 ]),
                 "is_active": data["is_active"],
             })
         return self._build_export_file("dishes", output_format, records)
+
+    def export_dish_flex_suggestions(self, output_format: str) -> tuple[bytes, str, str]:
+        """Export complete, import-safe dish rows with conservative flex suggestions."""
+        rows = self.session.execute(text(
+            """SELECT d.id, d.code, d.name, d.dish_type, d.cooking_method,
+                      d.description, d.instructions, d.tags, d.is_active,
+                      COALESCE(jsonb_agg(jsonb_build_object(
+                          'ingredient_id', di.ingredient_id, 'name', i.name,
+                          'quantity', di.quantity, 'unit', di.unit,
+                          'max_extra_quantity', di.max_extra_quantity,
+                          'extra_step_quantity', di.extra_step_quantity,
+                          'purchase_mode', i.purchase_mode,
+                          'purchase_increment', i.purchase_increment,
+                          'food_group', i.food_group
+                      ) ORDER BY i.name) FILTER (WHERE di.ingredient_id IS NOT NULL), '[]'::jsonb)
+                      AS ingredients
+               FROM dishes d
+               LEFT JOIN dish_ingredients di ON di.dish_id=d.id
+               LEFT JOIN ingredients i ON i.id=di.ingredient_id
+               GROUP BY d.id ORDER BY d.name"""
+        )).fetchall()
+        records: list[dict[str, Any]] = []
+        for row in rows:
+            data = _row_dict(row)
+            ingredients = data.get("ingredients") or []
+            if isinstance(ingredients, str):
+                ingredients = json.loads(ingredients)
+            changed = False
+            exported_ingredients: list[dict[str, Any]] = []
+            for item in ingredients:
+                quantity = float(item["quantity"])
+                maximum = float(item.get("max_extra_quantity") or 0)
+                step = item.get("extra_step_quantity")
+                eligible = (
+                    maximum <= 0
+                    and str(item.get("purchase_mode")) == "regular"
+                    and str(item.get("unit") or "").casefold() in {"g", "ml"}
+                    and str(item.get("food_group")) in {
+                        "protein", "vegetable", "grain", "fruit", "dairy"
+                    }
+                    and quantity >= 20
+                    and item.get("purchase_increment") is not None
+                )
+                if eligible:
+                    suggested_step = 5.0 if quantity < 100 else 10.0
+                    raw_max = min(
+                        float(item["purchase_increment"]) * 0.20,
+                        quantity * 0.25,
+                    )
+                    suggested_max = math.floor(raw_max / suggested_step) * suggested_step
+                    if suggested_max >= suggested_step:
+                        maximum = suggested_max
+                        step = suggested_step
+                        changed = True
+                exported_ingredients.append({
+                    "ingredient_id": item["ingredient_id"],
+                    "name": item["name"],
+                    "quantity": quantity,
+                    "unit": item["unit"],
+                    "max_extra_quantity": maximum,
+                    "extra_step_quantity": float(step) if step is not None else None,
+                })
+            if not changed:
+                continue
+            tags = data.get("tags") or []
+            if isinstance(tags, str):
+                tags = json.loads(tags)
+            records.append({
+                "id": data["id"], "code": data["code"], "name": data["name"],
+                "dish_type": _enum_value(data["dish_type"]),
+                "cooking_method": _enum_value(data["cooking_method"])
+                if data["cooking_method"] else None,
+                "description": data["description"], "instructions": data["instructions"],
+                "tags": ", ".join(str(tag).strip() for tag in tags if str(tag).strip()),
+                "ingredients_json": _json(exported_ingredients),
+                "is_active": data["is_active"],
+            })
+        content, media_type, filename = self._build_export_file(
+            "dishes", output_format, records
+        )
+        return content, media_type, filename.replace("dishes-export", "dish-flex-suggestions")
 
     def save_dish(
         self,
@@ -877,7 +1056,8 @@ class AdminService:
         if ids:
             ingredient_rows = self.session.execute(
                 text(
-                    """SELECT i.id, i.default_unit, i.is_active,
+                    """SELECT i.id, i.default_unit, i.is_active, i.purchase_mode,
+                              i.purchase_increment,
                               EXISTS (SELECT 1 FROM nutrition_facts n WHERE n.ingredient_id = i.id) AS has_nutrition,
                               EXISTS (SELECT 1 FROM price_snapshots p
                                       WHERE p.ingredient_id = i.id
@@ -897,8 +1077,10 @@ class AdminService:
                         problems.append(f"nguyên liệu id={item.ingredient_id} đang inactive")
                     if not ingredient.has_nutrition:
                         problems.append(f"nguyên liệu id={item.ingredient_id} thiếu dinh dưỡng")
-                    if not ingredient.has_price:
+                    if ingredient.purchase_mode == "regular" and not ingredient.has_price:
                         problems.append(f"nguyên liệu id={item.ingredient_id} thiếu giá chuẩn hoá")
+                    if ingredient.purchase_mode == "regular" and ingredient.purchase_increment is None:
+                        problems.append(f"nguyên liệu id={item.ingredient_id} thiếu bước mua")
                     if item.unit != ingredient.default_unit:
                         problems.append(
                             f"đơn vị '{item.unit}' của nguyên liệu id={item.ingredient_id} không khớp default_unit '{ingredient.default_unit}'"
@@ -943,8 +1125,10 @@ class AdminService:
         for item in data.ingredients:
             self.session.execute(
                 text(
-                    """INSERT INTO dish_ingredients (dish_id, ingredient_id, quantity, unit)
-                       VALUES (:dish_id, :ingredient_id, :quantity, :unit)"""
+                    """INSERT INTO dish_ingredients
+                       (dish_id, ingredient_id, quantity, unit, max_extra_quantity, extra_step_quantity)
+                       VALUES (:dish_id, :ingredient_id, :quantity, :unit,
+                               :max_extra_quantity, :extra_step_quantity)"""
                 ),
                 {"dish_id": dish_id, **item.model_dump()},
             )
@@ -958,8 +1142,8 @@ class AdminService:
         if active:
             ready = self.session.execute(
                 text(
-                    """SELECT ingredient_count, has_complete_nutrition, has_complete_price,
-                              all_ingredients_active
+                    """SELECT ingredient_count, has_complete_nutrition, has_complete_procurement,
+                               all_ingredients_active
                        FROM v_dishes_full WHERE id = :id"""
                 ),
                 {"id": dish_id},
@@ -967,11 +1151,11 @@ class AdminService:
             if not ready or not (
                 ready.ingredient_count > 0
                 and ready.has_complete_nutrition
-                and ready.has_complete_price
+                and ready.has_complete_procurement
                 and ready.all_ingredients_active
             ):
                 raise ValidationAppError(
-                    "Không thể kích hoạt dish thiếu recipe, nutrition, price hoặc chứa nguyên liệu inactive"
+                    "Không thể kích hoạt dish thiếu recipe, nutrition, procurement hoặc chứa nguyên liệu inactive"
                 )
         self.session.execute(text("UPDATE dishes SET is_active = :active WHERE id = :id"), {"active": active, "id": dish_id})
         after = self._dish_from_db(dish_id)
@@ -992,7 +1176,7 @@ class AdminService:
                    'missing_price'::text code, 'error'::text severity,
                    'Thiếu giá chuẩn hóa'::text title,
                    'Chưa có giá quy đổi theo đơn vị mặc định.'::text detail, i.updated_at
-            FROM ingredients i WHERE NOT EXISTS (
+            FROM ingredients i WHERE i.purchase_mode = 'regular' AND NOT EXISTS (
                 SELECT 1 FROM price_snapshots p WHERE p.ingredient_id = i.id
                   AND p.price_per_default_unit IS NOT NULL
             )
@@ -1012,6 +1196,22 @@ class AdminService:
                    END, i.updated_at
             FROM ingredients i WHERE {MISSING_CONVERSION_SQL}
             UNION ALL
+            SELECT 'ingredient', i.id, i.name, 'missing_purchase_rule', 'error',
+                   'Thiếu quy cách mua',
+                   'Nguyên liệu thường cần giá chuẩn hóa và bước mua trước khi planner V3 sử dụng.',
+                   i.updated_at
+            FROM ingredients i
+            LEFT JOIN LATERAL (
+                SELECT price_per_default_unit FROM price_snapshots p
+                WHERE p.ingredient_id = i.id ORDER BY recorded_at DESC LIMIT 1
+            ) p ON TRUE
+            WHERE {MISSING_PURCHASE_RULE_SQL}
+            UNION ALL
+            SELECT 'ingredient', i.id, i.name, 'missing_storage_rule', 'warning',
+                   'Chưa xác minh bảo quản',
+                   'Planner chỉ được mua và dùng nguyên liệu này trong cùng ngày.', i.updated_at
+            FROM ingredients i WHERE {MISSING_STORAGE_RULE_SQL}
+            UNION ALL
             SELECT 'dish', d.id, d.name, 'missing_recipe', 'error',
                    'Thiếu công thức', 'Món chưa có nguyên liệu trong công thức.', d.updated_at
             FROM dishes d WHERE NOT EXISTS (SELECT 1 FROM dish_ingredients di WHERE di.dish_id = d.id)
@@ -1019,7 +1219,8 @@ class AdminService:
             SELECT 'dish', d.id, d.name, 'missing_price', 'error',
                    'Không tính được chi phí', 'Ít nhất một nguyên liệu trong món đang thiếu giá.', d.updated_at
             FROM dishes d WHERE EXISTS (
-                SELECT 1 FROM dish_ingredients di WHERE di.dish_id = d.id
+                SELECT 1 FROM dish_ingredients di JOIN ingredients i ON i.id = di.ingredient_id
+                WHERE di.dish_id = d.id AND i.purchase_mode = 'regular'
                   AND NOT EXISTS (SELECT 1 FROM price_snapshots p
                       WHERE p.ingredient_id = di.ingredient_id
                         AND p.price_per_default_unit IS NOT NULL)
@@ -1097,6 +1298,9 @@ class AdminService:
                     "id", "code", "name", "food_group", "default_unit", "grams_per_unit",
                     "tags", "calories", "protein_g", "carbs_g", "fat_g", "fiber_g", "price",
                     "price_unit", "price_per_default_unit", "source", "is_active",
+                    "purchase_mode", "purchase_increment", "room_shelf_life_days",
+                    "fridge_shelf_life_days", "freezer_shelf_life_days",
+                    "shelf_life_source", "shelf_life_reviewed_at",
                 ],
                 "notes": [
                     "File dùng đúng cấu trúc import nguyên liệu và có thể chỉnh sửa rồi import lại.",
@@ -1170,6 +1374,9 @@ class AdminService:
                     "id", "code", "name", "food_group", "default_unit", "grams_per_unit",
                     "tags", "calories", "protein_g", "carbs_g", "fat_g", "fiber_g", "price",
                     "price_unit", "price_per_default_unit", "source", "is_active",
+                    "purchase_mode", "purchase_increment", "room_shelf_life_days",
+                    "fridge_shelf_life_days", "freezer_shelf_life_days",
+                    "shelf_life_source", "shelf_life_reviewed_at",
                 ],
                 "notes": [
                     "id: để trống khi tạo mới; điền ID hiện có khi muốn cập nhật đúng bản ghi.",
@@ -1177,6 +1384,8 @@ class AdminService:
                     "food_group: protein, vegetable, grain, dairy, fat, fruit hoặc other.",
                     "tags: các thẻ nguyên liệu, cách nhau bằng dấu phẩy; thẻ mới sẽ được tự tạo khi commit.",
                     "is_active: true/false; các cột dinh dưỡng và giá có thể để trống.",
+                    "purchase_mode: regular, pantry hoặc ignored; regular mua theo bội số purchase_increment.",
+                    "Shelf-life là số ngày cộng thêm sau ngày mua; có giá trị thì cần source và reviewed_at.",
                 ],
             },
             "dishes": {
@@ -1189,7 +1398,7 @@ class AdminService:
                     "code: mã riêng, duy nhất; để trống sẽ không thay đổi mã hiện có khi replace.",
                     "dish_type: staple, savory, soup, vegetable_side, side hoặc breakfast.",
                     "tags: các thẻ món ăn, cách nhau bằng dấu phẩy; thẻ mới sẽ được tự tạo khi commit.",
-                    "ingredients_json: mảng JSON với ingredient_id hoặc name, quantity và unit.",
+                    "ingredients_json: mảng JSON với ingredient_id hoặc name, quantity, unit, max_extra_quantity và extra_step_quantity.",
                     "Import nguyên liệu trước, sau đó mới import món ăn để các thành phần được đối chiếu.",
                 ],
             },
@@ -1343,8 +1552,34 @@ class AdminService:
                 raise ValueError(
                     f"Đơn vị '{unit}' của thành phần #{position} không khớp đơn vị mặc định '{expected_unit}'"
                 )
+            max_extra = _as_float(
+                item.get("max_extra_quantity"), "max_extra_quantity", position, default=0
+            )
+            step_extra = _as_float(
+                item.get("extra_step_quantity"), "extra_step_quantity", position
+            )
+            if max_extra is None or max_extra < 0:
+                raise ValueError(f"Mức tăng tối đa của thành phần #{position} không hợp lệ")
+            if max_extra == 0 and step_extra is not None:
+                raise ValueError(f"Thành phần #{position} cố định nhưng lại có bước tăng")
+            if max_extra > 0:
+                if step_extra is None or step_extra <= 0 or step_extra > max_extra:
+                    raise ValueError(f"Bước tăng của thành phần #{position} không hợp lệ")
+                quotient = max_extra / step_extra
+                if abs(quotient - round(quotient)) > 1e-6:
+                    raise ValueError(f"Mức tăng tối đa của thành phần #{position} phải chia hết cho bước tăng")
             seen_ingredients.add(resolved_id)
-            parsed.append({"ingredient_id": resolved_id, "quantity": quantity, "unit": expected_unit})
+            parsed_item = {
+                "ingredient_id": resolved_id,
+                "quantity": quantity,
+                "unit": expected_unit,
+            }
+            if "max_extra_quantity" in item or "extra_step_quantity" in item:
+                parsed_item.update({
+                    "max_extra_quantity": max_extra,
+                    "extra_step_quantity": step_extra,
+                })
+            parsed.append(parsed_item)
         return parsed
 
     def preview_import(
@@ -1415,6 +1650,68 @@ class AdminService:
                         }
                         if price["price_per_default_unit"] is None:
                             raise ValueError("Có price nhưng thiếu price_per_default_unit")
+                    procurement_fields = {
+                        "purchase_mode", "purchase_increment", "room_shelf_life_days",
+                        "fridge_shelf_life_days", "freezer_shelf_life_days",
+                        "shelf_life_source", "shelf_life_reviewed_at",
+                    }
+                    procurement_provided = any(field in raw for field in procurement_fields)
+                    raw_mode = str(raw.get("purchase_mode") or "").strip()
+                    purchase_mode = raw_mode or ("regular" if not existing else None)
+                    if purchase_mode is not None and purchase_mode not in {"regular", "pantry", "ignored"}:
+                        raise ValueError("purchase_mode không hợp lệ")
+                    purchase_increment = _as_float(
+                        raw.get("purchase_increment"), "purchase_increment", index
+                    )
+                    if purchase_increment is not None and purchase_increment <= 0:
+                        raise ValueError("purchase_increment phải lớn hơn 0")
+
+                    shelf_life: dict[str, int | None] = {}
+                    for field in (
+                        "room_shelf_life_days", "fridge_shelf_life_days", "freezer_shelf_life_days"
+                    ):
+                        value = _as_float(raw.get(field), field, index)
+                        if value is not None and (value < 0 or value > 3650 or value != int(value)):
+                            raise ValueError(f"{field} phải là số nguyên từ 0 đến 3650")
+                        shelf_life[field] = int(value) if value is not None else None
+                    shelf_source = str(raw.get("shelf_life_source") or "").strip() or None
+                    reviewed_raw = str(raw.get("shelf_life_reviewed_at") or "").strip()
+                    reviewed_at = None
+                    if reviewed_raw:
+                        try:
+                            reviewed_at = date.fromisoformat(reviewed_raw[:10])
+                        except ValueError as exc:
+                            raise ValueError("shelf_life_reviewed_at phải có dạng YYYY-MM-DD") from exc
+                        if reviewed_at > date.today():
+                            raise ValueError("shelf_life_reviewed_at không được ở tương lai")
+                    if any(value is not None for value in shelf_life.values()) and (
+                        shelf_source is None or reviewed_at is None
+                    ):
+                        raise ValueError("Có hạn bảo quản thì phải có source và reviewed_at")
+                    if purchase_mode in {"pantry", "ignored"} and (
+                        purchase_increment is not None
+                        or any(value is not None for value in shelf_life.values())
+                        or shelf_source is not None
+                        or reviewed_at is not None
+                    ):
+                        raise ValueError("pantry/ignored không được khai báo quy cách mua hoặc bảo quản")
+                    effective_mode = purchase_mode or "regular"
+                    if effective_mode == "regular" and purchase_increment is None and (
+                        procurement_provided or not existing
+                    ):
+                        warnings.append({
+                            "row": index,
+                            "field": "purchase_increment",
+                            "message": "Nguyên liệu regular chưa có bước mua và sẽ không planner-ready V3.",
+                        })
+                    if effective_mode == "regular" and not any(
+                        value is not None for value in shelf_life.values()
+                    ) and (procurement_provided or not existing):
+                        warnings.append({
+                            "row": index,
+                            "field": "storage",
+                            "message": "Chưa có hạn bảo quản; planner chỉ mua và dùng trong cùng ngày.",
+                        })
                     valid.append({
                         "source_row": index,
                         "id": record_id,
@@ -1427,6 +1724,12 @@ class AdminService:
                         "is_active": _as_bool(raw.get("is_active"), True),
                         "nutrition": nutrition,
                         "price": price,
+                        "procurement_provided": procurement_provided,
+                        "purchase_mode": purchase_mode,
+                        "purchase_increment": purchase_increment,
+                        **shelf_life,
+                        "shelf_life_source": shelf_source,
+                        "shelf_life_reviewed_at": reviewed_at.isoformat() if reviewed_at else None,
                     })
                 else:
                     dtype = str(raw.get("dish_type") or "").strip()
@@ -1518,8 +1821,35 @@ class AdminService:
                 if job_data["entity_type"] == "ingredients":
                     tags = _normalized_tags(raw.get("tags"))
                     self._ensure_catalog_tags(tags, "ingredient")
+                    procurement_params = {
+                        "purchase_mode": raw.get("purchase_mode") or "regular",
+                        "purchase_increment": raw.get("purchase_increment"),
+                        "room_shelf_life_days": raw.get("room_shelf_life_days"),
+                        "fridge_shelf_life_days": raw.get("fridge_shelf_life_days"),
+                        "freezer_shelf_life_days": raw.get("freezer_shelf_life_days"),
+                        "shelf_life_source": raw.get("shelf_life_source"),
+                        "shelf_life_reviewed_at": raw.get("shelf_life_reviewed_at"),
+                    }
                     if existing:
                         ingredient_id = existing["id"]
+                        current_unit = self.session.execute(
+                            text("SELECT default_unit FROM ingredients WHERE id=:id"),
+                            {"id": ingredient_id},
+                        ).scalar_one()
+                        if current_unit != raw["default_unit"]:
+                            referenced = self.session.execute(
+                                text(
+                                    """SELECT 1 FROM dish_ingredients WHERE ingredient_id=:id
+                                       UNION ALL SELECT 1 FROM meal_ingredients WHERE ingredient_id=:id
+                                       UNION ALL SELECT 1 FROM shopping_lists WHERE ingredient_id=:id
+                                       LIMIT 1"""
+                                ),
+                                {"id": ingredient_id},
+                            ).first()
+                            if referenced:
+                                raise ValidationAppError(
+                                    f"Không thể đổi default_unit của nguyên liệu {raw['name']} đang được tham chiếu"
+                                )
                         self.session.execute(
                             text("""UPDATE ingredients SET code=:code, name=:name, food_group=CAST(:group AS food_group),
                                    default_unit=:unit, grams_per_unit=:grams, tags=CAST(:tags AS jsonb),
@@ -1528,15 +1858,38 @@ class AdminService:
                              "unit": raw["default_unit"], "grams": raw["grams_per_unit"], "tags": _json(tags),
                              "active": raw["is_active"]},
                         )
+                        if raw.get("procurement_provided"):
+                            self.session.execute(
+                                text(
+                                    """UPDATE ingredients SET
+                                       purchase_mode=CAST(:purchase_mode AS ingredient_purchase_mode),
+                                       purchase_increment=:purchase_increment,
+                                       room_shelf_life_days=:room_shelf_life_days,
+                                       fridge_shelf_life_days=:fridge_shelf_life_days,
+                                       freezer_shelf_life_days=:freezer_shelf_life_days,
+                                       shelf_life_source=:shelf_life_source,
+                                       shelf_life_reviewed_at=:shelf_life_reviewed_at
+                                       WHERE id=:id"""
+                                ),
+                                {"id": ingredient_id, **procurement_params},
+                            )
                         updated += 1
                     else:
                         inserted = self.session.execute(
                             text("""INSERT INTO ingredients
-                                   (code, name, food_group, default_unit, grams_per_unit, tags, is_active)
+                                   (code, name, food_group, default_unit, grams_per_unit, tags, is_active,
+                                    purchase_mode, purchase_increment, room_shelf_life_days,
+                                    fridge_shelf_life_days, freezer_shelf_life_days,
+                                    shelf_life_source, shelf_life_reviewed_at)
                                    VALUES (:code, :name, CAST(:group AS food_group), :unit, :grams,
-                                           CAST(:tags AS jsonb), :active) RETURNING id"""),
+                                            CAST(:tags AS jsonb), :active,
+                                            CAST(:purchase_mode AS ingredient_purchase_mode), :purchase_increment,
+                                            :room_shelf_life_days, :fridge_shelf_life_days,
+                                            :freezer_shelf_life_days, :shelf_life_source,
+                                            :shelf_life_reviewed_at) RETURNING id"""),
                             {"code": next_code, "name": raw["name"], "group": raw["food_group"], "unit": raw["default_unit"],
-                             "grams": raw["grams_per_unit"], "tags": _json(tags), "active": raw["is_active"]},
+                             "grams": raw["grams_per_unit"], "tags": _json(tags), "active": raw["is_active"],
+                             **procurement_params},
                         ).first()
                         ingredient_id = inserted.id
                         created += 1
@@ -1572,6 +1925,9 @@ class AdminService:
                             "ingredient_id": found.id,
                             "quantity": float(item.get("quantity") or 0),
                             "unit": str(item.get("unit") or "").strip(),
+                            "max_extra_quantity": float(item.get("max_extra_quantity") or 0),
+                            "extra_step_quantity": float(item["extra_step_quantity"])
+                            if item.get("extra_step_quantity") is not None else None,
                         })
                     if existing:
                         dish_id = existing["id"]
@@ -1605,8 +1961,11 @@ class AdminService:
                         if not item["unit"]:
                             raise ValidationAppError(f"Thiếu đơn vị trong món {raw['name']}")
                         self.session.execute(
-                            text("""INSERT INTO dish_ingredients (dish_id, ingredient_id, quantity, unit)
-                                   VALUES (:dish_id, :ingredient_id, :quantity, :unit)"""),
+                            text("""INSERT INTO dish_ingredients
+                                   (dish_id, ingredient_id, quantity, unit,
+                                    max_extra_quantity, extra_step_quantity)
+                                   VALUES (:dish_id, :ingredient_id, :quantity, :unit,
+                                           :max_extra_quantity, :extra_step_quantity)"""),
                             {"dish_id": dish_id, **item},
                         )
             summary = {"created": created, "updated": updated, "skipped": skipped}

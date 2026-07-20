@@ -8,22 +8,60 @@ from app.shared.enums import CookingMethod, DishType, MealType
 
 @dataclass(frozen=True)
 class DishIngredientSnapshot:
-    """Nguyên liệu tại thời điểm candidate được đọc.
-
-    Snapshot này đi theo plan V2 để giá/công thức sau này không làm thay đổi lịch
-    sử hoặc shopping list của thực đơn đã lưu.
-    """
+    """Nguyên liệu tại thời điểm candidate được đọc cho Planner V3."""
 
     ingredient_id: int
     name: str
     quantity: float
     unit: str
     estimated_cost: float
+    purchase_mode: str = "regular"
+    purchase_increment: float | None = None
+    price_per_default_unit: float | None = None
+    price_source: str | None = None
+    price_recorded_at: str | None = None
+    grams_per_unit: float = 1.0
+    calories_per_100g: float = 0.0
+    protein_g_per_100g: float = 0.0
+    carbs_g_per_100g: float = 0.0
+    fat_g_per_100g: float = 0.0
+    room_shelf_life_days: int | None = None
+    fridge_shelf_life_days: int | None = None
+    freezer_shelf_life_days: int | None = None
+    max_extra_quantity: float = 0.0
+    extra_step_quantity: float | None = None
+
+    @property
+    def procurement_ready(self) -> bool:
+        return self.purchase_mode != "regular" or (
+            self.purchase_increment is not None
+            and self.purchase_increment > 0
+            and self.price_per_default_unit is not None
+            and self.price_per_default_unit >= 0
+        )
+
+    @property
+    def max_shelf_life_days(self) -> int:
+        values = (
+            self.room_shelf_life_days,
+            self.fridge_shelf_life_days,
+            self.freezer_shelf_life_days,
+        )
+        return max((value for value in values if value is not None), default=0)
+
+    def nutrition_for(self, quantity: float) -> dict[str, float]:
+        grams = quantity * self.grams_per_unit
+        return {
+            "calories": grams * self.calories_per_100g / 100.0,
+            "protein_g": grams * self.protein_g_per_100g / 100.0,
+            "fat_g": grams * self.fat_g_per_100g / 100.0,
+            "carb_g": grams * self.carbs_g_per_100g / 100.0,
+        }
 
 
 @dataclass(frozen=True)
 class DishCandidate:
-    """Đơn vị quyết định nhỏ nhất của Dish Planner V2."""
+    """Đơn vị quyết định nhỏ nhất của Planner V3."""
 
     dish_id: int
     name: str
@@ -93,6 +131,11 @@ class PlanMetrics:
     repeat_counts: dict[str, int] = field(default_factory=dict)
     solver_time_ms: int = 0
     nutrition_score: int = 0
+    purchase_cost: float = 0.0
+    consumption_value: float = 0.0
+    expired_waste_value: float = 0.0
+    ending_carryover_value: float = 0.0
+    shopping_days: int = 0
 
 
 @dataclass(frozen=True)
@@ -152,6 +195,25 @@ class PlanRequest:
     excluded_ingredient_ids: list[int] = field(default_factory=list)
     preferred_tags: list[str] = field(default_factory=list)
     previous_plan_signature: str | None = None
+    inventory_lots: tuple["InventoryLotSnapshot", ...] = ()
+    inventory_fingerprint: str | None = None
+    ledger_enabled: bool = False
+
+
+@dataclass(frozen=True)
+class InventoryLotSnapshot:
+    """Lot kho khả dụng được chuẩn hóa tương đối theo ngày bắt đầu plan."""
+
+    lot_id: int
+    ingredient_id: int
+    name: str
+    quantity: float
+    unit: str
+    purchase_increment: float
+    available_day: int
+    expiry_day: int
+    storage_mode: str
+    cost_basis_per_unit: float = 0.0
 
 
 @dataclass(frozen=True)

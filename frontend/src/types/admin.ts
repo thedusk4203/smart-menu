@@ -1,5 +1,7 @@
 import type { CookingMethod, DishType, FoodGroup, UserRole } from "./index";
 
+export type IngredientPurchaseMode = "regular" | "pantry" | "ignored";
+
 export interface Page<T> {
   items: T[];
   total: number;
@@ -61,6 +63,14 @@ export interface AdminIngredient {
   food_group: FoodGroup;
   default_unit: string;
   grams_per_unit: number;
+  purchase_mode: IngredientPurchaseMode;
+  purchase_increment: number | null;
+  room_shelf_life_days: number | null;
+  fridge_shelf_life_days: number | null;
+  freezer_shelf_life_days: number | null;
+  shelf_life_source: string | null;
+  shelf_life_reviewed_at: string | null;
+  purchase_block_cost: number | null;
   is_active: boolean;
   calories: number | null;
   protein_g: number | null;
@@ -77,6 +87,8 @@ export interface AdminIngredient {
   missing_price: boolean;
   missing_nutrition: boolean;
   missing_conversion: boolean;
+  missing_purchase_rule: boolean;
+  missing_storage_rule: boolean;
 }
 
 export interface AdminIngredientWrite {
@@ -84,6 +96,13 @@ export interface AdminIngredientWrite {
   food_group: FoodGroup;
   default_unit: string;
   grams_per_unit: number;
+  purchase_mode: IngredientPurchaseMode;
+  purchase_increment: number | null;
+  room_shelf_life_days: number | null;
+  fridge_shelf_life_days: number | null;
+  freezer_shelf_life_days: number | null;
+  shelf_life_source: string | null;
+  shelf_life_reviewed_at: string | null;
   is_active: boolean;
   nutrition: NutritionPayload | null;
   price: PricePayload | null;
@@ -94,6 +113,8 @@ export interface AdminDishIngredient {
   name: string;
   quantity: number;
   unit: string;
+  max_extra_quantity: number;
+  extra_step_quantity: number | null;
   missing_price: boolean;
   missing_nutrition: boolean;
 }
@@ -129,7 +150,13 @@ export interface AdminDishWrite {
   instructions: string | null;
   tags: string[];
   is_active: boolean;
-  ingredients: Array<{ ingredient_id: number; quantity: number; unit: string }>;
+  ingredients: Array<{
+    ingredient_id: number;
+    quantity: number;
+    unit: string;
+    max_extra_quantity: number;
+    extra_step_quantity: number | null;
+  }>;
 }
 
 export interface QualityIssue {

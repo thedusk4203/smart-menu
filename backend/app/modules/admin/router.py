@@ -208,6 +208,20 @@ def export_dishes(
     )
 
 
+@router.get("/dishes/flex-suggestions/export")
+def export_dish_flex_suggestions(
+    format: Literal["csv", "xlsx"] = "xlsx",
+    service: AdminService = Depends(get_admin_service),
+    _: UserEntity = Depends(require_data_editor),
+):
+    content, media_type, filename = service.export_dish_flex_suggestions(format)
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/dishes/{dish_id}", response_model=AdminDishItem)
 def get_dish(
     dish_id: int,

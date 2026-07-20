@@ -43,6 +43,8 @@ export const adminApi = {
   deleteDish: (id: number) => api.del<void>(`/api/admin/dishes/${id}`),
   exportDishes: (format: "csv" | "xlsx", params: Record<string, unknown> = {}) =>
     api.getDownload(`/api/admin/dishes/export${qs({ format, ...params })}`),
+  exportDishFlexSuggestions: (format: "csv" | "xlsx" = "xlsx") =>
+    api.getDownload(`/api/admin/dishes/flex-suggestions/export${qs({ format })}`),
 
   quality: (params: Record<string, unknown>) =>
     api.get<Page<QualityIssue>>(`/api/admin/quality/issues${qs(params)}`),

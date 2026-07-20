@@ -58,6 +58,15 @@ def test_ingredient_csv_template_exposes_identity_columns():
     assert headers[:3] == ["id", "code", "name"]
     assert headers[6] == "tags"
     assert "price_per_default_unit" in headers
+    assert headers[-7:] == [
+        "purchase_mode",
+        "purchase_increment",
+        "room_shelf_life_days",
+        "fridge_shelf_life_days",
+        "freezer_shelf_life_days",
+        "shelf_life_source",
+        "shelf_life_reviewed_at",
+    ]
 
 
 def test_dish_xlsx_template_includes_data_and_guide_sheets():
@@ -121,6 +130,37 @@ def test_dish_import_ingredients_require_existing_unique_positive_and_matching_u
         ], "Cơm gà")
 
 
+def test_dish_import_accepts_bounded_leftover_flex_rules():
+    service = AdminService(_IngredientSession())  # type: ignore[arg-type]
+
+    parsed = service._parse_dish_ingredients(
+        [{
+            "ingredient_id": 1,
+            "quantity": 150,
+            "unit": "g",
+            "max_extra_quantity": 20,
+            "extra_step_quantity": 5,
+        }],
+        "Cơm gà",
+    )
+
+    assert parsed == [{
+        "ingredient_id": 1,
+        "quantity": 150.0,
+        "unit": "g",
+        "max_extra_quantity": 20.0,
+        "extra_step_quantity": 5.0,
+    }]
+    with pytest.raises(ValueError, match="Bước tăng"):
+        service._parse_dish_ingredients([{
+            "ingredient_id": 1,
+            "quantity": 150,
+            "unit": "g",
+            "max_extra_quantity": 5,
+            "extra_step_quantity": 10,
+        }], "Cơm gà")
+
+
 def test_ingredient_export_csv_uses_import_headers_and_utf8_bom():
     service = AdminService(None)  # type: ignore[arg-type]
     content, media_type, filename = service._build_export_file("ingredients", "csv", [{
@@ -139,7 +179,37 @@ def test_ingredient_export_csv_uses_import_headers_and_utf8_bom():
         "default_unit": "g", "grams_per_unit": "1", "tags": "giàu đạm, chay", "calories": "76", "protein_g": "8",
         "carbs_g": "2", "fat_g": "4", "fiber_g": "1", "price": "30000",
         "price_unit": "kg", "price_per_default_unit": "30", "source": "Siêu thị", "is_active": "True",
+        "purchase_mode": "", "purchase_increment": "", "room_shelf_life_days": "",
+        "fridge_shelf_life_days": "", "freezer_shelf_life_days": "",
+        "shelf_life_source": "", "shelf_life_reviewed_at": "",
     }]
+
+
+def test_ingredient_export_round_trips_procurement_and_storage_metadata():
+    service = AdminService(None)  # type: ignore[arg-type]
+    content, _media_type, _filename = service._build_export_file("ingredients", "csv", [{
+        "id": 8,
+        "code": "ING-008",
+        "name": "Ức gà",
+        "food_group": "protein",
+        "default_unit": "g",
+        "purchase_mode": "regular",
+        "purchase_increment": 100,
+        "room_shelf_life_days": 0,
+        "fridge_shelf_life_days": 2,
+        "freezer_shelf_life_days": 30,
+        "shelf_life_source": "Nhà cung cấp",
+        "shelf_life_reviewed_at": "2026-07-01",
+    }])
+
+    row = next(csv.DictReader(io.StringIO(content.decode("utf-8-sig"))))
+    assert row["purchase_mode"] == "regular"
+    assert row["purchase_increment"] == "100"
+    assert row["room_shelf_life_days"] == "0"
+    assert row["fridge_shelf_life_days"] == "2"
+    assert row["freezer_shelf_life_days"] == "30"
+    assert row["shelf_life_source"] == "Nhà cung cấp"
+    assert row["shelf_life_reviewed_at"] == "2026-07-01"
 
 
 def test_dish_export_xlsx_is_import_compatible_and_has_guide():

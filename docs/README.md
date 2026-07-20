@@ -1,6 +1,6 @@
 # Smart Menu — Bộ tài liệu đồ án
 
-Đây là bộ tài liệu chuẩn đi cùng mã nguồn Smart Menu, được đối chiếu với working tree ngày **13/07/2026**. Tài liệu phục vụ hai mục đích: chuẩn bị báo cáo đồ án dài hơn 20 phút và giúp người không chuyên kỹ thuật tự thao tác, quan sát kết quả rồi kiểm tra mức độ hiểu.
+Đây là bộ tài liệu chuẩn đi cùng mã nguồn Smart Menu, được đối chiếu gần nhất với working tree ngày **20/07/2026**. Tài liệu phục vụ hai mục đích: chuẩn bị báo cáo đồ án dài hơn 20 phút và giúp người không chuyên kỹ thuật tự thao tác, quan sát kết quả rồi kiểm tra mức độ hiểu.
 
 ## Bắt đầu nhanh
 
@@ -9,7 +9,8 @@
 - [Phụ lục kỹ thuật](presentation/technical-appendix.md) và [code walkthrough](presentation/code-walkthrough.md): nội dung dự phòng khi hội đồng hỏi về code.
 - [Mục lục 9 hướng dẫn sử dụng](guides/README.md): hướng dẫn tiếng Việt, ảnh minh họa và bài kiểm tra ở cuối từng bài.
 - [Tổng quan kỹ thuật](technical-overview.md): kiến trúc, dữ liệu, planner, AI và phân quyền.
-- [Handbook kỹ thuật cho developer](code/README.md): architecture, code map, API/ADR và 16 bài học dễ hiểu về Meal Plan, Nutrition, AI, Shopping List, mỗi bài có quiz.
+- [Dusk Docs](dusk/README.md): 16 bài học dễ hiểu về Meal Plan V3, Nutrition, AI, Shopping List và inventory liên quan; mỗi bài có quiz.
+- [Handbook kỹ thuật cho developer](code/README.md): architecture, code map, API/ADR, security, testing và operations.
 - [Trạng thái sẵn sàng trình diễn](launch-readiness.md): bằng chứng kiểm thử mới nhất và giới hạn còn lại.
 
 ## Tài liệu nguồn trong repository

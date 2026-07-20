@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import date
+from datetime import date, timedelta
 from zoneinfo import ZoneInfo
-from types import SimpleNamespace
 
-from app.core.exceptions import ValidationAppError
-from app.modules.meal_planning import constraint_checker
+from app.core.config import settings
+from app.core.exceptions import ConflictError, ValidationAppError
+from app.modules.meal_planning import constraint_checker, procurement_checker
 from app.modules.meal_planning.composition import slots_for
 from app.modules.meal_planning.domain import ComposedMeal, MealPlanEntity, PlanRequest, ValidationResult
 from app.modules.meal_planning.exceptions import (
@@ -16,6 +16,8 @@ from app.modules.meal_planning.exceptions import (
     MealPlanNotFoundError,
 )
 from app.modules.meal_planning.planner import DishPlanner
+from app.modules.meal_planning.optimizer_v3 import ProcurementCpSatOptimizer
+from app.modules.inventory.repository import SqlInventoryRepository
 from app.modules.meal_planning.ports import (
     DishCandidateProviderPort,
     MealPlannerPort,
@@ -28,18 +30,19 @@ from app.modules.profiles.ports import ExclusionRepositoryPort, UserProfileRepos
 
 
 class SaveMealPlanUseCase:
-    """Lưu selection dish bằng cách reload và dựng lại snapshot V2 ở backend."""
+    """Lưu selection dish bằng cách reload và dựng lại snapshot V3 ở backend."""
 
     def __init__(
         self,
         repo: MealPlanRepositoryPort,
         candidate_provider: DishCandidateProviderPort,
         build_request: "BuildPlanRequestUseCase",
+        inventory_repo: SqlInventoryRepository | None = None,
     ) -> None:
         self._repo = repo
         self._candidates = candidate_provider
         self._build_request = build_request
-        self._snapshot_builder = DishPlanner()
+        self._inventory = inventory_repo
 
     def execute(self, data: MealPlanCreate, *, user_id: int) -> MealPlanEntity:
         first_slots = tuple(meal.slot for meal in data.days[0].meals)
@@ -65,6 +68,7 @@ class SaveMealPlanUseCase:
             days=len(data.days),
             meals_per_day=len(expected_slots),
             budget_limit=data.budget_limit,
+            start_date=data.start_date,
         )
         composed_days = [
             [
@@ -76,17 +80,67 @@ class SaveMealPlanUseCase:
         validation = constraint_checker.validate_plan(composed_days, request)
         if not validation.is_feasible:
             raise InvalidMealSelectionError("; ".join(validation.hard_violations))
-        entity = self._snapshot_builder.build_entity(
+        current_fingerprint = ProcurementCpSatOptimizer.source_fingerprint(request, composed_days)
+        if current_fingerprint != data.source_fingerprint:
+            raise ConflictError(
+                "PLAN_SOURCE_CHANGED: Dữ liệu món, giá, quy tắc hoặc kho đã đổi; hãy tạo lại thực đơn."
+            )
+        solved = ProcurementCpSatOptimizer().solve(
+            request, list(by_id.values()), fixed_days=composed_days
+        )
+        if solved is None:
+            raise InvalidMealSelectionError(
+                "Không thể dựng lịch mua hợp lệ cho lựa chọn hiện tại dưới ngân sách và dinh dưỡng."
+            )
+        v3_validation = procurement_checker.validate_v3(solved, request)
+        if not v3_validation.is_feasible:
+            raise InvalidMealSelectionError("; ".join(v3_validation.hard_violations))
+        submitted = sorted(
+            (
+                day.day,
+                meal.slot.value,
+                adjustment.dish_id,
+                adjustment.ingredient_id,
+                round(adjustment.extra_quantity, 2),
+            )
+            for day in data.days for meal in day.meals for adjustment in meal.adjustments
+        )
+        recomputed = sorted(
+            (
+                int(item["day"]),
+                str(item["slot"]),
+                int(item["dish_id"]),
+                int(item["ingredient_id"]),
+                round(float(item["extra_quantity"]), 2),
+            )
+            for item in solved.adjustments
+        )
+        if submitted != recomputed:
+            raise ConflictError(
+                "PLAN_ADJUSTMENTS_CHANGED: Phần tận dụng nguyên liệu không còn khớp; hãy tạo lại thực đơn."
+            )
+        entity = DishPlanner().build_entity(
             composed_days,
             request,
             data.start_date,
-            [],
-            SimpleNamespace(solver_time_ms=0, nutrition_score=0, solver_status="manual_selection"),
+            solved.warnings,
+            solved,
         )
-        # Keep the fallback consistent for API clients that do not provide a name.
         from datetime import datetime
         name = data.name or f"Thực đơn {datetime.now(ZoneInfo('Asia/Ho_Chi_Minh')).strftime('%H:%M %d/%m/%Y')}"
-        return self._repo.create(replace(entity, name=name))
+        try:
+            saved = self._repo.create(replace(entity, name=name))
+            if self._inventory is not None and saved.plan_data.get("procurement", {}).get("ledger_version") == 2:
+                self._inventory.verify_fingerprint(
+                    user_id, saved.start_date, saved.end_date, request.inventory_fingerprint
+                )
+                self._inventory.reserve_inputs(saved)
+                self._inventory.create_ending_lots(saved)
+            self._repo.commit()
+            return saved
+        except Exception:
+            self._repo.rollback()
+            raise
 
 
 class ListMealPlansUseCase:
@@ -109,13 +163,21 @@ class GetMealPlanUseCase:
 
 
 class DeleteMealPlanUseCase:
-    def __init__(self, repo: MealPlanRepositoryPort) -> None:
+    def __init__(self, repo: MealPlanRepositoryPort, inventory_repo: SqlInventoryRepository | None = None) -> None:
         self._repo = repo
+        self._inventory = inventory_repo
 
     def execute(self, plan_id: int) -> None:
         if self._repo.get(plan_id) is None:
             raise MealPlanNotFoundError(plan_id)
-        self._repo.delete(plan_id)
+        try:
+            if self._inventory is not None:
+                self._inventory.release_plan(plan_id)
+            self._repo.delete(plan_id)
+            self._repo.commit()
+        except Exception:
+            self._repo.rollback()
+            raise
 
 
 class GenerateMealPlanUseCase:
@@ -145,9 +207,11 @@ class BuildPlanRequestUseCase:
         self,
         profile_repo: UserProfileRepositoryPort,
         exclusion_repo: ExclusionRepositoryPort,
+        inventory_repo: SqlInventoryRepository | None = None,
     ) -> None:
         self._profiles = profile_repo
         self._exclusions = exclusion_repo
+        self._inventory = inventory_repo
 
     def execute(
         self,
@@ -158,6 +222,7 @@ class BuildPlanRequestUseCase:
         budget_limit: float | None = None,
         preferred_tags: list[str] | None = None,
         previous_plan_signature: str | None = None,
+        start_date: date | None = None,
     ) -> PlanRequest:
         profile = self._profiles.get_by_user(user_id)
         if profile is None:
@@ -204,6 +269,13 @@ class BuildPlanRequestUseCase:
                 tags.append(normalized)
                 seen.add(normalized.casefold())
         excluded = list({exclusion.ingredient_id for exclusion in self._exclusions.list_by_user(user_id)})
+        inventory_lots = ()
+        inventory_fingerprint = None
+        ledger_enabled = settings.meal_planner_v3_ledger_enabled
+        if ledger_enabled and self._inventory is not None and start_date is not None:
+            inventory_lots, inventory_fingerprint = self._inventory.snapshots_for_plan(
+                user_id, start_date, start_date + timedelta(days=resolved_days - 1)
+            )
         return PlanRequest(
             user_id=user_id,
             days=resolved_days,
@@ -216,4 +288,7 @@ class BuildPlanRequestUseCase:
             excluded_ingredient_ids=excluded,
             preferred_tags=tags,
             previous_plan_signature=previous_plan_signature,
+            inventory_lots=inventory_lots,
+            inventory_fingerprint=inventory_fingerprint,
+            ledger_enabled=ledger_enabled,
         )

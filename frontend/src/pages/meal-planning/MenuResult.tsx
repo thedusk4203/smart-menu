@@ -87,13 +87,21 @@ export function MenuResult() {
     try {
       await mealPlanApi.save({
         name: name.trim() || defaultMealPlanName(),
-        start_date: todayISO(),
+        start_date: plan.start_date ?? state.params?.start_date ?? todayISO(),
         budget_limit: plan.budget_limit,
+        source_fingerprint: plan.plan_data.source_fingerprint,
         days: plan.plan_data.days.map((d) => ({
           day: d.day,
           meals: d.meals.map((m) => ({
             slot: m.meal_type,
             dish_ids: m.dishes?.map((dish) => dish.dish_id) ?? [],
+            adjustments: (plan.plan_data.adjustments ?? [])
+              .filter((item) => item.day === d.day && item.slot === m.meal_type)
+              .map((item) => ({
+                dish_id: item.dish_id,
+                ingredient_id: item.ingredient_id,
+                extra_quantity: item.extra_quantity,
+              })),
           })),
         })),
       });

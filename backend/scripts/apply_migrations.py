@@ -21,6 +21,9 @@ MIGRATION_ORDER = (
     "20260712_ai_conversation_retention.sql",
     "20260713_typed_import_tags.sql",
     "20260718_ai_system_prompts.sql",
+    "20260719_procurement_planner_v3.sql",
+    "20260720_v3_ledger_inventory.sql",
+    "20260720_catalog_density_cleanup.sql",
 )
 
 MANUAL_SCRIPTS = {"20260713_reset_food_catalog.sql"}

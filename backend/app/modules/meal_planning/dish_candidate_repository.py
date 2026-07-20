@@ -30,6 +30,14 @@ def _json(value, default):
     return value
 
 
+def _optional_float(value) -> float | None:
+    return float(value) if value is not None else None
+
+
+def _optional_int(value) -> int | None:
+    return int(value) if value is not None else None
+
+
 class SqlDishCandidateProvider(DishCandidateProviderPort):
     """Đọc dish planner-ready trực tiếp từ view.
 
@@ -74,6 +82,22 @@ class SqlDishCandidateProvider(DishCandidateProviderPort):
                     quantity=_float(ingredient["quantity"]),
                     unit=str(ingredient["unit"]),
                     estimated_cost=_float(ingredient["estimated_cost"]),
+                    purchase_mode=str(ingredient.get("purchase_mode") or "regular"),
+                    purchase_increment=_optional_float(ingredient.get("purchase_increment")),
+                    price_per_default_unit=_optional_float(ingredient.get("price_per_default_unit")),
+                    price_source=str(ingredient["price_source"]) if ingredient.get("price_source") else None,
+                    price_recorded_at=str(ingredient["price_recorded_at"])
+                    if ingredient.get("price_recorded_at") else None,
+                    grams_per_unit=_float(ingredient.get("grams_per_unit") or 1),
+                    calories_per_100g=_float(ingredient.get("calories_per_100g")),
+                    protein_g_per_100g=_float(ingredient.get("protein_g_per_100g")),
+                    carbs_g_per_100g=_float(ingredient.get("carbs_g_per_100g")),
+                    fat_g_per_100g=_float(ingredient.get("fat_g_per_100g")),
+                    room_shelf_life_days=_optional_int(ingredient.get("room_shelf_life_days")),
+                    fridge_shelf_life_days=_optional_int(ingredient.get("fridge_shelf_life_days")),
+                    freezer_shelf_life_days=_optional_int(ingredient.get("freezer_shelf_life_days")),
+                    max_extra_quantity=_float(ingredient.get("max_extra_quantity")),
+                    extra_step_quantity=_optional_float(ingredient.get("extra_step_quantity")),
                 )
                 for ingredient in raw_ingredients
             )

@@ -8,11 +8,18 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from app.shared.enums import MealType
 
 
+class SavedIngredientAdjustment(BaseModel):
+    dish_id: int = Field(gt=0)
+    ingredient_id: int = Field(gt=0)
+    extra_quantity: float = Field(gt=0)
+
+
 class SavedMealSlot(BaseModel):
     """Client chỉ gửi slot và lựa chọn dish; role luôn lấy từ database."""
 
     slot: MealType
     dish_ids: list[int] = Field(min_length=1, max_length=3)
+    adjustments: list[SavedIngredientAdjustment] = Field(default_factory=list)
 
     @field_validator("dish_ids")
     @classmethod
@@ -20,8 +27,6 @@ class SavedMealSlot(BaseModel):
         if any(dish_id <= 0 for dish_id in value) or len(value) != len(set(value)):
             raise ValueError("dish_ids phải dương và không trùng")
         return value
-
-
 class SavedPlanDay(BaseModel):
     day: int = Field(ge=1, le=7)
     meals: list[SavedMealSlot] = Field(min_length=2, max_length=3)
@@ -38,6 +43,7 @@ class MealPlanCreate(BaseModel):
     name: str | None = Field(default=None, max_length=255)
     start_date: date
     budget_limit: float | None = Field(default=None, gt=0)
+    source_fingerprint: str = Field(min_length=64, max_length=64)
     days: list[SavedPlanDay] = Field(min_length=1, max_length=7)
 
     @field_validator("name")
@@ -80,6 +86,7 @@ class GenerateMealPlanRequest(BaseModel):
     preferred_tags: list[str] = Field(default_factory=list, max_length=12)
     seed: int | None = None
     previous_plan_signature: str | None = Field(default=None, max_length=4096)
+    start_date: date | None = None
 
     @field_validator("preferred_tags")
     @classmethod

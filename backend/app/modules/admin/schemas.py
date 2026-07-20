@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 from app.shared.enums import CookingMethod, DishType, FoodGroup, UserRole
 
@@ -87,6 +87,13 @@ class AdminIngredientWrite(BaseModel):
     food_group: FoodGroup
     default_unit: str = Field(default="g", min_length=1, max_length=20)
     grams_per_unit: float = Field(default=1, gt=0)
+    purchase_mode: Literal["regular", "pantry", "ignored"] = "regular"
+    purchase_increment: float | None = Field(default=None, gt=0)
+    room_shelf_life_days: int | None = Field(default=None, ge=0, le=3650)
+    fridge_shelf_life_days: int | None = Field(default=None, ge=0, le=3650)
+    freezer_shelf_life_days: int | None = Field(default=None, ge=0, le=3650)
+    shelf_life_source: str | None = Field(default=None, max_length=255)
+    shelf_life_reviewed_at: date | None = None
     is_active: bool = True
     nutrition: NutritionPayload | None = None
     price: PricePayload | None = None
@@ -96,6 +103,29 @@ class AdminIngredientWrite(BaseModel):
     def strip_text(cls, value: str) -> str:
         return " ".join(value.split())
 
+    @model_validator(mode="after")
+    def validate_procurement(self) -> "AdminIngredientWrite":
+        storage = (
+            self.room_shelf_life_days,
+            self.fridge_shelf_life_days,
+            self.freezer_shelf_life_days,
+        )
+        if self.purchase_mode != "regular" and (
+            self.purchase_increment is not None
+            or any(value is not None for value in storage)
+            or self.shelf_life_source is not None
+            or self.shelf_life_reviewed_at is not None
+        ):
+            raise ValueError("pantry/ignored không được khai báo quy cách mua hoặc bảo quản")
+        if any(value is not None for value in storage):
+            if not self.shelf_life_source or not self.shelf_life_source.strip():
+                raise ValueError("có hạn bảo quản thì phải có nguồn")
+            if self.shelf_life_reviewed_at is None:
+                raise ValueError("có hạn bảo quản thì phải có ngày xác minh")
+        if self.shelf_life_reviewed_at and self.shelf_life_reviewed_at > date.today():
+            raise ValueError("ngày xác minh bảo quản không được ở tương lai")
+        return self
+
 
 class AdminIngredientItem(BaseModel):
     id: int
@@ -103,6 +133,14 @@ class AdminIngredientItem(BaseModel):
     food_group: FoodGroup
     default_unit: str
     grams_per_unit: float
+    purchase_mode: Literal["regular", "pantry", "ignored"] = "regular"
+    purchase_increment: float | None = None
+    room_shelf_life_days: int | None = None
+    fridge_shelf_life_days: int | None = None
+    freezer_shelf_life_days: int | None = None
+    shelf_life_source: str | None = None
+    shelf_life_reviewed_at: date | None = None
+    purchase_block_cost: float | None = None
     tags: list[str] = []
     is_active: bool
     calories: float | None = None
@@ -120,6 +158,8 @@ class AdminIngredientItem(BaseModel):
     missing_price: bool
     missing_nutrition: bool
     missing_conversion: bool
+    missing_purchase_rule: bool = False
+    missing_storage_rule: bool = False
 
 
 class AdminIngredientPage(BaseModel):
@@ -133,6 +173,20 @@ class DishIngredientPayload(BaseModel):
     ingredient_id: int
     quantity: float = Field(gt=0)
     unit: str = Field(min_length=1, max_length=20)
+    max_extra_quantity: float = Field(default=0, ge=0)
+    extra_step_quantity: float | None = Field(default=None, gt=0)
+
+    @model_validator(mode="after")
+    def validate_flexibility(self) -> "DishIngredientPayload":
+        if self.max_extra_quantity == 0 and self.extra_step_quantity is not None:
+            raise ValueError("công thức cố định không được có bước tăng")
+        if self.max_extra_quantity > 0:
+            if self.extra_step_quantity is None or self.extra_step_quantity > self.max_extra_quantity:
+                raise ValueError("bước tăng phải dương và không vượt mức tăng tối đa")
+            quotient = self.max_extra_quantity / self.extra_step_quantity
+            if abs(quotient - round(quotient)) > 1e-6:
+                raise ValueError("mức tăng tối đa phải chia hết cho bước tăng")
+        return self
 
 
 class AdminDishWrite(BaseModel):
@@ -156,6 +210,8 @@ class AdminDishIngredient(BaseModel):
     name: str
     quantity: float
     unit: str
+    max_extra_quantity: float = 0
+    extra_step_quantity: float | None = None
     missing_price: bool
     missing_nutrition: bool
 

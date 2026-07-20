@@ -117,6 +117,7 @@ def get_deactivate_meal_use_case(s: Session = Depends(get_session)) -> Deactivat
 # ── meal_planning ─────────────────────────────────────────────────────────
 from app.modules.meal_planning.dish_candidate_repository import SqlDishCandidateProvider
 from app.modules.meal_planning.repository import SqlMealPlanRepository
+from app.modules.inventory.repository import SqlInventoryRepository
 from app.modules.meal_planning.use_cases import (
     BuildPlanRequestUseCase, DeleteMealPlanUseCase, GenerateMealPlanUseCase, GetMealPlanUseCase,
     ListMealPlansUseCase, SaveMealPlanUseCase,
@@ -127,7 +128,10 @@ def get_save_meal_plan_use_case(s: Session = Depends(get_session)) -> SaveMealPl
     return SaveMealPlanUseCase(
         SqlMealPlanRepository(s),
         SqlDishCandidateProvider(s),
-        BuildPlanRequestUseCase(SqlUserProfileRepository(s), SqlExclusionRepository(s)),
+        BuildPlanRequestUseCase(
+            SqlUserProfileRepository(s), SqlExclusionRepository(s), SqlInventoryRepository(s)
+        ),
+        SqlInventoryRepository(s),
     )
 
 def get_list_meal_plans_use_case(s: Session = Depends(get_session)) -> ListMealPlansUseCase:
@@ -137,24 +141,24 @@ def get_get_meal_plan_use_case(s: Session = Depends(get_session)) -> GetMealPlan
     return GetMealPlanUseCase(SqlMealPlanRepository(s))
 
 def get_delete_meal_plan_use_case(s: Session = Depends(get_session)) -> DeleteMealPlanUseCase:
-    return DeleteMealPlanUseCase(SqlMealPlanRepository(s))
+    return DeleteMealPlanUseCase(SqlMealPlanRepository(s), SqlInventoryRepository(s))
 
 def get_generate_meal_plan_use_case(s: Session = Depends(get_session)) -> GenerateMealPlanUseCase:
     return GenerateMealPlanUseCase(SqlDishCandidateProvider(s))
 
 def get_build_plan_request_use_case(s: Session = Depends(get_session)) -> BuildPlanRequestUseCase:
-    return BuildPlanRequestUseCase(SqlUserProfileRepository(s), SqlExclusionRepository(s))
+    return BuildPlanRequestUseCase(
+        SqlUserProfileRepository(s), SqlExclusionRepository(s), SqlInventoryRepository(s)
+    )
 
 
 # ── shopping lists ────────────────────────────────────────────────────────
-from app.modules.shopping_lists.repository import (
-    SqlLegacyDishRecipeProvider, SqlShoppingListRepository, SqlShoppingShareRepository,
-)
+from app.modules.shopping_lists.repository import SqlShoppingListRepository, SqlShoppingShareRepository
 from app.modules.shopping_lists.use_cases import BuildShoppingListUseCase
 
 
 def get_build_shopping_list_use_case(s: Session = Depends(get_session)) -> BuildShoppingListUseCase:
-    return BuildShoppingListUseCase(SqlLegacyDishRecipeProvider(s), SqlShoppingListRepository(s))
+    return BuildShoppingListUseCase(SqlShoppingListRepository(s))
 
 
 def get_shopping_list_repository(s: Session = Depends(get_session)) -> SqlShoppingListRepository:
@@ -238,6 +242,8 @@ def get_ai_suggest_swap_use_case(s: Session = Depends(get_session),
     return SuggestSwapUseCase(
         _get_ai_client(s, user, "suggest_swap"),
         SqlDishCandidateProvider(s),
-        BuildPlanRequestUseCase(SqlUserProfileRepository(s), SqlExclusionRepository(s)),
+        BuildPlanRequestUseCase(
+            SqlUserProfileRepository(s), SqlExclusionRepository(s), SqlInventoryRepository(s)
+        ),
         SystemPromptStore(s).get_effective("suggest_swap"),
     )

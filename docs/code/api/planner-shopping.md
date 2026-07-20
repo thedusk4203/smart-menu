@@ -1,903 +1,249 @@
-# API — Meal Plan, Shopping List và Public Sharing
+# API — Meal Plan V3, Shopping List, Inventory và Public Sharing
 
-> Full schema catalog được sao chép từ OpenAPI runtime ngày 13/07/2026. `401`, `403`, `404`, `422` và `{ "detail": string }` áp dụng theo authentication, quyền, ownership, target và validation.
+> Đối chiếu OpenAPI runtime và code ngày 20/07/2026. Planner chỉ hỗ trợ snapshot schema 3. Các endpoint trừ public share đều cần access token.
 
 ## Operation index
 
-| Method | Path | Request | Success response |
+| Method | Path | Body | Thành công |
 | --- | --- | --- | --- |
-| GET | `/api/meal-plans` |  | 200: array<MealPlanResponse> |
-| POST | `/api/meal-plans` | MealPlanCreate | 201: MealPlanResponse<br>422: HTTPValidationError |
-| DELETE | `/api/meal-plans/{plan_id}` |  | 204: no body<br>422: HTTPValidationError |
-| GET | `/api/meal-plans/{plan_id}` |  | 200: MealPlanResponse<br>422: HTTPValidationError |
-| GET | `/api/meal-plans/{plan_id}/shopping-list` |  | 200: ShoppingListResponse<br>422: HTTPValidationError |
-| PATCH | `/api/meal-plans/{plan_id}/shopping-list/items/{item_id}` | PurchaseUpdate | 200: ShoppingListResponse<br>422: HTTPValidationError |
-| DELETE | `/api/meal-plans/{plan_id}/shopping-list/share` |  | 204: no body<br>422: HTTPValidationError |
-| POST | `/api/meal-plans/{plan_id}/shopping-list/share` |  | 200: ShoppingShareResponse<br>422: HTTPValidationError |
-| POST | `/api/meal-plans/generate` | GenerateMealPlanRequest | 200: GeneratedMealPlanResponse **hoặc** InfeasiblePlanResponse<br>422: HTTPValidationError |
-| GET | `/api/public/shopping-lists/{token}` |  | 200: PublicShoppingListResponse<br>422: HTTPValidationError |
-| PATCH | `/api/public/shopping-lists/{token}/items/{item_id}` | PurchaseUpdate | 200: PublicShoppingListResponse<br>422: HTTPValidationError |
+| `POST` | `/api/meal-plans/generate` | `GenerateMealPlanRequest` | `GeneratedMealPlanResponse` hoặc `InfeasiblePlanResponse` |
+| `POST` | `/api/meal-plans` | `MealPlanCreate` | `201 MealPlanResponse` |
+| `GET` | `/api/meal-plans` | — | `MealPlanResponse[]` của User |
+| `GET` | `/api/meal-plans/{plan_id}` | — | `MealPlanResponse` |
+| `DELETE` | `/api/meal-plans/{plan_id}` | — | `204` |
+| `GET` | `/api/meal-plans/{plan_id}/shopping-list` | — | `ShoppingListResponse` |
+| `PATCH` | `/api/meal-plans/{plan_id}/shopping-list/items/{item_id}` | `PurchaseUpdate` | `ShoppingListResponse` |
+| `POST` | `/api/meal-plans/{plan_id}/shopping-list/share` | — | `ShoppingShareResponse` |
+| `DELETE` | `/api/meal-plans/{plan_id}/shopping-list/share` | — | `204` |
+| `GET` | `/api/public/shopping-lists/{token}` | — | `PublicShoppingListResponse` |
+| `PATCH` | `/api/public/shopping-lists/{token}/items/{item_id}` | `PurchaseUpdate` | `PublicShoppingListResponse` |
+| `GET` | `/api/inventory-lots` | — | `InventoryLotResponse[]` |
+| `PATCH` | `/api/inventory-lots/{lot_id}` | `InventoryLotUpdate` | `InventoryLotResponse` |
 
-## Parameters and content type
-### `GET /api/meal-plans`
-No path/query parameter.
+## Query parameters shopping
 
-### `POST /api/meal-plans`
-No path/query parameter.
-Request content type: `application/json`
+Ba owner endpoint GET/PATCH/share nhận cùng query:
 
-### `DELETE /api/meal-plans/{plan_id}`
-| Parameter | In | Required | Schema |
-| --- | --- | --- | --- |
-| `plan_id` | path | True | integer |
+| Field | Type | Quy tắc |
+| --- | --- | --- |
+| `day` | integer/null | 1–7 |
+| `scope` | enum/null | `all`, `purchase_day`, `usage_day` |
 
-### `GET /api/meal-plans/{plan_id}`
-| Parameter | In | Required | Schema |
-| --- | --- | --- | --- |
-| `plan_id` | path | True | integer |
+`purchase_day` và `usage_day` cần `day`. Khi không truyền scope: có day → `usage_day`; không day → `all`.
 
-### `GET /api/meal-plans/{plan_id}/shopping-list`
-| Parameter | In | Required | Schema |
-| --- | --- | --- | --- |
-| `plan_id` | path | True | integer |
-| `day` | query | False | integer 1–7 hoặc null |
+Public endpoint không nhận day/scope qua query; phạm vi được ký trong token.
 
-### `PATCH /api/meal-plans/{plan_id}/shopping-list/items/{item_id}`
-| Parameter | In | Required | Schema |
-| --- | --- | --- | --- |
-| `plan_id` | path | True | integer |
-| `item_id` | path | True | integer |
-| `day` | query | False | integer 1–7 hoặc null |
-Request content type: `application/json`
+## GenerateMealPlanRequest
 
-### `DELETE /api/meal-plans/{plan_id}/shopping-list/share`
-| Parameter | In | Required | Schema |
-| --- | --- | --- | --- |
-| `plan_id` | path | True | integer |
-
-### `POST /api/meal-plans/{plan_id}/shopping-list/share`
-| Parameter | In | Required | Schema |
-| --- | --- | --- | --- |
-| `plan_id` | path | True | integer |
-| `day` | query | False | integer 1–7 hoặc null |
-
-### `POST /api/meal-plans/generate`
-No path/query parameter.
-Request content type: `application/json`
-
-Response `200` là union: body thành công dùng `GeneratedMealPlanResponse`; bài toán hợp lệ về request nhưng không có nghiệm hard-valid dùng `InfeasiblePlanResponse` với `status="infeasible"`. Client phải phân nhánh theo shape/status, không chỉ theo HTTP code.
-
-### `GET /api/public/shopping-lists/{token}`
-| Parameter | In | Required | Schema |
-| --- | --- | --- | --- |
-| `token` | path | True | string |
-
-### `PATCH /api/public/shopping-lists/{token}/items/{item_id}`
-| Parameter | In | Required | Schema |
-| --- | --- | --- | --- |
-| `token` | path | True | string |
-| `item_id` | path | True | integer |
-Request content type: `application/json`
-
-## Schema catalog
-### `GeneratedMealPlanResponse`
 ```json
 {
-  "properties": {
-    "user_id": {
-      "type": "integer",
-      "title": "User Id"
-    },
-    "name": {
-      "type": "string",
-      "title": "Name"
-    },
-    "start_date": {
-      "anyOf": [
-        {
-          "type": "string",
-          "format": "date"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Start Date"
-    },
-    "end_date": {
-      "anyOf": [
-        {
-          "type": "string",
-          "format": "date"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "End Date"
-    },
-    "budget_limit": {
-      "anyOf": [
-        {
-          "type": "number"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Budget Limit"
-    },
-    "total_cost": {
-      "type": "number",
-      "title": "Total Cost"
-    },
-    "total_calories": {
-      "type": "number",
-      "title": "Total Calories"
-    },
-    "plan_data": {
-      "additionalProperties": true,
-      "type": "object",
-      "title": "Plan Data"
-    }
-  },
-  "type": "object",
-  "required": [
-    "user_id",
-    "name",
-    "start_date",
-    "end_date",
-    "budget_limit",
-    "total_cost",
-    "total_calories",
-    "plan_data"
-  ],
-  "title": "GeneratedMealPlanResponse"
+  "days": 7,
+  "meals_per_day": 3,
+  "budget_limit": 900000,
+  "preferred_tags": ["giàu đạm", "ít dầu"],
+  "seed": 42,
+  "previous_plan_signature": null,
+  "start_date": "2026-07-20"
 }
 ```
 
-### `GenerateMealPlanRequest`
+| Field | Type | Quy tắc |
+| --- | --- | --- |
+| `days` | integer/null | 1–7; backend mặc định 7 |
+| `meals_per_day` | 2, 3 hoặc null | Mặc định từ profile |
+| `budget_limit` | number/null | `>0`; nếu null có thể dùng daily budget × days |
+| `preferred_tags` | string[] | Tối đa 12; trim, bỏ rỗng/trùng, mỗi tag tối đa 64 |
+| `seed` | integer/null | Không có hard range |
+| `previous_plan_signature` | string/null | Tối đa 4096 |
+| `start_date` | date/null | Router mặc định ngày hiện tại HCM |
+
+## Generate response
+
+Thành công:
+
 ```json
 {
-  "properties": {
-    "days": {
-      "anyOf": [
+  "user_id": 7,
+  "name": "Thực đơn tuần",
+  "start_date": "2026-07-20",
+  "end_date": "2026-07-26",
+  "budget_limit": 900000,
+  "total_cost": 742000,
+  "total_calories": 14010.5,
+  "plan_data": { "schema_version": 3 }
+}
+```
+
+Không có nghiệm vẫn là HTTP 200:
+
+```json
+{
+  "status": "infeasible",
+  "reasons": [
+    {"code": "BUDGET_PURCHASE_BLOCK_CONFLICT", "message": "...", "details": {}}
+  ],
+  "warnings": []
+}
+```
+
+Client phải kiểm `status`/shape, không chỉ HTTP status.
+
+## MealPlanCreate
+
+Save chỉ nhận selection và proof; backend reload/recompute snapshot V3.
+
+```json
+{
+  "name": "Thực đơn 10:30 20/07/2026",
+  "start_date": "2026-07-20",
+  "budget_limit": 900000,
+  "source_fingerprint": "64-hex-characters...",
+  "days": [
+    {
+      "day": 1,
+      "meals": [
         {
-          "type": "integer",
-          "maximum": 7.0,
-          "minimum": 1.0
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Days"
-    },
-    "meals_per_day": {
-      "anyOf": [
-        {
-          "type": "integer",
-          "enum": [
-            2,
-            3
+          "slot": "breakfast",
+          "dish_ids": [12],
+          "adjustments": [
+            {"dish_id": 12, "ingredient_id": 5, "extra_quantity": 10}
           ]
         },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Meals Per Day"
-    },
-    "budget_limit": {
-      "anyOf": [
-        {
-          "type": "number",
-          "exclusiveMinimum": 0.0
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Budget Limit"
-    },
-    "preferred_tags": {
-      "items": {
-        "type": "string"
-      },
-      "type": "array",
-      "maxItems": 12,
-      "title": "Preferred Tags"
-    },
-    "seed": {
-      "anyOf": [
-        {
-          "type": "integer"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Seed"
-    },
-    "previous_plan_signature": {
-      "anyOf": [
-        {
-          "type": "string",
-          "maxLength": 4096
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Previous Plan Signature"
+        {"slot": "lunch", "dish_ids": [2, 8, 16], "adjustments": []},
+        {"slot": "dinner", "dish_ids": [1, 9, 17], "adjustments": []}
+      ]
     }
-  },
-  "type": "object",
-  "title": "GenerateMealPlanRequest"
+  ]
 }
 ```
 
-### `HTTPValidationError`
+Quy tắc:
+
+- `name`: null hoặc tối đa 255; trim và không được rỗng sau trim.
+- `start_date`: bắt buộc.
+- `budget_limit`: null hoặc dương.
+- `source_fingerprint`: đúng 64 ký tự.
+- `days`: 1–7, day liên tục từ 1, không trùng.
+- mỗi ngày 2–3 meal, slot không trùng và đúng thứ tự do backend kiểm.
+- `dish_ids`: 1–3 ID dương, không trùng.
+- adjustment có ba số dương: dish ID, ingredient ID, extra quantity.
+
+Ngoài lỗi validation, save có thể trả conflict nghiệp vụ `PLAN_SOURCE_CHANGED`, `PLAN_ADJUSTMENTS_CHANGED`, `INVENTORY_CHANGED`.
+
+## MealPlanResponse
+
+| Field | Type |
+| --- | --- |
+| `id`, `user_id` | integer |
+| `name` | string |
+| `start_date` | date |
+| `end_date` | date/null |
+| `budget_limit` | number/null |
+| `total_cost`, `total_calories` | number |
+| `plan_data` | object snapshot V3 |
+| `created_at` | datetime/null |
+
+Nhánh quan trọng trong `plan_data`: `schema_version`, `algorithm_version`, `source_fingerprint`, `plan_signature`, `request_snapshot`, `nutrition_target`, `base_nutrition`, `final_nutrition`, `cost_summary`, `procurement`, `adjustments`, `days`, `metrics`, `warnings`, `meals_per_day`.
+
+## ShoppingListResponse
+
+| Field | Type | Ghi chú |
+| --- | --- | --- |
+| `plan_id` | integer | Plan nguồn |
+| `plan_name` | string/null | Tên snapshot/entity |
+| `day` | integer/null | Scope ngày |
+| `date` | date/null | Ngày thực |
+| `schema_version` | integer | Hiện là 3 |
+| `shopping_schema_version` | integer | 3 có ledger; 2 là V3 fallback không ledger |
+| `scope` | enum | `all/purchase_day/usage_day` |
+| `items` | `ShoppingListItem[]` | Adapter cho checkbox chung |
+| `total_estimated_cost` | number | Tổng item đang hiển thị |
+| `purchase_items` | `PurchaseItem[]` | Các lần mua/block |
+| `pantry_checks` | `PantryCheck[]` | Đồ giả định có sẵn |
+| `carryover_usage` | `CarryoverUsage[]` | Đồ từ tồn/lần mua trước dùng ngày này |
+| `leftovers` | `LeftoverItem[]` | Tồn cuối/waste |
+| `daily_ledger` | `DailyLedgerDay[]` | Opening+mua−dùng−hết hạn=closing |
+| `summary` | object number/integer | Cost hierarchy và visible cost |
+| `warnings` | `{code,message}[]` | Warning từ plan |
+
+### ShoppingListItem
+
+`id|null`, `ingredient_id`, `name`, `quantity`, `unit`, `estimated_cost`, `is_purchased`, `item_key|null`, `item_kind` (`purchase|pantry`), `scheduled_day|null`.
+
+### PurchaseItem
+
+Kế thừa item và thêm `required_quantity`, `purchase_quantity`, `purchase_cost`, `purchase_increment`, `block_count`, `remaining_quantity`, `expired_waste_quantity`, `carryover_quantity`, `storage_splits[]`.
+
+### CarryoverUsage
+
+`ingredient_id`, `name`, `quantity`, `unit`, `purchase_day`, `use_day`, `storage_mode`, `expiry_day`, `dish_name|null`.
+
+### LeftoverItem
+
+`ingredient_id`, `name`, `quantity`, `unit`, `purchase_day`, `status` thuộc `carryover|closing_stock|expired_waste`.
+
+### DailyLedgerItem
+
+`item_key`, `source_kind` (`inventory|purchase`), `inventory_lot_id|null`, ingredient identity, unit, `opening_quantity`, `purchase_quantity`, `usage_quantity`, `expired_quantity`, `closing_quantity`, `unit_value`, `purchase_cost`, `allocations[]`.
+
+## PurchaseUpdate
+
 ```json
-{
-  "properties": {
-    "detail": {
-      "items": {
-        "$ref": "#/components/schemas/ValidationError"
-      },
-      "type": "array",
-      "title": "Detail"
-    }
-  },
-  "type": "object",
-  "title": "HTTPValidationError"
-}
+{"is_purchased": true}
 ```
 
-### `InfeasiblePlanResponse`
-```json
-{
-  "properties": {
-    "status": {
-      "type": "string",
-      "title": "Status",
-      "default": "infeasible"
-    },
-    "reasons": {
-      "items": {
-        "$ref": "#/components/schemas/InfeasibleReasonResponse"
-      },
-      "type": "array",
-      "title": "Reasons"
-    },
-    "warnings": {
-      "items": {
-        "additionalProperties": true,
-        "type": "object"
-      },
-      "type": "array",
-      "title": "Warnings"
-    }
-  },
-  "type": "object",
-  "title": "InfeasiblePlanResponse"
-}
-```
+Owner và public PATCH đều build visible scope trước; item ngoài scope trả 404.
 
-### `InfeasibleReasonResponse`
-```json
-{
-  "properties": {
-    "code": {
-      "type": "string",
-      "title": "Code"
-    },
-    "message": {
-      "type": "string",
-      "title": "Message"
-    },
-    "details": {
-      "additionalProperties": {
-        "anyOf": [
-          {
-            "type": "number"
-          },
-          {
-            "type": "integer"
-          },
-          {
-            "type": "string"
-          }
-        ]
-      },
-      "type": "object",
-      "title": "Details"
-    }
-  },
-  "type": "object",
-  "required": [
-    "code",
-    "message"
-  ],
-  "title": "InfeasibleReasonResponse"
-}
-```
+## Share schemas
 
-### `MealPlanCreate`
-```json
-{
-  "properties": {
-    "name": {
-      "anyOf": [
-        {
-          "type": "string",
-          "maxLength": 255
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Name"
-    },
-    "start_date": {
-      "type": "string",
-      "format": "date",
-      "title": "Start Date"
-    },
-    "budget_limit": {
-      "anyOf": [
-        {
-          "type": "number",
-          "exclusiveMinimum": 0.0
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Budget Limit"
-    },
-    "days": {
-      "items": {
-        "$ref": "#/components/schemas/SavedPlanDay"
-      },
-      "type": "array",
-      "maxItems": 7,
-      "minItems": 1,
-      "title": "Days"
-    }
-  },
-  "type": "object",
-  "required": [
-    "start_date",
-    "days"
-  ],
-  "title": "MealPlanCreate"
-}
-```
+`ShoppingShareResponse` gồm `token`, `expires_at`, `day|null`, `scope`. `PublicShoppingListResponse` kế thừa toàn bộ shopping response và thêm `expires_at`.
 
-### `MealPlanResponse`
-```json
-{
-  "properties": {
-    "id": {
-      "type": "integer",
-      "title": "Id"
-    },
-    "user_id": {
-      "type": "integer",
-      "title": "User Id"
-    },
-    "name": {
-      "type": "string",
-      "title": "Name"
-    },
-    "start_date": {
-      "type": "string",
-      "format": "date",
-      "title": "Start Date"
-    },
-    "end_date": {
-      "anyOf": [
-        {
-          "type": "string",
-          "format": "date"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "End Date"
-    },
-    "budget_limit": {
-      "anyOf": [
-        {
-          "type": "number"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Budget Limit"
-    },
-    "total_cost": {
-      "type": "number",
-      "title": "Total Cost"
-    },
-    "total_calories": {
-      "type": "number",
-      "title": "Total Calories"
-    },
-    "plan_data": {
-      "additionalProperties": true,
-      "type": "object",
-      "title": "Plan Data"
-    },
-    "created_at": {
-      "anyOf": [
-        {
-          "type": "string",
-          "format": "date-time"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Created At"
-    }
-  },
-  "type": "object",
-  "required": [
-    "id",
-    "user_id",
-    "name",
-    "start_date",
-    "end_date",
-    "budget_limit",
-    "total_cost",
-    "total_calories",
-    "plan_data"
-  ],
-  "title": "MealPlanResponse"
-}
-```
+Token sai/hết hạn/revoked trả 410. Revoke theo plan làm mọi token dùng cùng share record mất hiệu lực.
 
-### `MealType`
-```json
-{
-  "type": "string",
-  "enum": [
-    "breakfast",
-    "lunch",
-    "dinner"
-  ],
-  "title": "MealType",
-  "description": "Loại bữa ăn."
-}
-```
+## InventoryLotResponse
 
-### `PublicShoppingListResponse`
-```json
-{
-  "properties": {
-    "plan_id": {
-      "type": "integer",
-      "title": "Plan Id"
-    },
-    "plan_name": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Plan Name"
-    },
-    "day": {
-      "anyOf": [
-        {
-          "type": "integer"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Day"
-    },
-    "date": {
-      "anyOf": [
-        {
-          "type": "string",
-          "format": "date"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Date"
-    },
-    "schema_version": {
-      "type": "integer",
-      "title": "Schema Version"
-    },
-    "items": {
-      "items": {
-        "$ref": "#/components/schemas/ShoppingListItem"
-      },
-      "type": "array",
-      "title": "Items"
-    },
-    "total_estimated_cost": {
-      "type": "number",
-      "title": "Total Estimated Cost"
-    },
-    "warnings": {
-      "items": {
-        "$ref": "#/components/schemas/ShoppingListWarning"
-      },
-      "type": "array",
-      "title": "Warnings"
-    },
-    "expires_at": {
-      "type": "string",
-      "format": "date-time",
-      "title": "Expires At"
-    }
-  },
-  "type": "object",
-  "required": [
-    "plan_id",
-    "schema_version",
-    "total_estimated_cost",
-    "expires_at"
-  ],
-  "title": "PublicShoppingListResponse"
-}
-```
+| Field | Type |
+| --- | --- |
+| `id`, `ingredient_id` | integer |
+| `name`, `unit` | string |
+| `quantity_remaining`, `reserved_quantity` | number |
+| `available_from`, `expires_on` | date |
+| `storage_mode` | `room|fridge|freezer|same_day` |
+| `cost_basis_per_unit` | number |
+| `source_plan_id`, `source_plan_name` | integer/string hoặc null |
+| `status` | `projected|available|consumed|expired|discarded` |
+| `created_at` | datetime |
 
-### `PurchaseUpdate`
-```json
-{
-  "properties": {
-    "is_purchased": {
-      "type": "boolean",
-      "title": "Is Purchased"
-    }
-  },
-  "type": "object",
-  "required": [
-    "is_purchased"
-  ],
-  "title": "PurchaseUpdate"
-}
-```
+## InventoryLotUpdate
 
-### `SavedMealSlot`
-```json
-{
-  "properties": {
-    "slot": {
-      "$ref": "#/components/schemas/MealType"
-    },
-    "dish_ids": {
-      "items": {
-        "type": "integer"
-      },
-      "type": "array",
-      "maxItems": 3,
-      "minItems": 1,
-      "title": "Dish Ids"
-    }
-  },
-  "type": "object",
-  "required": [
-    "slot",
-    "dish_ids"
-  ],
-  "title": "SavedMealSlot",
-  "description": "Client chỉ gửi slot và lựa chọn dish; role luôn lấy từ database."
-}
-```
+Body nhận ít nhất một field:
 
-### `SavedPlanDay`
-```json
-{
-  "properties": {
-    "day": {
-      "type": "integer",
-      "maximum": 7.0,
-      "minimum": 1.0,
-      "title": "Day"
-    },
-    "meals": {
-      "items": {
-        "$ref": "#/components/schemas/SavedMealSlot"
-      },
-      "type": "array",
-      "maxItems": 3,
-      "minItems": 2,
-      "title": "Meals"
-    }
-  },
-  "type": "object",
-  "required": [
-    "day",
-    "meals"
-  ],
-  "title": "SavedPlanDay"
-}
-```
+- `quantity_remaining`: number `>=0`;
+- `expires_on`: date;
+- `storage_mode`: enum;
+- `status`: chỉ `available` hoặc `discarded`.
 
-### `ShoppingListItem`
-```json
-{
-  "properties": {
-    "id": {
-      "anyOf": [
-        {
-          "type": "integer"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Id"
-    },
-    "ingredient_id": {
-      "type": "integer",
-      "title": "Ingredient Id"
-    },
-    "name": {
-      "type": "string",
-      "title": "Name"
-    },
-    "quantity": {
-      "type": "number",
-      "title": "Quantity"
-    },
-    "unit": {
-      "type": "string",
-      "title": "Unit"
-    },
-    "estimated_cost": {
-      "type": "number",
-      "title": "Estimated Cost"
-    },
-    "is_purchased": {
-      "type": "boolean",
-      "title": "Is Purchased",
-      "default": false
-    }
-  },
-  "type": "object",
-  "required": [
-    "ingredient_id",
-    "name",
-    "quantity",
-    "unit",
-    "estimated_cost"
-  ],
-  "title": "ShoppingListItem"
-}
-```
+Lot có reservation không được discard hoặc giảm lượng. Expiry không được trước available date. Endpoint luôn scope theo User hiện tại.
 
-### `ShoppingListResponse`
-```json
-{
-  "properties": {
-    "plan_id": {
-      "type": "integer",
-      "title": "Plan Id"
-    },
-    "plan_name": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Plan Name"
-    },
-    "day": {
-      "anyOf": [
-        {
-          "type": "integer"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Day"
-    },
-    "date": {
-      "anyOf": [
-        {
-          "type": "string",
-          "format": "date"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Date"
-    },
-    "schema_version": {
-      "type": "integer",
-      "title": "Schema Version"
-    },
-    "items": {
-      "items": {
-        "$ref": "#/components/schemas/ShoppingListItem"
-      },
-      "type": "array",
-      "title": "Items"
-    },
-    "total_estimated_cost": {
-      "type": "number",
-      "title": "Total Estimated Cost"
-    },
-    "warnings": {
-      "items": {
-        "$ref": "#/components/schemas/ShoppingListWarning"
-      },
-      "type": "array",
-      "title": "Warnings"
-    }
-  },
-  "type": "object",
-  "required": [
-    "plan_id",
-    "schema_version",
-    "total_estimated_cost"
-  ],
-  "title": "ShoppingListResponse"
-}
-```
+## Ownership và lỗi
 
-### `ShoppingListWarning`
-```json
-{
-  "properties": {
-    "code": {
-      "type": "string",
-      "title": "Code"
-    },
-    "message": {
-      "type": "string",
-      "title": "Message"
-    }
-  },
-  "type": "object",
-  "required": [
-    "code",
-    "message"
-  ],
-  "title": "ShoppingListWarning"
-}
-```
-
-### `ShoppingShareResponse`
-```json
-{
-  "properties": {
-    "token": {
-      "type": "string",
-      "title": "Token"
-    },
-    "expires_at": {
-      "type": "string",
-      "format": "date-time",
-      "title": "Expires At"
-    },
-    "day": {
-      "anyOf": [
-        {
-          "type": "integer"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Day"
-    }
-  },
-  "type": "object",
-  "required": [
-    "token",
-    "expires_at"
-  ],
-  "title": "ShoppingShareResponse"
-}
-```
-
-### `ValidationError`
-```json
-{
-  "properties": {
-    "loc": {
-      "items": {
-        "anyOf": [
-          {
-            "type": "string"
-          },
-          {
-            "type": "integer"
-          }
-        ]
-      },
-      "type": "array",
-      "title": "Location"
-    },
-    "msg": {
-      "type": "string",
-      "title": "Message"
-    },
-    "type": {
-      "type": "string",
-      "title": "Error Type"
-    },
-    "input": {
-      "title": "Input"
-    },
-    "ctx": {
-      "type": "object",
-      "title": "Context"
-    }
-  },
-  "type": "object",
-  "required": [
-    "loc",
-    "msg",
-    "type"
-  ],
-  "title": "ValidationError"
-}
-```
+- Plan GET/delete/shopping cho owner; Admin/Super Admin có một số quyền hỗ trợ theo router hiện tại.
+- List plan luôn dùng User ID hiện tại.
+- Public link không cấp quyền đọc profile hoặc plan JSON đầy đủ.
+- `422` là schema/query/business validation; `404` che item ngoài scope; `409` có thể xuất hiện từ conflict fingerprint/inventory/dependency; `410` dành cho share capability không còn hiệu lực.
 
 ## Kiểm tra mức độ hiểu
 
-### Câu 1 (trắc nghiệm)
+1. Generate infeasible dùng HTTP nào? A. 200 B. 404 C. 409 D. 500
+2. Save gửi snapshot procurement từ client không? A. Có B. Không C. Chỉ Admin D. Chỉ public
+3. Scope theo ngày cần field nào? A. `day` B. `email` C. `role` D. `seed_name`
+4. Public PATCH item ngoài token scope trả gì? A. 404 B. 201 C. 302 D. 204
+5. Lot đang reserve có được giảm quantity không? A. Có B. Không C. Chỉ ngày 1 D. Chỉ freezer
 
-Generate plan success schema là gì?
+## Đáp án
 
-A. `GeneratedMealPlanResponse` hoặc `InfeasiblePlanResponse` theo result  
-B. `TokenResponse`  
-C. `ProviderItem`
-
-### Câu 2 (trắc nghiệm)
-
-Public share request có dùng Bearer token không?
-
-A. Không; token capability nằm ở path  
-B. Luôn dùng admin Bearer  
-C. Chỉ dùng cookie DB
-
-### Câu 3 (trắc nghiệm)
-
-HTTP 204 có body JSON không?
-
-A. Có  
-B. Không  
-C. Chỉ với shopping list
-
-### Câu 4 (tình huống)
-
-Hãy xác định schema và parameter để update trạng thái purchased qua public link.
-
-### Câu 5 (tình huống)
-
-Planner trả infeasible. Hãy nêu schema cần đọc thay vì cố parse generated plan.
-
-## Đáp án, giải thích và bằng chứng mong đợi
-
-1. **A.** Generator có outcome hợp lệ hoặc infeasible có cấu trúc.
-2. **A.** Share token là capability scope/expiry riêng.
-3. **B.** Client không gọi `.json()` cho 204.
-4. `PATCH /api/public/shopping-lists/{token}/items/{item_id}`, path token/item ID và body `PurchaseUpdate`.
-5. `InfeasiblePlanResponse` và nested `InfeasibleReasonResponse`; hiển thị reason/warning, không tự chế day/meal data.
-
-
-Tự chấm mỗi câu đúng/hoàn thành là 1 điểm: **5/5 = hiểu tốt; 4/5 = đạt; 3/5 = xem lại; 0–2/5 = đọc lại tài liệu và thực hành lại.**
+1. **A.** Infeasible là kết quả nghiệp vụ hợp lệ của generate.
+2. **B.** Backend reload và tự dựng snapshot V3.
+3. **A.** `purchase_day/usage_day` cần ngày 1–7.
+4. **A.** Router kiểm visible item trước update.
+5. **B.** Giảm sẽ phá plan đang giữ lot.

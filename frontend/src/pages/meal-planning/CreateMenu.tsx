@@ -13,6 +13,7 @@ import { ApiError } from "../../lib/apiClient";
 import { tagApi, type Tag } from "../../api/tagApi";
 import { TagPicker } from "../../components/domain/TagPicker";
 import type { GenerateParams, InfeasibleResult } from "../../types";
+import { todayISO } from "../../lib/format";
 
 export function CreateMenu() {
   const { user } = useAuth();
@@ -58,6 +59,7 @@ export function CreateMenu() {
       meals_per_day: Number(mealsPerDay),
       budget_limit: budget ? Number(budget) : null,
       preferred_tags: tags,
+      start_date: todayISO(),
     };
 
     try {
