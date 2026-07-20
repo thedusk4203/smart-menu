@@ -7,9 +7,11 @@ import { useAuth } from "../../context/AuthContext";
 import { mealPlanApi, isInfeasible } from "../../api/mealPlanApi";
 import { aiApi } from "../../api/aiApi";
 import {
-  PageHeader, Card, Button, SelectField, MoneyField, Textarea,
+  PageHeader, Card, Button, SelectField, MoneyField, Textarea, FeedbackBanner,
 } from "../../components/ui";
 import { ApiError } from "../../lib/apiClient";
+import { planNoticeText } from "../../lib/domainMessages";
+import { toUserFeedback, type UserFeedback } from "../../lib/userFeedback";
 import { tagApi, type Tag } from "../../api/tagApi";
 import { TagPicker } from "../../components/domain/TagPicker";
 import type { GenerateParams, InfeasibleResult } from "../../types";
@@ -29,6 +31,7 @@ export function CreateMenu() {
   const [parsing, setParsing] = useState(false);
   const [clarification, setClarification] = useState("");
   const [catalogTags, setCatalogTags] = useState<Tag[]>([]);
+  const [feedback, setFeedback] = useState<UserFeedback | null>(null);
 
   useEffect(() => { tagApi.active().then(setCatalogTags).catch(() => undefined); }, []);
 
@@ -42,8 +45,8 @@ export function CreateMenu() {
       if (parsed.budget_limit != null) setBudget(String(parsed.budget_limit));
       if (parsed.preferred_tags.length) setTags(parsed.preferred_tags.filter((tag) => catalogTags.some((item) => item.name.toLocaleLowerCase("vi") === tag.toLocaleLowerCase("vi"))));
       if (parsed.needs_clarification) setClarification(parsed.clarification_question ?? "Hãy bổ sung thêm yêu cầu.");
-      else toast.success("Đã điền form từ yêu cầu. Hãy kiểm tra trước khi sinh thực đơn.");
-    } catch (err) { toast.error(err instanceof ApiError ? err.message : "Không thể phân tích yêu cầu."); }
+      else toast.success("Đã điền các lựa chọn từ yêu cầu. Hãy kiểm tra trước khi tạo thực đơn.");
+    } catch (err) { setFeedback(toUserFeedback(err, "ai_chat")); }
     finally { setParsing(false); }
   };
 
@@ -53,6 +56,7 @@ export function CreateMenu() {
     setLoading(true);
     setReasons([]);
     setProfileHint(false);
+    setFeedback(null);
 
     const params: GenerateParams = {
       days: Number(days),
@@ -65,15 +69,14 @@ export function CreateMenu() {
     try {
       const result = await mealPlanApi.generate(params);
       if (isInfeasible(result)) {
-        setReasons(result.reasons.length ? result.reasons : [{ code: "NO_SOLUTION", message: "Không thể tạo thực đơn với các ràng buộc hiện tại." }]);
+        setReasons(result.reasons.length ? result.reasons : [{ code: "NO_SOLUTION", message: "Không thể tạo thực đơn với các điều kiện hiện tại." }]);
         return;
       }
       navigate("/menu-result", { state: { plan: result, params } });
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Có lỗi xảy ra";
-      toast.error(msg);
-      // Loi thuong gap: ho so chua day du de tinh dinh duong.
-      if (err instanceof ApiError && (err.status === 400 || err.status === 422 || /hồ sơ|profile|dinh dưỡng/i.test(msg))) {
+      const nextFeedback = toUserFeedback(err, "generate_menu");
+      setFeedback(nextFeedback);
+      if (err instanceof ApiError && ["PROFILE_INCOMPLETE", "PROFILE_NOT_FOUND", "NUTRITION_TARGET_INFEASIBLE"].includes(err.code)) {
         setProfileHint(true);
       }
     } finally {
@@ -85,17 +88,18 @@ export function CreateMenu() {
     <div>
       <PageHeader
         title="Tạo thực đơn"
-        description="Chọn số ngày, số bữa và ngân sách — hệ thống sẽ sinh thực đơn phù hợp."
+        description="Chọn số ngày, số bữa và ngân sách — Smart Menu sẽ tạo phương án phù hợp."
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="Tuỳ chọn thực đơn" icon={<UtensilsCrossed className="h-5 w-5" />}>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            {feedback && <FeedbackBanner feedback={feedback} onDismiss={() => setFeedback(null)} />}
             <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
               <Textarea label="Mô tả bằng tiếng Việt" value={naturalRequest}
                 onChange={(e) => setNaturalRequest(e.target.value)}
                 placeholder="Ví dụ: Thực đơn 5 ngày, 3 bữa, ngân sách 600k, ưu tiên giàu đạm..." rows={3}
-                hint="AI chỉ chuyển mô tả thành các trường bên dưới; planner vẫn tính toán bằng dữ liệu hệ thống." />
+                hint="Menuto chỉ điền giúp các lựa chọn bên dưới; kết quả vẫn được kiểm tra bằng dữ liệu món ăn và dinh dưỡng của Smart Menu." />
               <Button type="button" variant="secondary" size="sm" className="mt-3" loading={parsing} onClick={parseNaturalRequest}><Sparkles className="h-4 w-4" /> Phân tích yêu cầu</Button>
               {clarification && <p className="mt-3 text-sm text-amber-800">AI cần làm rõ: {clarification}</p>}
             </div>
@@ -133,7 +137,7 @@ export function CreateMenu() {
             />
             <TagPicker tags={catalogTags} selected={tags} onChange={setTags} />
             <Button type="submit" loading={loading} className="w-full">
-              <Sparkles className="h-4 w-4" /> Sinh thực đơn
+              <Sparkles className="h-4 w-4" /> Tạo thực đơn
             </Button>
           </form>
         </Card>
@@ -142,7 +146,7 @@ export function CreateMenu() {
           {reasons.length > 0 && (
             <Card title="Không thể tạo thực đơn" icon={<AlertTriangle className="h-5 w-5 text-red-500" />}>
               <p className="mb-3 text-sm text-gray-600">
-                Hệ thống không tìm được thực đơn thoả mãn các ràng buộc. Lý do:
+                Smart Menu chưa tìm được phương án đáp ứng các điều kiện đã chọn:
               </p>
               <ul className="space-y-2">
                 {reasons.map((r, i) => (
@@ -151,7 +155,7 @@ export function CreateMenu() {
                     className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
                   >
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>{r.message}</span>
+                    <span>{planNoticeText(r)}</span>
                   </li>
                 ))}
               </ul>
@@ -178,7 +182,7 @@ export function CreateMenu() {
 
           <Card title="Mẹo tạo thực đơn">
             <ul className="space-y-2 text-sm text-gray-600">
-              <li>• Hoàn thiện hồ sơ để thực đơn khớp nhu cầu calo &amp; macro của bạn.</li>
+              <li>• Hoàn thiện hồ sơ để thực đơn khớp nhu cầu năng lượng, đạm, chất béo và tinh bột.</li>
               <li>• Ngân sách là tổng cho toàn bộ số ngày đã chọn.</li>
               <li>• Sau khi có kết quả, bạn có thể tạo lại hoặc lưu thực đơn.</li>
             </ul>

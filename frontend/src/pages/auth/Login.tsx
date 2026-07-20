@@ -1,11 +1,10 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import { Button, TextField } from "../../components/ui";
-import { ApiError } from "../../lib/apiClient";
+import { Button, FeedbackBanner, TextField } from "../../components/ui";
+import { toUserFeedback, type UserFeedback } from "../../lib/userFeedback";
 import { isAdminRole } from "../../lib/roles";
 import type { User } from "../../types";
 import { GoogleLoginButton } from "../../components/auth/GoogleLoginButton";
@@ -22,6 +21,7 @@ export function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<UserFeedback | null>(null);
 
   const getRedirectTo = (user: User) => {
     const from = (location.state as LocationState | null)?.from?.pathname;
@@ -31,13 +31,13 @@ export function Login() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setFeedback(null);
     setLoading(true);
     try {
       const user = await login(email, password);
-      toast.success("Đăng nhập thành công!");
       navigate(getRedirectTo(user), { replace: true });
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
+      setFeedback(toUserFeedback(err, "login"));
     } finally {
       setLoading(false);
     }
@@ -48,7 +48,9 @@ export function Login() {
       <h1 className="text-2xl font-bold text-gray-900">Đăng nhập</h1>
       <p className="mt-1 text-sm text-gray-500">Chào mừng trở lại với Smart Menu.</p>
 
-      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+      {feedback && <FeedbackBanner feedback={feedback} className="mt-5" />}
+
+      <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
         <TextField
           label="Email"
           type="email"
@@ -57,6 +59,7 @@ export function Login() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="ban@email.com"
+          error={feedback?.fields.email}
         />
         <TextField
           label="Mật khẩu"
@@ -77,6 +80,7 @@ export function Login() {
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           }
+          error={feedback?.fields.password}
         />
         <Button type="submit" loading={loading} className="w-full">
           Đăng nhập
@@ -84,7 +88,6 @@ export function Login() {
       </form>
 
       <GoogleLoginButton onAuthenticated={(user) => {
-        toast.success("Đăng nhập thành công!");
         navigate(getRedirectTo(user), { replace: true });
       }} />
 

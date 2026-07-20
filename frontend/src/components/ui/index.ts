@@ -11,6 +11,7 @@ export { Modal } from "./Modal";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { Spinner, FullPageSpinner } from "./Spinner";
 export { EmptyState } from "./EmptyState";
+export { FeedbackBanner } from "./FeedbackBanner";
 export { StatCard } from "./StatCard";
 export { PageHeader } from "./PageHeader";
 export { Pagination } from "./Pagination";

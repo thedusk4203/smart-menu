@@ -18,7 +18,8 @@ from app.modules.meal_planning.domain import (
     StructuredWarning,
     ValidationResult,
 )
-from app.modules.meal_planning.optimizer_v3 import ProcurementCpSatOptimizer, V3OptimizationResult
+from app.modules.meal_planning.optimizer_contracts import V3OptimizationResult
+from app.modules.meal_planning.optimizer_v3 import ProcurementCpSatOptimizer
 from app.modules.meal_planning.ports import MealPlannerPort
 from app.modules.meal_planning.quality import DEFAULT_QUALITY_POLICY
 

@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
 import { Beef, ChefHat, Droplet, Flame, Search, Wallet } from "lucide-react";
 import { dishApi } from "../../api/dishApi";
-import { EmptyState, Pagination, SelectField, Spinner, Badge, PageHeader } from "../../components/ui";
+import { EmptyState, FeedbackBanner, Pagination, SelectField, Spinner, Badge, PageHeader } from "../../components/ui";
 import { FilterBar } from "../../components/domain/FilterBar";
-import { ApiError } from "../../lib/apiClient";
+import { toUserFeedback, type UserFeedback } from "../../lib/userFeedback";
 import { COOKING_METHOD_LABELS, DISH_TYPE_LABELS, DISH_TYPE_STYLES } from "../../lib/labels";
 import { formatGram, formatKcal, formatVND } from "../../lib/format";
 import type { DishSummary, DishType } from "../../types";
@@ -22,6 +21,7 @@ export function Meals() {
   const [search, setSearch] = useState("");
   const [dishType, setDishType] = useState<DishType | "">("");
   const [offset, setOffset] = useState(0);
+  const [feedback, setFeedback] = useState<UserFeedback | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -33,9 +33,10 @@ export function Meals() {
         offset,
       });
       setItems(list);
+      setFeedback(null);
     } catch (err) {
       setItems([]);
-      toast.error(err instanceof ApiError ? err.message : "Không thể tải danh sách món ăn.");
+      setFeedback(toUserFeedback(err, "load_catalog"));
     } finally {
       setLoading(false);
     }
@@ -52,6 +53,8 @@ export function Meals() {
         title="Món ăn"
         description="Khám phá các món đã có đủ công thức, dinh dưỡng và giá để đưa vào thực đơn."
       />
+
+      {feedback && <FeedbackBanner feedback={feedback} onRetry={load} className="mb-5" />}
 
       <FilterBar>
         <label className="relative block min-w-0 flex-1">
@@ -83,7 +86,7 @@ export function Meals() {
         <div className="flex justify-center py-16">
           <Spinner className="h-7 w-7" />
         </div>
-      ) : items.length === 0 ? (
+      ) : feedback ? null : items.length === 0 ? (
         <EmptyState
           icon={ChefHat}
           title={search || dishType ? "Không tìm thấy món phù hợp" : "Chưa có món sẵn sàng"}

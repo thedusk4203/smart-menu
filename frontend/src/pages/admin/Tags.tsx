@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { ChefHat, Leaf, Plus, Tag as TagIcon } from "lucide-react";
 import { tagApi, type Tag, type TagEntityType } from "../../api/tagApi";
-import { ApiError } from "../../lib/apiClient";
+import { adminFeedbackMessage } from "../../lib/userFeedback";
 import { Badge, Button, Card, Modal, PageHeader, SelectField, TextField } from "../../components/ui";
 
 const TYPE_OPTIONS = [
@@ -94,7 +94,7 @@ export function AdminTags() {
     try {
       setTags(await tagApi.listAdmin());
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Không thể tải danh mục thẻ");
+      toast.error(adminFeedbackMessage(err));
     } finally {
       setLoadingList(false);
     }
@@ -116,7 +116,7 @@ export function AdminTags() {
       await load();
       toast.success(`Đã thêm thẻ ${type === "dish" ? "món ăn" : "nguyên liệu"}.`);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Không thể thêm thẻ");
+      toast.error(adminFeedbackMessage(err));
     } finally {
       setLoading(false);
     }
@@ -130,7 +130,7 @@ export function AdminTags() {
       await load();
       toast.success("Đã đổi tên thẻ.");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Không thể đổi tên thẻ");
+      toast.error(adminFeedbackMessage(err));
     }
   };
 
@@ -139,13 +139,13 @@ export function AdminTags() {
       await tagApi.setActive(tag.id, !tag.is_active);
       await load();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Không thể cập nhật thẻ");
+      toast.error(adminFeedbackMessage(err));
     }
   };
 
   return (
     <div>
-      <PageHeader title="Quản lý thẻ" description="Quản lý riêng thẻ nguyên liệu và thẻ món ăn; import sẽ tự bổ sung thẻ mới đúng loại." />
+      <PageHeader title="Quản lý thẻ" description="Quản lý riêng thẻ nguyên liệu và thẻ món ăn; quá trình nhập dữ liệu (import) sẽ tự bổ sung thẻ mới đúng loại." />
       <Card title="Thêm thẻ" icon={<TagIcon className="h-5 w-5" />} className="mb-5">
         <div className="grid gap-3 sm:grid-cols-[180px_minmax(0,1fr)_auto] sm:items-end">
           <SelectField

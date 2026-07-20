@@ -6,13 +6,13 @@ import io
 import pytest
 from openpyxl import load_workbook
 
-from app.modules.admin.use_cases import (
-    AdminService,
-    _as_money,
-    _as_optional_id,
-    _normalized_code,
-    _normalized_tags,
+from app.modules.admin.normalization import (
+    as_money as _as_money,
+    as_optional_id as _as_optional_id,
+    normalized_code as _normalized_code,
+    normalized_tags as _normalized_tags,
 )
+from app.modules.admin.use_cases import AdminService
 
 
 def test_import_code_is_normalized_and_rejects_unsafe_values():

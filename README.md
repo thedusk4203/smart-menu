@@ -22,11 +22,17 @@ Docker demo dùng `docker compose --profile demo up --build -d`; frontend mặc 
 ## Kiểm tra trước khi bàn giao
 
 ```powershell
-cd backend; uv run pytest -q
-cd frontend; npm run build
+cd backend; $env:UV_CACHE_DIR = ".uv-cache"; uv run ruff check app scripts
+cd backend; $env:UV_CACHE_DIR = ".uv-cache"; uv run pytest -q --cov --cov-report=term-missing
 cd frontend; npm run lint
+cd frontend; npm run test:coverage
 cd frontend; npm run check:release
+cd frontend; npm run build
 ```
+
+Trước khi nâng database đang có dữ liệu, chạy
+`cd backend; uv run python scripts/apply_migrations.py --plan`, backup database,
+rồi mới cấp `--allow-destructive` nếu output có migration được đánh dấu phá dữ liệu.
 
 ## Quy tắc làm việc
 

@@ -11,7 +11,7 @@ from app.modules.ai.ports import AIClientPort, AIMessage
 from app.modules.ai.schemas import ChatRequest, ParseMenuRequest, SwapSuggestionRequest
 from app.modules.ai.use_cases import ChatUseCase, ParseMenuRequestUseCase, SuggestSwapUseCase
 from app.modules.inventory.repository import SqlInventoryRepository
-from app.modules.meal_planning.domain import DishCandidate, PlanRequest
+from app.modules.meal_planning.domain import DishCandidate, MealPlanEntity, PlanRequest
 from app.shared.enums import DishType
 
 
@@ -204,7 +204,7 @@ class _FakeCandidateProvider:
 
 
 class _FakeBuildPlanRequest:
-    def __init__(self, *, meals_per_day: int = 1) -> None:
+    def __init__(self, *, meals_per_day: int = 2) -> None:
         self.meals_per_day = meals_per_day
         self.last_kwargs = None
 
@@ -246,6 +246,7 @@ def _swap_request(note: str) -> SwapSuggestionRequest:
         plan={
             "total_cost": 20_000,
             "plan_data": {
+                "schema_version": 3,
                 "days": [{
                     "day": 1,
                     "meals": [{"meal_type": "lunch", "dishes": [{"dish_id": 1}]}],
@@ -266,6 +267,14 @@ def _swap_use_case(client, system_prompt="Prompt đổi món mặc định trong
         _FakeCandidateProvider(target, replacements),
         _FakeBuildPlanRequest(),
         system_prompt,
+        optimizer=SimpleNamespace(solve=lambda *_args, **_kwargs: SimpleNamespace(warnings=[])),
+        planner=SimpleNamespace(build_entity=lambda _days, request, start_date, *_args: MealPlanEntity(
+            id=None,
+            user_id=request.user_id,
+            start_date=start_date,
+            total_cost=20_000,
+            plan_data={"schema_version": 3, "solver_status": "ai_validated_swap"},
+        )),
     )
 
 
@@ -367,6 +376,14 @@ def test_v3_swap_omits_unpersistable_preview_when_procurement_cannot_rebuild(mon
     result = use_case.execute(request, user_id=7)
 
     assert result == []
+
+
+def test_swap_rejects_non_v3_plan() -> None:
+    request = _swap_request("Món tương tự, phù hợp ngân sách")
+    request.plan["plan_data"].pop("schema_version")
+
+    with pytest.raises(AIResponseValidationError, match="schema V3"):
+        _swap_use_case(_FakeAIClient()).execute(request, user_id=7)
 
 
 def test_swap_dependency_builds_request_with_inventory_repository(monkeypatch):

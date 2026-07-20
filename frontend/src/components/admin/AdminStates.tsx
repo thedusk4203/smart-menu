@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import type { UserFeedback } from "../../lib/userFeedback";
 
 export function AdminTableSkeleton({ rows = 6 }: { rows?: number }) {
   return (
@@ -15,14 +16,23 @@ export function AdminTableSkeleton({ rows = 6 }: { rows?: number }) {
   );
 }
 
-export function AdminErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+export function AdminErrorState({ message, feedback, onRetry }: { message?: string | UserFeedback; feedback?: UserFeedback; onRetry: () => void }) {
+  const detail = feedback ?? (typeof message === "object" ? message : undefined);
+  const summary = detail?.message ?? (typeof message === "string" ? message : undefined) ?? "Máy chủ chưa trả về dữ liệu.";
   return (
     <div className="flex flex-col items-center px-5 py-14 text-center" role="alert">
       <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-red-50 text-red-700">
         <AlertTriangle className="h-5 w-5" aria-hidden="true" />
       </span>
       <p className="font-semibold text-gray-900">Không tải được dữ liệu</p>
-      <p className="mt-1 max-w-md text-sm text-gray-600">{message}</p>
+      <p className="mt-1 max-w-md text-sm text-gray-600">{summary}</p>
+      {(detail?.code || detail?.technicalMessage) && (
+        <p className="mt-3 max-w-xl break-words rounded-lg bg-red-50 px-3 py-2 text-left font-mono text-xs leading-5 text-red-900">
+          {detail.code && <span>Mã: {detail.code}</span>}
+          {detail.code && detail.technicalMessage && <span aria-hidden="true"> · </span>}
+          {detail.technicalMessage && <span>Chi tiết: {detail.technicalMessage}</span>}
+        </p>
+      )}
       <button
         type="button"
         onClick={onRetry}

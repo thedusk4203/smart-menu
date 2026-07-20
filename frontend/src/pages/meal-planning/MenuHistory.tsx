@@ -5,11 +5,11 @@ import { History, Trash2, Eye, Wallet, Flame, Calendar, UtensilsCrossed } from "
 import { useAuth } from "../../context/AuthContext";
 import { mealPlanApi } from "../../api/mealPlanApi";
 import {
-  PageHeader, Card, Button, Badge, Modal, FullPageSpinner, EmptyState, ConfirmDialog,
+  PageHeader, Card, Button, Badge, Modal, FullPageSpinner, EmptyState, ConfirmDialog, FeedbackBanner,
 } from "../../components/ui";
 import { MealPlanView } from "../../components/domain/MealPlanView";
 import { formatVND, formatKcal, formatDate } from "../../lib/format";
-import { ApiError } from "../../lib/apiClient";
+import { toUserFeedback, type UserFeedback } from "../../lib/userFeedback";
 import type { MealPlan } from "../../types";
 
 export function MenuHistory() {
@@ -19,14 +19,16 @@ export function MenuHistory() {
   const [selected, setSelected] = useState<MealPlan | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const [feedback, setFeedback] = useState<UserFeedback | null>(null);
 
   const load = async () => {
     if (!user) return;
     try {
+      setFeedback(null);
       const list = await mealPlanApi.list();
       setPlans(list);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
+      setFeedback(toUserFeedback(err, "load_history"));
     } finally {
       setLoading(false);
     }
@@ -46,7 +48,7 @@ export function MenuHistory() {
       if (selected?.id === id) setSelected(null);
       toast.success("Đã xoá thực đơn.");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
+      setFeedback(toUserFeedback(err, "generic"));
     } finally {
       setDeletingId(null);
     }
@@ -68,6 +70,8 @@ export function MenuHistory() {
           </Link>
         }
       />
+
+      {feedback && <FeedbackBanner feedback={feedback} onRetry={load} onDismiss={() => setFeedback(null)} className="mb-5" />}
 
       {plans.length === 0 ? (
         <EmptyState
@@ -129,7 +133,7 @@ export function MenuHistory() {
           />
         )}
       </Modal>
-      <ConfirmDialog open={confirmingId !== null} onClose={() => setConfirmingId(null)} onConfirm={() => confirmingId !== null && handleDelete(confirmingId)} loading={deletingId === confirmingId} title="Xóa thực đơn" message="Xóa thực đơn này? Hành động không thể hoàn tác." confirmLabel="Xóa thực đơn" />
+      <ConfirmDialog open={confirmingId !== null} onClose={() => setConfirmingId(null)} onConfirm={() => confirmingId !== null && handleDelete(confirmingId)} loading={deletingId === confirmingId} title="Xóa thực đơn" message={`Bạn sắp xóa “${plans.find((plan) => plan.id === confirmingId)?.name ?? "thực đơn này"}”. Thực đơn sẽ không thể khôi phục.`} confirmLabel="Xóa thực đơn" cancelLabel="Giữ lại" />
     </div>
   );
 }

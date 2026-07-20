@@ -6,14 +6,14 @@ import { profileApi } from "../api/profileApi";
 import { ingredientApi } from "../api/ingredientApi";
 import { nutritionApi } from "../api/nutritionApi";
 import {
-  PageHeader, Card, Button, TextField, NumberField, MoneyField, SelectField, FullPageSpinner, Badge, Spinner,
+  PageHeader, Card, Button, TextField, NumberField, MoneyField, SelectField, FullPageSpinner, Badge, Spinner, FeedbackBanner,
 } from "../components/ui";
 import { NutritionSummary } from "../components/domain/NutritionSummary";
 import { IngredientPicker } from "../components/domain/IngredientPicker";
 import {
   GENDER_LABELS, ACTIVITY_LABELS, GOAL_LABELS, EXCLUSION_REASON_LABELS,
 } from "../lib/labels";
-import { ApiError } from "../lib/apiClient";
+import { toUserFeedback, type UserFeedback } from "../lib/userFeedback";
 import type {
   ActivityLevel, Exclusion, ExclusionReason, FitnessGoal, Gender, NutritionTarget, Profile as ProfileType,
 } from "../types";
@@ -41,6 +41,8 @@ export function Profile() {
   const [exclusions, setExclusions] = useState<Exclusion[]>([]);
   const [names, setNames] = useState<Record<number, string>>({});
   const [reason, setReason] = useState<ExclusionReason>("dislike");
+  const [feedback, setFeedback] = useState<UserFeedback | null>(null);
+  const [nutritionFeedback, setNutritionFeedback] = useState<UserFeedback | null>(null);
 
   const applyProfile = (p: ProfileType) => {
     setFullName(p.full_name ?? "");
@@ -80,7 +82,7 @@ export function Profile() {
         const p = await profileApi.getMyProfile();
         applyProfile(p);
       } catch (err) {
-        toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
+        setFeedback(toUserFeedback(err, "load_profile"));
       } finally {
         setLoading(false);
       }
@@ -96,6 +98,7 @@ export function Profile() {
     const w = Number(weight);
     if (!g || !a || !h || !w) {
       setTarget(null);
+      setNutritionFeedback(null);
       return;
     }
     setTargetLoading(true);
@@ -110,8 +113,10 @@ export function Profile() {
           fitness_goal: goal,
         });
         setTarget(res);
-      } catch {
+        setNutritionFeedback(null);
+      } catch (err) {
         setTarget(null);
+        setNutritionFeedback(toUserFeedback(err, "load_profile"));
       } finally {
         setTargetLoading(false);
       }
@@ -122,6 +127,7 @@ export function Profile() {
   const handleSave = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setFeedback(null);
     try {
       const updated = await profileApi.updateMyProfile({
         full_name: fullName || null,
@@ -137,7 +143,7 @@ export function Profile() {
       applyProfile(updated);
       toast.success("Đã lưu hồ sơ.");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
+      setFeedback(toUserFeedback(err, "save_profile"));
     } finally {
       setSaving(false);
     }
@@ -154,7 +160,7 @@ export function Profile() {
       setNames((prev) => ({ ...prev, [ingredientId]: ingredientName }));
       toast.success("Đã thêm loại trừ.");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
+      setFeedback(toUserFeedback(err, "profile_exclusion"));
     }
   };
 
@@ -164,7 +170,7 @@ export function Profile() {
       setExclusions((prev) => prev.filter((ex) => ex.ingredient_id !== ingredientId));
       toast.success("Đã xoá loại trừ.");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
+      setFeedback(toUserFeedback(err, "profile_exclusion"));
     }
   };
 
@@ -173,11 +179,12 @@ export function Profile() {
   return (
     <div>
       <PageHeader title="Hồ sơ cá nhân" description="Cập nhật thông tin để nhận thực đơn & dinh dưỡng phù hợp." />
+      {feedback && <FeedbackBanner feedback={feedback} onDismiss={() => setFeedback(null)} className="mb-5" />}
 
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="lg:col-span-3">
           <Card title="Thông tin cơ thể & mục tiêu">
-            <form onSubmit={handleSave} className="space-y-4">
+            <form onSubmit={handleSave} className="space-y-4" noValidate>
               <TextField
                 label="Họ và tên"
                 value={fullName}
@@ -191,6 +198,7 @@ export function Profile() {
                   onChange={(e) => setGender(e.target.value as Gender)}
                   options={toOptions(GENDER_LABELS)}
                   placeholder="Chọn..."
+                  error={feedback?.fields.gender}
                 />
                 <NumberField
                   label="Tuổi"
@@ -199,6 +207,7 @@ export function Profile() {
                   min={1}
                   max={120}
                   suffix="tuổi"
+                  error={feedback?.fields.age}
                 />
                 <NumberField
                   label="Chiều cao"
@@ -207,6 +216,7 @@ export function Profile() {
                   min={100}
                   max={250}
                   suffix="cm"
+                  error={feedback?.fields.height_cm}
                 />
                 <NumberField
                   label="Cân nặng"
@@ -215,18 +225,21 @@ export function Profile() {
                   min={20}
                   max={300}
                   suffix="kg"
+                  error={feedback?.fields.weight_kg}
                 />
                 <SelectField
                   label="Mức vận động"
                   value={activity}
                   onChange={(e) => setActivity(e.target.value as ActivityLevel)}
                   options={toOptions(ACTIVITY_LABELS)}
+                  error={feedback?.fields.activity_level}
                 />
                 <SelectField
                   label="Mục tiêu"
                   value={goal}
                   onChange={(e) => setGoal(e.target.value as FitnessGoal)}
                   options={toOptions(GOAL_LABELS)}
+                  error={feedback?.fields.goal}
                 />
                 <SelectField
                   label="Số bữa / ngày"
@@ -236,6 +249,7 @@ export function Profile() {
                     { value: "2", label: "2 bữa (trưa + tối)" },
                     { value: "3", label: "3 bữa (sáng + trưa + tối)" },
                   ]}
+                  error={feedback?.fields.meals_per_day}
                 />
                 <MoneyField
                   label="Ngân sách / ngày"
@@ -243,6 +257,7 @@ export function Profile() {
                   onValueChange={setBudget}
                   min={0}
                   hint="Để trống nếu không giới hạn"
+                  error={feedback?.fields.daily_budget}
                 />
               </div>
               <div className="flex justify-end pt-1">
@@ -256,7 +271,9 @@ export function Profile() {
 
         <div className="space-y-6 lg:col-span-2">
           <Card title="Nhu cầu dinh dưỡng" icon={<Flame className="h-5 w-5" />}>
-            {targetLoading ? (
+            {nutritionFeedback ? (
+              <FeedbackBanner feedback={nutritionFeedback} onDismiss={() => setNutritionFeedback(null)} />
+            ) : targetLoading ? (
               <div className="flex items-center gap-2 py-6 text-sm text-gray-500">
                 <Spinner className="h-5 w-5" /> Đang tính toán...
               </div>

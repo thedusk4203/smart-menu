@@ -7,10 +7,11 @@ from datetime import date, timedelta
 from sqlalchemy import text
 
 from app.core.exceptions import ConflictError, NotFoundError, ValidationAppError
-from app.modules.meal_planning.domain import InventoryLotSnapshot, MealPlanEntity
+from app.modules.inventory.domain import InventoryLotSnapshot, PersistedPlanInventory
+from app.modules.inventory.ports import InventoryRepositoryPort
 
 
-class SqlInventoryRepository:
+class SqlInventoryRepository(InventoryRepositoryPort):
     def __init__(self, session) -> None:
         self._session = session
 
@@ -73,9 +74,7 @@ class SqlInventoryRepository:
                 "INVENTORY_CHANGED: Kho nguyên liệu đã đổi; hãy tạo lại thực đơn."
             )
 
-    def reserve_inputs(self, plan: MealPlanEntity) -> None:
-        if plan.id is None:
-            raise ValueError("Plan phải được flush trước khi giữ kho")
+    def reserve_inputs(self, plan: PersistedPlanInventory) -> None:
         inventory_items = plan.plan_data.get("procurement", {}).get("inventory_items", [])
         for item in inventory_items:
             allocations_by_day: dict[int, float] = {}
@@ -118,16 +117,14 @@ class SqlInventoryRepository:
                     ),
                     {
                         "lot_id": int(item["inventory_lot_id"]),
-                        "plan_id": plan.id,
+                        "plan_id": plan.plan_id,
                         "item_key": str(item["item_key"]),
                         "quantity": quantity,
                         "use_day": day,
                     },
                 )
 
-    def create_ending_lots(self, plan: MealPlanEntity) -> None:
-        if plan.id is None or plan.start_date is None or plan.end_date is None:
-            return
+    def create_ending_lots(self, plan: PersistedPlanInventory) -> None:
         for item in plan.plan_data.get("procurement", {}).get("purchase_items", []):
             quantity = float(item.get("carryover_quantity", 0))
             if quantity <= 0:
@@ -161,7 +158,7 @@ class SqlInventoryRepository:
                     "expires_on": expiry,
                     "storage_mode": str(split["mode"]),
                     "cost_basis": float(item.get("price_per_default_unit", 0)),
-                    "source_plan_id": plan.id,
+                    "source_plan_id": plan.plan_id,
                     "source_item_key": str(item["item_key"]),
                 },
             )

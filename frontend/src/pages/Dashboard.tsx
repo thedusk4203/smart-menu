@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Flame, Wallet, User, UtensilsCrossed, Salad, ShoppingCart, AlertTriangle,
@@ -7,8 +7,9 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { profileApi } from "../api/profileApi";
 import { mealPlanApi } from "../api/mealPlanApi";
-import { StatCard, Card, FullPageSpinner, EmptyState, Badge } from "../components/ui";
+import { StatCard, Card, FullPageSpinner, EmptyState, Badge, FeedbackBanner } from "../components/ui";
 import { formatKcal, formatVND, formatDate } from "../lib/format";
+import { toUserFeedback, type UserFeedback } from "../lib/userFeedback";
 import type { Profile, MealPlan } from "../types";
 
 const SHORTCUTS = [
@@ -23,24 +24,26 @@ export function Dashboard() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [plans, setPlans] = useState<MealPlan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [profileFeedback, setProfileFeedback] = useState<UserFeedback | null>(null);
+  const [plansFeedback, setPlansFeedback] = useState<UserFeedback | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!user) return;
-    (async () => {
-      try {
-        const [p, list] = await Promise.all([
-          profileApi.getMyProfile(),
-          mealPlanApi.list(),
-        ]);
-        setProfile(p);
-        setPlans(list.slice(0, 3));
-      } catch {
-        // Loi tai du lieu — hien trang thai trong ben duoi.
-      } finally {
-        setLoading(false);
-      }
-    })();
+    setLoading(true);
+    setProfileFeedback(null);
+    setPlansFeedback(null);
+    const [profileResult, plansResult] = await Promise.allSettled([
+      profileApi.getMyProfile(),
+      mealPlanApi.list(),
+    ]);
+    if (profileResult.status === "fulfilled") setProfile(profileResult.value);
+    else setProfileFeedback(toUserFeedback(profileResult.reason, "load_profile"));
+    if (plansResult.status === "fulfilled") setPlans(plansResult.value.slice(0, 3));
+    else setPlansFeedback(toUserFeedback(plansResult.reason, "load_history"));
+    setLoading(false);
   }, [user]);
+
+  useEffect(() => { void load(); }, [load]);
 
   if (loading) return <FullPageSpinner />;
 
@@ -59,6 +62,8 @@ export function Dashboard() {
         <h1 className="text-2xl font-bold text-gray-900">Xin chào, {greetingName} 👋</h1>
         <p className="mt-1 text-sm text-gray-500">Chúc bạn một ngày ăn uống ngon miệng và đủ chất.</p>
       </div>
+
+      {profileFeedback && <FeedbackBanner feedback={profileFeedback} onRetry={() => void load()} className="mb-5" />}
 
       {incomplete && (
         <Link
@@ -118,7 +123,9 @@ export function Dashboard() {
             </Link>
           }
         >
-          {plans.length === 0 ? (
+          {plansFeedback ? (
+            <FeedbackBanner feedback={plansFeedback} onRetry={() => void load()} />
+          ) : plans.length === 0 ? (
             <EmptyState
               icon={UtensilsCrossed}
               title="Chưa có thực đơn nào"

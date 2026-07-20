@@ -6,12 +6,18 @@ from app.modules.shopping_lists.exceptions import (
     ShoppingListScopeError,
     UnsupportedShoppingPlanError,
 )
+from app.modules.shopping_lists.ports import (
+    ShoppingListUnitOfWorkPort,
+    ShoppingShareRepositoryPort,
+)
 from app.modules.shopping_lists.schemas import ShoppingListResponse
 
 
 class BuildShoppingListUseCase:
-    def __init__(self, list_repo=None) -> None:
-        self._list_repo = list_repo
+    """Chiếu snapshot meal-plan V3 ledger thành danh sách mua sắm."""
+
+    def __init__(self, unit_of_work: ShoppingListUnitOfWorkPort | None = None) -> None:
+        self._unit_of_work = unit_of_work
 
     def execute(
         self,
@@ -19,142 +25,21 @@ class BuildShoppingListUseCase:
         day: int | None = None,
         scope: str | None = None,
     ) -> ShoppingListResponse:
-        selected_day = self._selected_day(plan.plan_data, day)
-        schema_version = int(plan.plan_data.get("schema_version", 1))
-        resolved_scope = scope or ("usage_day" if day is not None else "all")
-        if schema_version < 3:
+        if int(plan.plan_data.get("schema_version", 0)) != 3:
             raise UnsupportedShoppingPlanError()
+        procurement = plan.plan_data.get("procurement", {})
+        if int(procurement.get("ledger_version", 0)) != 2:
+            raise UnsupportedShoppingPlanError()
+
+        selected_day = self._selected_day(plan.plan_data, day)
+        resolved_scope = scope or ("usage_day" if day is not None else "all")
+        if resolved_scope not in {"all", "purchase_day", "usage_day"}:
+            raise ShoppingListScopeError()
+        if resolved_scope != "all" and day is None:
+            raise ShoppingListScopeError("Phạm vi theo ngày cần có query day")
         return self._from_v3_plan(plan, day, resolved_scope, selected_day)
 
     def _from_v3_plan(
-        self,
-        plan: MealPlanEntity,
-        day: int | None,
-        scope: str,
-        selected_day: dict | None,
-    ) -> ShoppingListResponse:
-        if scope not in {"all", "purchase_day", "usage_day"}:
-            raise ShoppingListScopeError()
-        if scope != "all" and day is None:
-            raise ShoppingListScopeError("Phạm vi theo ngày cần có query day")
-        procurement = plan.plan_data.get("procurement", {})
-        if int(procurement.get("ledger_version", 0)) == 2:
-            return self._from_v3_ledger(plan, day, scope, selected_day)
-        raw_purchase = list(procurement.get("purchase_items", []))
-        raw_pantry = list(procurement.get("pantry_checks", []))
-        materialized: list[dict] = []
-        purchase_items: list[dict] = []
-        for raw in raw_purchase:
-            item = {
-                **raw,
-                "quantity": float(raw.get("purchase_quantity", 0)),
-                "estimated_cost": float(raw.get("purchase_cost", 0)),
-                "item_kind": "purchase",
-                "scheduled_day": int(raw.get("purchase_day", 0)) or None,
-                "is_purchased": False,
-            }
-            materialized.append(item)
-            if scope == "all" or int(raw.get("purchase_day", 0)) == day:
-                purchase_items.append(item)
-        pantry_items: list[dict] = []
-        pantry_ids_for_day = self._pantry_ids_for_day(plan.plan_data, day) if day else None
-        for raw in raw_pantry:
-            item = {
-                **raw,
-                "quantity": float(raw.get("quantity", 0)),
-                "estimated_cost": 0.0,
-                "item_kind": "pantry",
-                "scheduled_day": None,
-                "is_purchased": False,
-            }
-            materialized.append(item)
-            if pantry_ids_for_day is None or int(item["ingredient_id"]) in pantry_ids_for_day:
-                pantry_items.append(item)
-
-        persisted: list[dict] = []
-        if self._list_repo is not None and plan.id:
-            persisted = self._list_repo.ensure_items(plan.id, materialized)
-        persisted_by_key = {str(item.get("item_key")): item for item in persisted}
-
-        def state(item: dict) -> dict:
-            saved = persisted_by_key.get(str(item.get("item_key")), {})
-            return {
-                **item,
-                "id": saved.get("id"),
-                "is_purchased": bool(saved.get("is_purchased", False)),
-            }
-
-        purchase_items = [state(item) for item in purchase_items]
-        pantry_items = [state(item) for item in pantry_items]
-        carryover_usage: list[dict] = []
-        if day is not None:
-            for raw in raw_purchase:
-                for allocation in raw.get("allocations", []):
-                    if int(allocation.get("day", 0)) != day:
-                        continue
-                    if int(raw.get("purchase_day", 0)) >= day:
-                        continue
-                    carryover_usage.append({
-                        "ingredient_id": int(raw["ingredient_id"]),
-                        "name": str(raw["name"]),
-                        "quantity": float(allocation["quantity"]),
-                        "unit": str(raw["unit"]),
-                        "purchase_day": int(raw["purchase_day"]),
-                        "use_day": day,
-                        "storage_mode": str(allocation.get("storage_mode") or "same_day"),
-                        "expiry_day": int(allocation.get("expiry_day") or day),
-                        "dish_name": allocation.get("dish_name"),
-                    })
-        leftovers: list[dict] = []
-        for raw in raw_purchase:
-            if scope == "purchase_day" and int(raw.get("purchase_day", 0)) != day:
-                continue
-            for key, status in (
-                ("carryover_quantity", "carryover"),
-                ("expired_waste_quantity", "expired_waste"),
-            ):
-                quantity = float(raw.get(key, 0))
-                if quantity > 0:
-                    leftovers.append({
-                        "ingredient_id": int(raw["ingredient_id"]),
-                        "name": str(raw["name"]),
-                        "quantity": quantity,
-                        "unit": str(raw["unit"]),
-                        "purchase_day": int(raw["purchase_day"]),
-                        "status": status,
-                    })
-        adapter_items = [*purchase_items, *pantry_items]
-        summary = dict(plan.plan_data.get("cost_summary", {}))
-        summary["visible_purchase_cost"] = round(
-            sum(float(item["purchase_cost"]) for item in purchase_items), 0
-        )
-        summary["shopping_days"] = len(procurement.get("shopping_days", []))
-        warning_rows = []
-        for warning in plan.plan_data.get("warnings", []):
-            if isinstance(warning, dict) and warning.get("code"):
-                warning_rows.append({
-                    "code": str(warning["code"]),
-                    "message": str(warning.get("message") or warning["code"]),
-                })
-        return ShoppingListResponse(
-            plan_id=plan.id or 0,
-            plan_name=plan.name,
-            day=day,
-            date=selected_day.get("date") if selected_day else None,
-            schema_version=3,
-            shopping_schema_version=2,
-            scope=scope,
-            items=adapter_items,
-            total_estimated_cost=round(sum(float(item["estimated_cost"]) for item in adapter_items), 0),
-            purchase_items=purchase_items,
-            pantry_checks=pantry_items,
-            carryover_usage=carryover_usage,
-            leftovers=leftovers,
-            summary=summary,
-            warnings=warning_rows,
-        )
-
-    def _from_v3_ledger(
         self,
         plan: MealPlanEntity,
         day: int | None,
@@ -180,18 +65,18 @@ class BuildShoppingListUseCase:
             }
             for raw in raw_purchase
         ]
-        materialized.extend({
-            **raw,
-            "quantity": float(raw.get("quantity", 0)),
-            "estimated_cost": 0.0,
-            "item_kind": "pantry",
-            "scheduled_day": None,
-            "is_purchased": False,
-        } for raw in raw_pantry)
-        persisted = (
-            self._list_repo.ensure_items(plan.id, materialized)
-            if self._list_repo is not None and plan.id else []
+        materialized.extend(
+            {
+                **raw,
+                "quantity": float(raw.get("quantity", 0)),
+                "estimated_cost": 0.0,
+                "item_kind": "pantry",
+                "scheduled_day": None,
+                "is_purchased": False,
+            }
+            for raw in raw_pantry
         )
+        persisted = self._materialize(plan.id, materialized) if plan.id else []
         persisted_by_key = {str(item.get("item_key")): item for item in persisted}
 
         def with_state(item: dict) -> dict:
@@ -203,13 +88,15 @@ class BuildShoppingListUseCase:
             }
 
         purchase_items = [
-            with_state(item) for item in materialized
+            with_state(item)
+            for item in materialized
             if item["item_kind"] == "purchase"
             and (day is None or int(item.get("scheduled_day") or 0) == day)
         ]
         pantry_ids = self._pantry_ids_for_day(plan.plan_data, day) if day else None
         pantry_items = [
-            with_state(item) for item in materialized
+            with_state(item)
+            for item in materialized
             if item["item_kind"] == "pantry"
             and (pantry_ids is None or int(item["ingredient_id"]) in pantry_ids)
         ]
@@ -218,18 +105,25 @@ class BuildShoppingListUseCase:
             for ledger_day in visible_ledger:
                 for row in ledger_day.get("items", []):
                     for allocation in row.get("allocations", []):
-                        if row.get("source_kind") == "inventory" or float(row.get("opening_quantity", 0)) > 0:
-                            carryover_usage.append({
-                                "ingredient_id": int(row["ingredient_id"]),
-                                "name": str(row["name"]),
-                                "quantity": float(allocation["quantity"]),
-                                "unit": str(row["unit"]),
-                                "purchase_day": max(1, day - 1),
-                                "use_day": day,
-                                "storage_mode": str(allocation.get("storage_mode") or "stored"),
-                                "expiry_day": int(allocation.get("expiry_day") or day),
-                                "dish_name": allocation.get("dish_name"),
-                            })
+                        if (
+                            row.get("source_kind") == "inventory"
+                            or float(row.get("opening_quantity", 0)) > 0
+                        ):
+                            carryover_usage.append(
+                                {
+                                    "ingredient_id": int(row["ingredient_id"]),
+                                    "name": str(row["name"]),
+                                    "quantity": float(allocation["quantity"]),
+                                    "unit": str(row["unit"]),
+                                    "purchase_day": max(1, day - 1),
+                                    "use_day": day,
+                                    "storage_mode": str(
+                                        allocation.get("storage_mode") or "stored"
+                                    ),
+                                    "expiry_day": int(allocation.get("expiry_day") or day),
+                                    "dish_name": allocation.get("dish_name"),
+                                }
+                            )
         leftovers = [
             {
                 "ingredient_id": int(row["ingredient_id"]),
@@ -244,9 +138,9 @@ class BuildShoppingListUseCase:
             if float(row.get("closing_quantity", 0)) > 0
         ]
         summary = dict(plan.plan_data.get("cost_summary", {}))
-        summary["visible_purchase_cost"] = round(sum(
-            float(item["purchase_cost"]) for item in purchase_items
-        ))
+        summary["visible_purchase_cost"] = round(
+            sum(float(item["purchase_cost"]) for item in purchase_items)
+        )
         summary["shopping_days"] = len(procurement.get("shopping_days", []))
         adapter_items = [*purchase_items, *pantry_items]
         return ShoppingListResponse(
@@ -254,11 +148,11 @@ class BuildShoppingListUseCase:
             plan_name=plan.name,
             day=day,
             date=selected_day.get("date") if selected_day else None,
-            schema_version=3,
-            shopping_schema_version=3,
             scope=scope,
             items=adapter_items,
-            total_estimated_cost=round(sum(float(item["estimated_cost"]) for item in adapter_items)),
+            total_estimated_cost=round(
+                sum(float(item["estimated_cost"]) for item in adapter_items)
+            ),
             purchase_items=purchase_items,
             pantry_checks=pantry_items,
             carryover_usage=carryover_usage,
@@ -266,7 +160,10 @@ class BuildShoppingListUseCase:
             daily_ledger=visible_ledger,
             summary=summary,
             warnings=[
-                {"code": str(value["code"]), "message": str(value.get("message") or value["code"])}
+                {
+                    "code": str(value["code"]),
+                    "message": str(value.get("message") or value["code"]),
+                }
                 for value in plan.plan_data.get("warnings", [])
                 if isinstance(value, dict) and value.get("code")
             ],
@@ -291,3 +188,85 @@ class BuildShoppingListUseCase:
             if int(plan_day.get("day", index)) == day:
                 return plan_day
         raise ShoppingListDayNotFoundError(day)
+
+    def _materialize(self, plan_id: int, items: list[dict]) -> list[dict]:
+        if self._unit_of_work is None:
+            return []
+        try:
+            persisted = self._unit_of_work.shopping_lists.ensure_items(plan_id, items)
+            self._unit_of_work.commit()
+            return persisted
+        except Exception:
+            self._unit_of_work.rollback()
+            raise
+
+
+class UpdateShoppingItemUseCase:
+    def __init__(self, unit_of_work: ShoppingListUnitOfWorkPort) -> None:
+        self._unit_of_work = unit_of_work
+
+    def execute(self, plan_id: int, item_id: int, purchased: bool) -> dict | None:
+        try:
+            result = self._unit_of_work.shopping_lists.set_purchased(
+                plan_id, item_id, purchased
+            )
+            self._unit_of_work.commit()
+            return result
+        except Exception:
+            self._unit_of_work.rollback()
+            raise
+
+
+class UpdateShoppingItemsUseCase:
+    def __init__(self, unit_of_work: ShoppingListUnitOfWorkPort) -> None:
+        self._unit_of_work = unit_of_work
+
+    def execute(self, plan_id: int, item_ids: list[int], purchased: bool) -> bool:
+        unique_ids = list(dict.fromkeys(item_ids))
+        try:
+            updated = self._unit_of_work.shopping_lists.set_purchased_many(
+                plan_id, unique_ids, purchased
+            )
+            if updated != len(unique_ids):
+                self._unit_of_work.rollback()
+                return False
+            self._unit_of_work.commit()
+            return True
+        except Exception:
+            self._unit_of_work.rollback()
+            raise
+
+
+class GetOrCreateShoppingShareUseCase:
+    def __init__(self, unit_of_work: ShoppingListUnitOfWorkPort) -> None:
+        self._unit_of_work = unit_of_work
+
+    def execute(self, plan_id: int) -> dict:
+        try:
+            result = self._unit_of_work.shares.get_or_create(plan_id)
+            self._unit_of_work.commit()
+            return result
+        except Exception:
+            self._unit_of_work.rollback()
+            raise
+
+
+class GetActiveShoppingShareUseCase:
+    def __init__(self, repository: ShoppingShareRepositoryPort) -> None:
+        self._repository = repository
+
+    def execute(self, share_id: str) -> dict | None:
+        return self._repository.get_active(share_id)
+
+
+class RevokeShoppingShareUseCase:
+    def __init__(self, unit_of_work: ShoppingListUnitOfWorkPort) -> None:
+        self._unit_of_work = unit_of_work
+
+    def execute(self, plan_id: int) -> None:
+        try:
+            self._unit_of_work.shares.revoke(plan_id)
+            self._unit_of_work.commit()
+        except Exception:
+            self._unit_of_work.rollback()
+            raise

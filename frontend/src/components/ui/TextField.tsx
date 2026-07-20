@@ -11,6 +11,7 @@ interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
 export function TextField({ label, error, hint, trailingAction, className = "", id, ...props }: TextFieldProps) {
   const autoId = useId();
   const fieldId = id ?? autoId;
+  const descriptionId = `${fieldId}-description`;
   return (
     <div className={className}>
       {label && (
@@ -25,13 +26,15 @@ export function TextField({ label, error, hint, trailingAction, className = "", 
             error ? "border-red-400 focus:ring-red-300" : "border-sand-200"
           } ${trailingAction ? "pr-11" : ""}`}
           {...props}
+          aria-invalid={error ? "true" : undefined}
+          aria-describedby={error || hint ? descriptionId : undefined}
         />
         {trailingAction && <div className="absolute inset-y-0 right-0 flex items-center pr-3">{trailingAction}</div>}
       </div>
       {error ? (
-        <p className="mt-1 text-xs text-red-600">{error}</p>
+        <p id={descriptionId} className="mt-1 text-xs text-red-600">{error}</p>
       ) : hint ? (
-        <p className="mt-1 text-xs text-gray-500">{hint}</p>
+        <p id={descriptionId} className="mt-1 text-xs text-gray-500">{hint}</p>
       ) : null}
     </div>
   );

@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 
 from app.modules.meal_planning.domain import PlanRequest, ValidationResult
-from app.modules.meal_planning.optimizer_v3 import V3OptimizationResult
+from app.modules.meal_planning.optimizer_contracts import V3OptimizationResult
 
 
 def validate_v3(result: V3OptimizationResult, request: PlanRequest) -> ValidationResult:
@@ -66,30 +66,29 @@ def validate_v3(result: V3OptimizationResult, request: PlanRequest) -> Validatio
             f"HC-BUDGET: tiền mua {summary_cost:.0f}đ vượt ngân sách {request.budget_limit:.0f}đ."
         )
 
-    if request.ledger_enabled:
-        ledger = procurement.get("daily_ledger", [])
-        if procurement.get("ledger_version") != 2 or len(ledger) != request.days:
-            violations.append("LEDGER-SCHEMA: ledger V2 thiếu hoặc sai số ngày.")
-        for day in ledger:
-            for row in day.get("items", []):
-                if (
-                    row.get("source_kind") == "purchase"
-                    and float(row["purchase_quantity"]) > 1e-8
-                    and float(row["usage_quantity"]) <= 1e-8
-                ):
-                    violations.append(
-                        f"LEDGER-JIT: {row['name']} ngày {day.get('day')} mua nhưng không dùng."
-                    )
-                expected = (
-                    float(row["opening_quantity"])
-                    + float(row["purchase_quantity"])
-                    - float(row["usage_quantity"])
-                    - float(row["expired_quantity"])
+    ledger = procurement.get("daily_ledger", [])
+    if procurement.get("ledger_version") != 2 or len(ledger) != request.days:
+        violations.append("LEDGER-SCHEMA: ledger V2 thiếu hoặc sai số ngày.")
+    for day in ledger:
+        for row in day.get("items", []):
+            if (
+                row.get("source_kind") == "purchase"
+                and float(row["purchase_quantity"]) > 1e-8
+                and float(row["usage_quantity"]) <= 1e-8
+            ):
+                violations.append(
+                    f"LEDGER-JIT: {row['name']} ngày {day.get('day')} mua nhưng không dùng."
                 )
-                if abs(expected - float(row["closing_quantity"])) > 0.011:
-                    violations.append(
-                        f"LEDGER-BALANCE: {row['name']} ngày {day.get('day')} không cân bằng."
-                    )
+            expected = (
+                float(row["opening_quantity"])
+                + float(row["purchase_quantity"])
+                - float(row["usage_quantity"])
+                - float(row["expired_quantity"])
+            )
+            if abs(expected - float(row["closing_quantity"])) > 0.011:
+                violations.append(
+                    f"LEDGER-BALANCE: {row['name']} ngày {day.get('day')} không cân bằng."
+                )
 
     if len(result.final_nutrition) != request.days:
         violations.append("NUTRITION-DAYS: số ngày dinh dưỡng không khớp request.")

@@ -61,6 +61,29 @@
 ::-webkit-scrollbar-thumb { background: var(--color-sand-300); border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background: #bcb4a4; }
 
+.print-only { display: none; }
+
 @media print {
   .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  body, .app-shell { background: white !important; }
+  .app-content-shell {
+    display: block !important;
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  .app-main { width: 100% !important; }
+  .shopping-print-row,
+  .shopping-print-section { break-inside: avoid; }
+  .shopping-print-section { box-shadow: none !important; }
+  * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  @page {
+    size: A4;
+    margin: 16mm 14mm 20mm;
+    @bottom-right {
+      content: "Trang " counter(page) "/" counter(pages);
+      color: #4b5563;
+      font-size: 9pt;
+    }
+  }
 }

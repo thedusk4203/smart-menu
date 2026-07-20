@@ -7,8 +7,8 @@ import { FullPageSpinner } from "../components/ui";
 
 const FEATURES = [
   { icon: Wallet, title: "Bám sát ngân sách", desc: "Lập thực đơn vừa túi tiền, kiểm soát chi phí từng ngày." },
-  { icon: Flame, title: "Đúng nhu cầu dinh dưỡng", desc: "Tính BMR, TDEE, calo và macro theo mục tiêu cá nhân." },
-  { icon: UtensilsCrossed, title: "Thực đơn tự động", desc: "Sinh thực đơn nhiều ngày chỉ với vài thao tác." },
+  { icon: Flame, title: "Đúng nhu cầu dinh dưỡng", desc: "Ước tính năng lượng, đạm, chất béo và tinh bột theo mục tiêu cá nhân." },
+  { icon: UtensilsCrossed, title: "Thực đơn tự động", desc: "Tạo thực đơn nhiều ngày chỉ với vài thao tác." },
   { icon: Salad, title: "Nguyên liệu & món ăn", desc: "Kho nguyên liệu và món ăn phong phú, dễ tra cứu." },
   { icon: ShoppingCart, title: "Danh sách đi chợ", desc: "Tự gom nguyên liệu từ thực đơn, tiện in mang theo." },
   { icon: Sparkles, title: "Trợ lý Menuto", desc: "Gợi ý đổi món và giải đáp dinh dưỡng." },

@@ -4,11 +4,111 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  code: string;
+  userMessage: string;
+  technicalMessage: string;
+  details: Record<string, unknown>;
+  fields: Record<string, string>;
+  retryable: boolean;
+
+  constructor(
+    status: number,
+    message: string,
+    options: {
+      code?: string;
+      technicalMessage?: string;
+      details?: Record<string, unknown>;
+      fields?: Record<string, string>;
+      retryable?: boolean;
+    } = {},
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = options.code ?? defaultError(status).code;
+    this.userMessage = message;
+    this.technicalMessage = options.technicalMessage ?? message;
+    this.details = options.details ?? {};
+    this.fields = options.fields ?? {};
+    this.retryable = options.retryable ?? (status === 0 || status >= 500);
   }
+}
+
+interface ErrorEnvelope {
+  detail?: unknown;
+  error?: {
+    code?: unknown;
+    message?: unknown;
+    details?: unknown;
+    fields?: unknown;
+  };
+}
+
+const ERROR_DEFAULTS: Record<number, { code: string; message: string }> = {
+  0: { code: "NETWORK_UNAVAILABLE", message: "Smart Menu chưa kết nối được. Kiểm tra mạng rồi thử lại." },
+  400: { code: "BAD_REQUEST", message: "Yêu cầu chưa hợp lệ. Hãy kiểm tra rồi thử lại." },
+  401: { code: "AUTH_SESSION_EXPIRED", message: "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại để tiếp tục." },
+  403: { code: "AUTH_FORBIDDEN", message: "Bạn không có quyền thực hiện thao tác này." },
+  404: { code: "RESOURCE_NOT_FOUND", message: "Không tìm thấy dữ liệu được yêu cầu." },
+  409: { code: "RESOURCE_CONFLICT", message: "Dữ liệu đã thay đổi. Hãy tải lại rồi thử lại." },
+  410: { code: "RESOURCE_GONE", message: "Nội dung này không còn khả dụng." },
+  422: { code: "VALIDATION_FAILED", message: "Một số thông tin chưa hợp lệ. Hãy kiểm tra rồi thử lại." },
+  500: { code: "INTERNAL_ERROR", message: "Smart Menu chưa thể hoàn tất yêu cầu. Dữ liệu của bạn chưa bị thay đổi." },
+  503: { code: "SERVICE_UNAVAILABLE", message: "Dịch vụ đang tạm gián đoạn. Hãy thử lại sau." },
+};
+
+function defaultError(status: number): { code: string; message: string } {
+  if (ERROR_DEFAULTS[status]) return ERROR_DEFAULTS[status];
+  if (status >= 500) return ERROR_DEFAULTS[500];
+  return { code: "REQUEST_FAILED", message: "Không thể hoàn tất yêu cầu. Vui lòng thử lại." };
+}
+
+function detailText(detail: unknown): string {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => item && typeof item === "object" && "msg" in item ? String(item.msg) : "")
+      .filter(Boolean)
+      .join("; ");
+  }
+  return "";
+}
+
+function stringRecord(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+  );
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+export function apiErrorFromResponse(status: number, body: unknown): ApiError {
+  const fallback = defaultError(status);
+  const envelope = body && typeof body === "object" ? body as ErrorEnvelope : {};
+  const error = envelope.error && typeof envelope.error === "object" ? envelope.error : {};
+  const technicalMessage = detailText(envelope.detail) || fallback.message;
+  const message = typeof error.message === "string" && error.message.trim()
+    ? error.message
+    : fallback.message;
+  return new ApiError(status, message, {
+    code: typeof error.code === "string" && error.code ? error.code : fallback.code,
+    technicalMessage,
+    details: objectRecord(error.details),
+    fields: stringRecord(error.fields),
+  });
+}
+
+function networkError(): ApiError {
+  return new ApiError(0, ERROR_DEFAULTS[0].message, {
+    code: ERROR_DEFAULTS[0].code,
+    technicalMessage: "Không kết nối được máy chủ.",
+    retryable: true,
+  });
 }
 
 interface RequestOptions {
@@ -49,27 +149,20 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   try {
     res = await fetch(`${BASE_URL}${path}`, { method, headers, body: payload });
   } catch {
-    throw new ApiError(0, "Khong ket noi duoc may chu. Kiem tra backend co dang chay khong.");
+    throw networkError();
   }
 
   if (res.status === 401) {
     clearToken();
     const data = await res.json().catch(() => null);
-    throw new ApiError(401, data?.detail ?? "Phien dang nhap da het han.");
+    throw apiErrorFromResponse(401, data);
   }
 
   if (res.status === 204) return undefined as T;
 
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    const detail = data?.detail;
-    const message =
-      typeof detail === "string"
-        ? detail
-        : Array.isArray(detail)
-          ? detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join("; ")
-          : `Loi ${res.status}`;
-    throw new ApiError(res.status, message);
+    throw apiErrorFromResponse(res.status, data);
   }
   return data as T;
 }
@@ -94,23 +187,19 @@ export async function streamSse(
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
-    throw new ApiError(0, "Khong ket noi duoc may chu. Kiem tra backend co dang chay khong.");
+    throw networkError();
   }
 
   if (response.status === 401) {
     clearToken();
     const data = await response.json().catch(() => null);
-    throw new ApiError(401, data?.detail ?? "Phien dang nhap da het han.");
+    throw apiErrorFromResponse(401, data);
   }
   if (!response.ok) {
     const data = await response.json().catch(() => null);
-    const detail = data?.detail;
-    throw new ApiError(
-      response.status,
-      typeof detail === "string" ? detail : `Loi ${response.status}`,
-    );
+    throw apiErrorFromResponse(response.status, data);
   }
-  if (!response.body) throw new ApiError(0, "May chu khong mo duoc luong tra loi.");
+  if (!response.body) throw new ApiError(0, "Máy chủ không mở được luồng trả lời.");
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -137,7 +226,10 @@ export async function streamSse(
           onEvent({ event, data: JSON.parse(rawData) });
         } catch (error) {
           if (error instanceof ApiError) throw error;
-          throw new ApiError(0, "May chu tra ve du lieu streaming khong hop le.");
+          throw new ApiError(0, "Menuto nhận được dữ liệu chưa đúng định dạng. Hãy thử lại.", {
+            code: "STREAM_DATA_INVALID",
+            technicalMessage: "Máy chủ trả về dữ liệu streaming không hợp lệ.",
+          });
         }
       }
       if (done) break;
@@ -161,13 +253,13 @@ async function requestDownload(path: string): Promise<DownloadFile> {
   try {
     res = await fetch(`${BASE_URL}${path}`, { headers });
   } catch {
-    throw new ApiError(0, "Khong ket noi duoc may chu. Kiem tra backend co dang chay khong.");
+    throw networkError();
   }
 
   if (!res.ok) {
     const data = await res.json().catch(() => null);
     if (res.status === 401) clearToken();
-    throw new ApiError(res.status, typeof data?.detail === "string" ? data.detail : `Loi ${res.status}`);
+    throw apiErrorFromResponse(res.status, data);
   }
   const disposition = res.headers.get("Content-Disposition") || "";
   const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || null;

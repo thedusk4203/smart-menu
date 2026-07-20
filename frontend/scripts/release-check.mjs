@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
@@ -15,3 +16,5 @@ for (const [file, forbidden] of files) {
     }
   }
 }
+
+execFileSync(process.execPath, [resolve(root, "scripts/ui-copy-check.mjs")], { stdio: "inherit" });

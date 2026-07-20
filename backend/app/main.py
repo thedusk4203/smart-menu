@@ -5,6 +5,8 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -47,7 +49,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="Smart Menu API",
-    description="API backend cho á»©ng dá»¥ng láº­p thá»±c Ä‘Æ¡n theo ngÃ¢n sÃ¡ch & dinh dÆ°á»¡ng",
+    description="API backend cho ứng dụng lập thực đơn theo ngân sách và dinh dưỡng",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -62,11 +64,87 @@ app.add_middleware(
 
 
 @app.exception_handler(AppException)
-def handle_app_exception(request: Request, exc: AppException) -> JSONResponse:
-    """Map má»i domain exception (NotFoundError/ConflictError/...) sang HTTP
-    response. Use case/domain layer khÃ´ng phá»¥ thuá»™c FastAPI â€” chá»‰ cÃ³ Ä‘iá»ƒm
-    nÃ y má»›i biáº¿t tá»›i HTTP."""
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+def handle_app_exception(_request: Request, exc: AppException) -> JSONResponse:
+    """Map domain exception sang HTTP tại duy nhất application boundary này."""
+    return JSONResponse(status_code=exc.status_code, content=exc.response_content())
+
+
+_HTTP_ERROR_DEFAULTS: dict[int, tuple[str, str]] = {
+    400: ("BAD_REQUEST", "Yêu cầu chưa hợp lệ. Hãy kiểm tra rồi thử lại."),
+    401: ("AUTH_SESSION_EXPIRED", "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại để tiếp tục."),
+    403: ("AUTH_FORBIDDEN", "Bạn không có quyền thực hiện thao tác này."),
+    404: ("RESOURCE_NOT_FOUND", "Không tìm thấy dữ liệu được yêu cầu."),
+    409: ("RESOURCE_CONFLICT", "Dữ liệu đã thay đổi hoặc đang được sử dụng. Hãy tải lại rồi thử lại."),
+    410: ("RESOURCE_GONE", "Nội dung này không còn khả dụng."),
+    422: ("VALIDATION_FAILED", "Một số thông tin chưa hợp lệ. Hãy kiểm tra rồi thử lại."),
+    503: ("SERVICE_UNAVAILABLE", "Dịch vụ đang tạm gián đoạn. Hãy thử lại sau."),
+}
+
+
+@app.exception_handler(HTTPException)
+def handle_http_exception(_request: Request, exc: HTTPException) -> JSONResponse:
+    code, message = _HTTP_ERROR_DEFAULTS.get(
+        exc.status_code,
+        ("HTTP_ERROR", "Không thể hoàn tất yêu cầu. Vui lòng thử lại."),
+    )
+    code = getattr(exc, "code", code)
+    message = getattr(exc, "user_message", None) or message
+    return JSONResponse(
+        status_code=exc.status_code,
+        headers=exc.headers,
+        content={
+            "detail": jsonable_encoder(exc.detail),
+            "error": {"code": code, "message": message, "details": {}},
+        },
+    )
+
+
+def _validation_fields(exc: RequestValidationError) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    for item in exc.errors():
+        path = ".".join(str(part) for part in item.get("loc", ()) if part not in {"body", "query", "path"})
+        if not path or path in fields:
+            continue
+        error_type = str(item.get("type") or "")
+        if error_type == "missing":
+            fields[path] = "Vui lòng nhập thông tin này."
+        elif "greater_than" in error_type or "less_than" in error_type:
+            fields[path] = "Giá trị nằm ngoài phạm vi cho phép."
+        else:
+            fields[path] = "Giá trị chưa hợp lệ."
+    return fields
+
+
+@app.exception_handler(RequestValidationError)
+def handle_request_validation(_request: Request, exc: RequestValidationError) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "detail": jsonable_encoder(exc.errors()),
+            "error": {
+                "code": "REQUEST_VALIDATION_FAILED",
+                "message": "Một số thông tin chưa hợp lệ. Hãy kiểm tra các trường được đánh dấu.",
+                "details": {},
+                "fields": _validation_fields(exc),
+            },
+        },
+    )
+
+
+@app.exception_handler(Exception)
+def handle_unexpected_exception(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled API error for %s %s", request.method, request.url.path, exc_info=exc)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "detail": "Đã có lỗi xảy ra.",
+            "error": {
+                "code": "INTERNAL_ERROR",
+                "message": "Smart Menu chưa thể hoàn tất yêu cầu. Dữ liệu của bạn chưa bị thay đổi.",
+                "details": {},
+            },
+        },
+    )
 
 
 app.include_router(api_router)

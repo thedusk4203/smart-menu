@@ -6,12 +6,12 @@ import { useAuth } from "../../context/AuthContext";
 import { ingredientApi } from "../../api/ingredientApi";
 import {
   PageHeader, Card, Button, Badge, Modal, TextField, NumberField, SelectField,
-  Spinner, EmptyState, Pagination, ConfirmDialog,
+  Spinner, EmptyState, Pagination, ConfirmDialog, FeedbackBanner,
 } from "../../components/ui";
 import { FilterBar } from "../../components/domain/FilterBar";
 import { FOOD_GROUP_LABELS, FOOD_GROUP_STYLES } from "../../lib/labels";
 import { formatVND, formatKcal, formatGram } from "../../lib/format";
-import { ApiError } from "../../lib/apiClient";
+import { toUserFeedback, type UserFeedback } from "../../lib/userFeedback";
 import type { FoodGroup, Ingredient } from "../../types";
 
 const LIMIT = 20;
@@ -50,6 +50,7 @@ export function Ingredients() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState<Ingredient | null>(null);
+  const [feedback, setFeedback] = useState<UserFeedback | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -62,8 +63,9 @@ export function Ingredients() {
         offset,
       });
       setItems(list);
+      setFeedback(null);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
+      setFeedback(toUserFeedback(err, "load_catalog"));
     } finally {
       setLoading(false);
     }
@@ -127,7 +129,7 @@ export function Ingredients() {
       setModalOpen(false);
       load();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
+      setFeedback(toUserFeedback(err, "admin_action", isAdmin ? "admin" : "consumer"));
     } finally {
       setSaving(false);
     }
@@ -140,7 +142,7 @@ export function Ingredients() {
       toast.success("Đã ẩn nguyên liệu.");
       load();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
+      setFeedback(toUserFeedback(err, "admin_action", isAdmin ? "admin" : "consumer"));
     }
   };
 
@@ -157,6 +159,8 @@ export function Ingredients() {
           ) : undefined
         }
       />
+
+      {feedback && <FeedbackBanner feedback={feedback} onRetry={load} onDismiss={() => setFeedback(null)} className="mb-5" />}
 
       <FilterBar>
         <div className="relative flex-1">
@@ -191,7 +195,7 @@ export function Ingredients() {
             }}
             className="h-4 w-4 rounded border-sand-300 text-brand-600 focus:ring-brand-400"
           />
-          Chỉ hiển thị đang dùng
+          Chỉ hiện nguyên liệu khả dụng
         </label>
       </FilterBar>
 

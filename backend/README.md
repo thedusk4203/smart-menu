@@ -12,3 +12,21 @@ Tạo `backend/.env` từ `.env.example`; không commit secret. Database local m
 
 Đọc [backend handbook](../docs/code/backend.md), [API reference](../docs/code/api/README.md), [database/migrations](../docs/code/database.md) và [operations](../docs/code/operations.md) trước khi sửa contract hoặc persistence.
 
+## Hợp đồng lỗi API
+
+Lỗi API giữ `detail` để tương thích với client cũ và bổ sung dữ liệu có cấu trúc cho UI:
+
+```json
+{
+  "detail": "Technical detail",
+  "error": {
+    "code": "PROFILE_INCOMPLETE",
+    "message": "Hồ sơ còn thiếu thông tin.",
+    "details": {},
+    "fields": { "age": "Vui lòng bổ sung thông tin này." }
+  }
+}
+```
+
+UI người dùng cuối ánh xạ `error.code` sang thông điệp theo ngữ cảnh và không hiển thị `detail`. UI quản trị hiển thị cả mã và chi tiết kỹ thuật. Sự kiện `error` của luồng SSE dùng cùng cấu trúc, kèm `retryable`, `conversation_id` và `turn_id` khi có.
+

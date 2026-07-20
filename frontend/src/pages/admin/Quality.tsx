@@ -6,7 +6,7 @@ import { AdminEmptyState, AdminErrorState, AdminTableSkeleton } from "../../comp
 import { AdminPagination } from "../../components/admin/AdminPagination";
 import { DataStateBadge } from "../../components/admin/QualityBadges";
 import { Card, PageHeader, SelectField } from "../../components/ui";
-import { ApiError } from "../../lib/apiClient";
+import { toUserFeedback, type UserFeedback } from "../../lib/userFeedback";
 import { formatDate } from "../../lib/format";
 import type { QualityIssue } from "../../types/admin";
 
@@ -16,8 +16,8 @@ const CODE_LABELS: Record<string, string> = { missing_price: "Thiếu giá", mis
 
 export function AdminQuality() {
   const [params, setParams] = useSearchParams();
-  const [items, setItems] = useState<QualityIssue[]>([]); const [total, setTotal] = useState(0); const [search, setSearch] = useState(""); const [entityType, setEntityType] = useState(params.get("entity_type") || ""); const [severity, setSeverity] = useState(""); const [code, setCode] = useState(params.get("code") || ""); const [offset, setOffset] = useState(0); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
-  const load = useCallback(async () => { setLoading(true); setError(""); try { const page = await adminApi.quality({ search: search.trim() || undefined, entity_type: entityType, severity, code, limit: LIMIT, offset }); setItems(page.items); setTotal(page.total); } catch (err) { setError(err instanceof ApiError ? err.message : "Không thể tải danh sách chất lượng dữ liệu."); } finally { setLoading(false); } }, [code, entityType, offset, search, severity]);
+  const [items, setItems] = useState<QualityIssue[]>([]); const [total, setTotal] = useState(0); const [search, setSearch] = useState(""); const [entityType, setEntityType] = useState(params.get("entity_type") || ""); const [severity, setSeverity] = useState(""); const [code, setCode] = useState(params.get("code") || ""); const [offset, setOffset] = useState(0); const [loading, setLoading] = useState(true); const [error, setError] = useState<UserFeedback | null>(null);
+  const load = useCallback(async () => { setLoading(true); setError(null); try { const page = await adminApi.quality({ search: search.trim() || undefined, entity_type: entityType, severity, code, limit: LIMIT, offset }); setItems(page.items); setTotal(page.total); } catch (err) { setError(toUserFeedback(err, "admin_action", "admin")); } finally { setLoading(false); } }, [code, entityType, offset, search, severity]);
   useEffect(() => { const timer = window.setTimeout(load, 250); return () => window.clearTimeout(timer); }, [load]);
   const updateCode = (value: string) => { setCode(value); setOffset(0); setParams(Object.fromEntries([...params.entries()].filter(([key]) => key !== "code").concat(value ? [["code", value]] : []))); };
   const target = (issue: QualityIssue) => issue.entity_type === "ingredient"

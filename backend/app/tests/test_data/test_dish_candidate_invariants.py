@@ -13,7 +13,7 @@ def planner_catalog(db_session):
     savepoint = db_session.begin_nested()
     try:
         ingredient_ids: list[int] = []
-        for index, dish_type in enumerate((
+        for _index, dish_type in enumerate((
             DishType.BREAKFAST,
             DishType.STAPLE,
             DishType.SAVORY,

@@ -5,9 +5,7 @@ import pytest
 from app.modules.nutrition.calculator import NutritionCalculator
 from app.modules.nutrition.domain import (
     MACRO_PRESETS,
-    MacroRatio,
     NutritionTarget,
-    NutritionWarning,
     NutritionWarningCode,
 )
 from app.modules.nutrition.exceptions import (

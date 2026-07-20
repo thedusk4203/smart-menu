@@ -154,7 +154,7 @@ Nhánh quan trọng trong `plan_data`: `schema_version`, `algorithm_version`, `s
 | `day` | integer/null | Scope ngày |
 | `date` | date/null | Ngày thực |
 | `schema_version` | integer | Hiện là 3 |
-| `shopping_schema_version` | integer | 3 có ledger; 2 là V3 fallback không ledger |
+| `shopping_schema_version` | literal `3` | Chỉ còn hợp đồng ledger V3 |
 | `scope` | enum | `all/purchase_day/usage_day` |
 | `items` | `ShoppingListItem[]` | Adapter cho checkbox chung |
 | `total_estimated_cost` | number | Tổng item đang hiển thị |

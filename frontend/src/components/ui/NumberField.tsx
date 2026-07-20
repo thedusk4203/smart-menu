@@ -19,6 +19,7 @@ export function NumberField({
 }: NumberFieldProps) {
   const autoId = useId();
   const fieldId = id ?? autoId;
+  const descriptionId = `${fieldId}-description`;
   return (
     <div className={className}>
       {label && (
@@ -35,6 +36,8 @@ export function NumberField({
             suffix ? "pr-12" : ""
           } ${error ? "border-red-400 focus:ring-red-300" : "border-sand-200"}`}
           {...props}
+          aria-invalid={error ? "true" : undefined}
+          aria-describedby={error || hint ? descriptionId : undefined}
         />
         {suffix && (
           <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-gray-400">
@@ -43,9 +46,9 @@ export function NumberField({
         )}
       </div>
       {error ? (
-        <p className="mt-1 text-xs text-red-600">{error}</p>
+        <p id={descriptionId} className="mt-1 text-xs text-red-600">{error}</p>
       ) : hint ? (
-        <p className="mt-1 text-xs text-gray-500">{hint}</p>
+        <p id={descriptionId} className="mt-1 text-xs text-gray-500">{hint}</p>
       ) : null}
     </div>
   );

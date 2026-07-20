@@ -180,7 +180,7 @@ class ProviderConfigStore:
         return self._public(self.get(config_id))
 
     def clone(self, config_id: int, actor_id: int) -> dict[str, Any]:
-        source = self.get(config_id)
+        self.get(config_id)
         new_id = self.session.execute(
             text("""INSERT INTO llm_provider_configs
                     (name, provider_type, base_url, model, encrypted_api_key, api_key_suffix,

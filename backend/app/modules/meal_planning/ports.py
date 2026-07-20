@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from datetime import date
 
+from app.modules.inventory.ports import InventoryRepositoryPort
 from app.modules.meal_planning.domain import (
     DishCandidate,
     MealPlanEntity,
@@ -24,11 +25,6 @@ class MealPlanRepositoryPort(ABC):
     @abstractmethod
     def delete(self, plan_id: int) -> None: ...
 
-    def commit(self) -> None: ...
-
-    def rollback(self) -> None: ...
-
-
 class DishCandidateProviderPort(ABC):
 
     @abstractmethod
@@ -49,3 +45,19 @@ class MealPlannerPort(ABC):
         start_date: date | None = None,
         seed: int | None = None,
     ) -> MealPlanEntity | ValidationResult: ...
+
+
+class MealPlanUnitOfWorkPort(ABC):
+    @property
+    @abstractmethod
+    def plans(self) -> MealPlanRepositoryPort: ...
+
+    @property
+    @abstractmethod
+    def inventory(self) -> InventoryRepositoryPort: ...
+
+    @abstractmethod
+    def commit(self) -> None: ...
+
+    @abstractmethod
+    def rollback(self) -> None: ...

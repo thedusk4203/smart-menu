@@ -91,8 +91,8 @@ class ShoppingListResponse(BaseModel):
     plan_name: str | None = None
     day: int | None = None
     date: Date | None = None
-    schema_version: int
-    shopping_schema_version: int = 1
+    schema_version: Literal[3] = 3
+    shopping_schema_version: Literal[3] = 3
     scope: Literal["all", "purchase_day", "usage_day"] = "all"
     items: list[ShoppingListItem] = Field(default_factory=list)
     total_estimated_cost: float
@@ -106,6 +106,11 @@ class ShoppingListResponse(BaseModel):
 
 
 class PurchaseUpdate(BaseModel):
+    is_purchased: bool
+
+
+class BulkPurchaseUpdate(BaseModel):
+    item_ids: list[int] = Field(min_length=1, max_length=200)
     is_purchased: bool
 
 

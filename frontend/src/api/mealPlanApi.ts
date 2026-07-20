@@ -62,6 +62,8 @@ export const mealPlanApi = {
 
   updateShoppingItem: (planId: number, itemId: number, is_purchased: boolean, day?: number, scope?: ShoppingScope) =>
     api.patch<ShoppingListResponse>(`/api/meal-plans/${planId}/shopping-list/items/${itemId}${shoppingQuery(day, scope)}`, { is_purchased }),
+  updateShoppingItems: (planId: number, itemIds: number[], is_purchased: boolean, day?: number, scope?: ShoppingScope) =>
+    api.patch<ShoppingListResponse>(`/api/meal-plans/${planId}/shopping-list/items${shoppingQuery(day, scope)}`, { item_ids: itemIds, is_purchased }),
   shareShoppingList: (planId: number, day?: number, scope?: ShoppingScope) =>
     api.post<ShoppingShareResponse>(`/api/meal-plans/${planId}/shopping-list/share${shoppingQuery(day, scope)}`),
   revokeShoppingShare: (planId: number) => api.del<void>(`/api/meal-plans/${planId}/shopping-list/share`),
@@ -139,8 +141,8 @@ export interface ShoppingListResponse {
   plan_name?: string | null;
   day?: number | null;
   date?: string | null;
-  schema_version: number;
-  shopping_schema_version: number;
+  schema_version: 3;
+  shopping_schema_version: 3;
   scope: ShoppingScope;
   items: ShoppingListItem[];
   total_estimated_cost: number;
@@ -167,6 +169,8 @@ export const publicShoppingListApi = {
   get: (token: string) => api.publicGet<PublicShoppingListResponse>(`/api/public/shopping-lists/${token}`),
   updateItem: (token: string, itemId: number, is_purchased: boolean) =>
     api.publicPatch<PublicShoppingListResponse>(`/api/public/shopping-lists/${token}/items/${itemId}`, { is_purchased }),
+  updateItems: (token: string, itemIds: number[], is_purchased: boolean) =>
+    api.publicPatch<PublicShoppingListResponse>(`/api/public/shopping-lists/${token}/items`, { item_ids: itemIds, is_purchased }),
 };
 
 export interface PublicShoppingListResponse extends ShoppingListResponse { expires_at: string; }

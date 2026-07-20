@@ -1,6 +1,6 @@
 import { GoogleLogin } from "@react-oauth/google";
 import toast from "react-hot-toast";
-import { ApiError } from "../../lib/apiClient";
+import { feedbackMessage } from "../../lib/userFeedback";
 import { useAuth } from "../../context/AuthContext";
 import type { User } from "../../types";
 
@@ -30,7 +30,7 @@ export function GoogleLoginButton({ onAuthenticated }: GoogleLoginButtonProps) {
             try {
               onAuthenticated(await loginWithGoogle(credential));
             } catch (err) {
-              toast.error(err instanceof ApiError ? err.message : "Không thể đăng nhập với Google");
+              toast.error(feedbackMessage(err, "login"));
             }
           }}
           onError={() => toast.error("Không thể hoàn tất đăng nhập với Google")}

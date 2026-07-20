@@ -13,7 +13,10 @@ from app.modules.shopping_lists.router import (
     _share_token,
     share_shopping_list,
 )
-from app.modules.shopping_lists.use_cases import BuildShoppingListUseCase
+from app.modules.shopping_lists.use_cases import (
+    BuildShoppingListUseCase,
+    UpdateShoppingItemsUseCase,
+)
 
 
 class FakeShoppingListRepository:
@@ -26,6 +29,25 @@ class FakeShoppingListRepository:
             {**item, "id": index, "is_purchased": item["ingredient_id"] == 1}
             for index, item in enumerate(items, start=1)
         ]
+
+    def set_purchased_many(
+        self, plan_id: int, item_ids: list[int], purchased: bool
+    ) -> int:
+        self.updated_many = (plan_id, item_ids, purchased)
+        return len(item_ids)
+
+
+class FakeShoppingUnitOfWork:
+    def __init__(self, repository: FakeShoppingListRepository) -> None:
+        self.shopping_lists = repository
+        self.commits = 0
+        self.rollbacks = 0
+
+    def commit(self) -> None:
+        self.commits += 1
+
+    def rollback(self) -> None:
+        self.rollbacks += 1
 
 
 def test_shared_shopping_list_token_preserves_selected_day():
@@ -63,7 +85,7 @@ def test_share_response_confirms_selected_day():
             assert scope == "usage_day"
 
     class FakeShares:
-        def get_or_create(self, plan_id: int):
+        def execute(self, plan_id: int):
             assert plan_id == plan.id
             return share
 
@@ -73,7 +95,7 @@ def test_share_response_confirms_selected_day():
         current_user=UserEntity(id=1, email="owner@example.com", hashed_password="hash"),
         plans=FakePlans(),
         build=FakeBuild(),
-        shares=FakeShares(),
+        create_share=FakeShares(),
     )
 
     assert response.day == 2
@@ -94,6 +116,7 @@ def _v3_plan() -> MealPlanEntity:
                 "ending_carryover_value": 1_200,
             },
             "procurement": {
+                "ledger_version": 2,
                 "shopping_days": [1, 2],
                 "purchase_items": [
                     {
@@ -156,6 +179,54 @@ def _v3_plan() -> MealPlanEntity:
                         "unit": "g",
                     }
                 ],
+                "daily_ledger": [
+                    {
+                        "day": 1,
+                        "items": [{
+                            "item_key": "purchase:1:1", "source_kind": "purchase",
+                            "inventory_lot_id": None, "ingredient_id": 1,
+                            "name": "Thịt gà", "unit": "g", "opening_quantity": 0,
+                            "purchase_quantity": 200, "usage_quantity": 100,
+                            "expired_quantity": 0, "closing_quantity": 100,
+                            "unit_value": 20, "purchase_cost": 4_000,
+                            "allocations": [{
+                                "day": 1, "quantity": 100, "storage_mode": "room",
+                                "expiry_day": 1, "dish_name": "Gà áp chảo",
+                            }],
+                        }],
+                        "totals": {},
+                    },
+                    {
+                        "day": 2,
+                        "items": [
+                            {
+                                "item_key": "purchase:1:1", "source_kind": "purchase",
+                                "inventory_lot_id": None, "ingredient_id": 1,
+                                "name": "Thịt gà", "unit": "g", "opening_quantity": 100,
+                                "purchase_quantity": 0, "usage_quantity": 80,
+                                "expired_quantity": 0, "closing_quantity": 20,
+                                "unit_value": 20, "purchase_cost": 0,
+                                "allocations": [{
+                                    "day": 2, "quantity": 80, "storage_mode": "fridge",
+                                    "expiry_day": 3, "dish_name": "Gà xào",
+                                }],
+                            },
+                            {
+                                "item_key": "purchase:2:2", "source_kind": "purchase",
+                                "inventory_lot_id": None, "ingredient_id": 2,
+                                "name": "Rau cải", "unit": "g", "opening_quantity": 0,
+                                "purchase_quantity": 100, "usage_quantity": 100,
+                                "expired_quantity": 0, "closing_quantity": 0,
+                                "unit_value": 10, "purchase_cost": 1_000,
+                                "allocations": [{
+                                    "day": 2, "quantity": 100, "storage_mode": "room",
+                                    "expiry_day": 2, "dish_name": "Rau luộc",
+                                }],
+                            },
+                        ],
+                        "totals": {},
+                    },
+                ],
             },
             "days": [
                 {
@@ -177,10 +248,11 @@ def _v3_plan() -> MealPlanEntity:
 
 def test_v3_shopping_list_exposes_purchase_blocks_pantry_and_cost_hierarchy():
     repository = FakeShoppingListRepository()
+    unit_of_work = FakeShoppingUnitOfWork(repository)
 
-    result = BuildShoppingListUseCase(repository).execute(_v3_plan())
+    result = BuildShoppingListUseCase(unit_of_work).execute(_v3_plan())
 
-    assert result.shopping_schema_version == 2
+    assert result.shopping_schema_version == 3
     assert result.scope == "all"
     assert [(item.item_key, item.purchase_quantity) for item in result.purchase_items] == [
         ("purchase:1:1", 200),
@@ -192,6 +264,35 @@ def test_v3_shopping_list_exposes_purchase_blocks_pantry_and_cost_hierarchy():
     assert result.summary["purchase_cost"] == 5_000
     assert result.summary["visible_purchase_cost"] == 5_000
     assert len(repository.materialized_items) == 3
+    assert unit_of_work.commits == 1
+
+
+def test_bulk_purchase_update_deduplicates_ids_and_commits_once():
+    repository = FakeShoppingListRepository()
+    unit_of_work = FakeShoppingUnitOfWork(repository)
+
+    updated = UpdateShoppingItemsUseCase(unit_of_work).execute(
+        plan_id=12, item_ids=[1, 2, 1], purchased=True
+    )
+
+    assert updated is True
+    assert repository.updated_many == (12, [1, 2], True)
+    assert unit_of_work.commits == 1
+    assert unit_of_work.rollbacks == 0
+
+
+def test_bulk_purchase_update_rolls_back_when_any_item_is_missing():
+    repository = FakeShoppingListRepository()
+    repository.set_purchased_many = lambda plan_id, item_ids, purchased: 1
+    unit_of_work = FakeShoppingUnitOfWork(repository)
+
+    updated = UpdateShoppingItemsUseCase(unit_of_work).execute(
+        plan_id=12, item_ids=[1, 2], purchased=True
+    )
+
+    assert updated is False
+    assert unit_of_work.commits == 0
+    assert unit_of_work.rollbacks == 1
 
 
 def test_v3_usage_day_distinguishes_new_purchase_from_fridge_carryover():
@@ -205,7 +306,7 @@ def test_v3_usage_day_distinguishes_new_purchase_from_fridge_carryover():
     assert [(item.ingredient_id, item.purchase_day, item.storage_mode) for item in result.carryover_usage] == [
         (1, 1, "fridge"),
     ]
-    assert result.leftovers[0].status == "carryover"
+    assert result.leftovers[0].status == "closing_stock"
 
 
 def test_v3_purchase_day_scope_requires_a_day_and_filters_visible_cost():
@@ -221,7 +322,6 @@ def test_v3_purchase_day_scope_requires_a_day_and_filters_visible_cost():
 
 def test_v3_ledger_usage_day_reports_true_day_end_stock():
     plan = deepcopy(_v3_plan())
-    plan.plan_data["procurement"]["ledger_version"] = 2
     plan.plan_data["procurement"]["inventory_items"] = []
     plan.plan_data["procurement"]["daily_ledger"] = [
         {

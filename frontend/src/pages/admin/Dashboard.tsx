@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { adminApi } from "../../api/adminApi";
 import { useAuth } from "../../context/AuthContext";
-import { ApiError } from "../../lib/apiClient";
+import { toUserFeedback, type UserFeedback } from "../../lib/userFeedback";
 import { formatDate } from "../../lib/format";
 import { PageHeader } from "../../components/ui";
 import { AdminErrorState, AdminTableSkeleton } from "../../components/admin/AdminStates";
@@ -42,16 +42,16 @@ function Metric({ label, value, note, icon: Icon, to }: MetricProps) {
 export function AdminDashboard() {
   const { user } = useAuth();
   const [data, setData] = useState<AdminDashboardSummary | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<UserFeedback | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError("");
+    setError(null);
     try {
       setData(await adminApi.dashboard());
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Máy chủ không trả về dữ liệu tổng quan.");
+      setError(toUserFeedback(err, "admin_action", "admin"));
     } finally {
       setLoading(false);
     }
@@ -71,7 +71,7 @@ export function AdminDashboard() {
             to="/admin/imports"
             className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
           >
-            <FileUp className="h-4 w-4" aria-hidden="true" /> Import dữ liệu
+            <FileUp className="h-4 w-4" aria-hidden="true" /> Nhập dữ liệu (import)
           </Link>
         }
       />
@@ -80,7 +80,7 @@ export function AdminDashboard() {
         <div className="overflow-hidden rounded-2xl border border-sand-200 bg-white"><AdminTableSkeleton rows={8} /></div>
       ) : error || !data ? (
         <div className="rounded-2xl border border-sand-200 bg-white">
-          <AdminErrorState message={error} onRetry={load} />
+          <AdminErrorState feedback={error ?? undefined} onRetry={load} />
         </div>
       ) : (
         <>
@@ -90,7 +90,7 @@ export function AdminDashboard() {
             )}
             <Metric label="Nguyên liệu" value={data.ingredients_total} note={`${data.ingredients_active} đang được sử dụng`} icon={Salad} to="/admin/ingredients" />
             <Metric label="Món thành phần" value={data.dishes_total} note={`${data.incomplete_dishes} món cần bổ sung`} icon={ChefHat} to="/admin/dishes" />
-            <Metric label="Món sẵn sàng cho planner" value={data.planner_ready_dishes} note={`Sáng ${data.breakfast_count} · Tinh bột ${data.staple_count} · Mặn ${data.savory_count} · Rau/Canh ${data.vegetable_count + data.soup_count}`} icon={ChefHat} to="/admin/dishes" />
+            <Metric label="Món sẵn sàng để lập thực đơn" value={data.planner_ready_dishes} note={`Sáng ${data.breakfast_count} · Tinh bột ${data.staple_count} · Mặn ${data.savory_count} · Rau/Canh ${data.vegetable_count + data.soup_count}`} icon={ChefHat} to="/admin/dishes" />
           </section>
 
           <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.7fr)]">
@@ -98,7 +98,7 @@ export function AdminDashboard() {
               <div className="flex items-start justify-between gap-4 border-b border-sand-200 px-5 py-4">
                 <div>
                   <h2 id="quality-title" className="font-semibold text-gray-950">Việc cần xử lý</h2>
-                  <p className="mt-1 text-sm text-gray-600">Các lỗi có thể làm planner tính sai hoặc không tìm được bữa phù hợp.</p>
+                  <p className="mt-1 text-sm text-gray-600">Các lỗi có thể làm hệ thống tính sai hoặc không tìm được bữa phù hợp.</p>
                 </div>
                 <span className="rounded-full bg-red-50 px-3 py-1 text-sm font-semibold tabular-nums text-red-800">
                   {data.open_quality_issues}
@@ -107,9 +107,9 @@ export function AdminDashboard() {
               <div className="divide-y divide-sand-100">
                 {[
                   ["Nguyên liệu thiếu giá", data.missing_price, "/admin/quality?code=missing_price", "Không thể tính đúng chi phí món"],
-                  ["Nguyên liệu thiếu dinh dưỡng", data.missing_nutrition, "/admin/quality?code=missing_nutrition", "Làm thiếu tổng calo và macro"],
+                  ["Nguyên liệu thiếu dinh dưỡng", data.missing_nutrition, "/admin/quality?code=missing_nutrition", "Làm thiếu tổng năng lượng và các chất chính"],
                   ["Cần kiểm tra quy đổi", data.missing_conversion, "/admin/quality?code=missing_conversion", "Đơn vị khác gram nhưng hệ số đang bằng 1"],
-                  ["Món thiếu công thức hoặc dữ liệu", data.incomplete_dishes, "/admin/quality?entity_type=dish", "Cần bổ sung trước khi đưa vào planner"],
+                  ["Món thiếu công thức hoặc dữ liệu", data.incomplete_dishes, "/admin/quality?entity_type=dish", "Cần bổ sung trước khi dùng để lập thực đơn"],
                   ["Tên có khả năng trùng", data.duplicate_names, "/admin/quality?code=duplicate_name", "Kiểm tra trước khi gộp dữ liệu"],
                 ].map(([label, value, to, detail]) => (
                   <Link key={String(label)} to={String(to)} className="group flex min-h-16 items-center gap-4 px-5 py-3 transition hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-400">
@@ -130,17 +130,17 @@ export function AdminDashboard() {
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-brand-700 shadow-sm">
                   <ShieldCheck className="h-5 w-5" aria-hidden="true" />
                 </span>
-                <h2 className="mt-4 font-semibold text-brand-950">Dữ liệu canonical</h2>
+                <h2 className="mt-4 font-semibold text-brand-950">Dữ liệu chuẩn (canonical)</h2>
                 <p className="mt-1 text-sm leading-6 text-brand-900">
-                  Planner ghép trực tiếp dish theo vai trò dinh dưỡng. Mọi thay đổi hợp lệ tại đây được dùng ở lần tạo thực đơn tiếp theo.
+                  Hệ thống ghép trực tiếp món thành phần (dish) theo vai trò dinh dưỡng. Mọi thay đổi hợp lệ tại đây được dùng ở lần tạo thực đơn tiếp theo.
                 </p>
               </div>
               <div className="rounded-2xl border border-sand-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-                  <Clock3 className="h-4 w-4 text-gray-500" aria-hidden="true" /> Import gần nhất
+                  <Clock3 className="h-4 w-4 text-gray-500" aria-hidden="true" /> Lần nhập dữ liệu (import) gần nhất
                 </div>
                 <p className="mt-3 text-sm text-gray-600">
-                  {data.last_import_at ? formatDate(data.last_import_at) : "Chưa có phiên import nào."}
+                  {data.last_import_at ? formatDate(data.last_import_at) : "Chưa có lần nhập dữ liệu nào."}
                 </p>
                 <Link to="/admin/imports" className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-brand-700 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
                   Xem lịch sử <ArrowRight className="h-4 w-4" aria-hidden="true" />

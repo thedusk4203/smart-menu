@@ -8,7 +8,7 @@ from sqlalchemy import text
 
 from app.core.exceptions import ConflictError, NotFoundError
 from app.modules.ai.conversation_store import ConversationStore, make_conversation_title
-from app.modules.ai.exceptions import AIResponseValidationError, AIUnavailableError
+from app.modules.ai.exceptions import AIUnavailableError
 from app.modules.ai.schemas import ChatRequest
 from app.modules.ai.use_cases import ChatUseCase, _recent_chat_history
 

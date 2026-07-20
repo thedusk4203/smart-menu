@@ -73,7 +73,6 @@ class Settings:
         os.getenv("AI_CONVERSATION_CLEANUP_INTERVAL_SECONDS", "3600")
     )
     ai_config_encryption_key: str | None = os.getenv("AI_CONFIG_ENCRYPTION_KEY")
-    meal_planner_v3_ledger_enabled: bool = _env_bool("MEAL_PLANNER_V3_LEDGER_ENABLED", False)
     cors_origins: list[str] = _env_list(
         "CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
     )

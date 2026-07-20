@@ -45,9 +45,3 @@ class SqlMealPlanRepository(MealPlanRepositoryPort):
         if row:
             self._session.delete(row)
             self._session.flush()
-
-    def commit(self) -> None:
-        self._session.commit()
-
-    def rollback(self) -> None:
-        self._session.rollback()

@@ -254,7 +254,7 @@ def test_jit_schedule_survives_timeout_before_waste_and_holding_phases(monkeypat
         return (ingredient(12, 220, room=5),)
 
     candidates, days = fixed_catalog(3, ingredients_for)
-    request = plan_request(days=3, ledger_enabled=True)
+    request = plan_request(days=3)
     optimizer = ProcurementCpSatOptimizer(timeout_seconds=3)
     original_run_phase = optimizer._run_phase
 
@@ -373,7 +373,7 @@ def test_independent_checker_rejects_purchase_without_same_day_use():
         1,
         lambda _day, _position, _dish_id: (ingredient(1, 20, room=2),),
     )
-    request = plan_request(ledger_enabled=True)
+    request = plan_request()
     result = solve_fixed(request, candidates, days)
     tampered_procurement = deepcopy(result.procurement_plan)
     tampered_procurement["purchase_items"][0]["purchase_day"] = 0
@@ -398,7 +398,6 @@ def test_ledger_uses_inventory_before_new_purchase_and_balances_day_end():
         lambda _day, _position, _dish_id: (ingredient(1, 20, room=2),),
     )
     request = plan_request(
-        ledger_enabled=True,
         inventory_fingerprint="inventory-v1",
         inventory_lots=(InventoryLotSnapshot(
             lot_id=7, ingredient_id=1, name="Nguyên liệu 1", quantity=100,
@@ -425,7 +424,6 @@ def test_jit_inventory_allocation_is_fefo_before_new_purchase():
         lambda _day, _position, _dish_id: (ingredient(1, 20, room=2),),
     )
     request = plan_request(
-        ledger_enabled=True,
         inventory_fingerprint="inventory-fefo",
         inventory_lots=(
             InventoryLotSnapshot(
@@ -672,14 +670,34 @@ class _SaveRepository:
         self.created = None
 
     def create(self, entity):
-        self.created = entity
-        return entity
+        self.created = replace(entity, id=99)
+        return self.created
+
+
+
+class _SaveInventory:
+    def verify_fingerprint(self, *_args):
+        return None
+
+    def reserve_inputs(self, _plan):
+        return None
+
+    def create_ending_lots(self, _plan):
+        return None
+
+
+class _SaveUnitOfWork:
+    def __init__(self, repository):
+        self.plans = repository
+        self.inventory = _SaveInventory()
+        self.commits = 0
+        self.rollbacks = 0
 
     def commit(self):
-        return None
+        self.commits += 1
 
     def rollback(self):
-        return None
+        self.rollbacks += 1
 
 
 def test_save_v3_recomputes_and_persists_backend_owned_snapshot():
@@ -687,7 +705,7 @@ def test_save_v3_recomputes_and_persists_backend_owned_snapshot():
     repository = _SaveRepository()
 
     saved = SaveMealPlanUseCase(
-        repository, _SaveProvider(candidates), _SaveRequestBuilder(request)
+        _SaveUnitOfWork(repository), _SaveProvider(candidates), _SaveRequestBuilder(request)
     ).execute(payload, user_id=1)
 
     assert repository.created is saved
@@ -695,6 +713,26 @@ def test_save_v3_recomputes_and_persists_backend_owned_snapshot():
     assert saved.plan_data["source_fingerprint"] == generated.plan_data["source_fingerprint"]
     assert saved.total_cost == 2_000
     assert saved.plan_data["cost_summary"]["purchase_cost"] == 2_000
+
+
+def test_save_v3_rolls_back_plan_and_inventory_as_one_transaction():
+    candidates, request, _generated, payload = _save_fixture()
+    unit_of_work = _SaveUnitOfWork(_SaveRepository())
+
+    def fail_reservation(_plan):
+        raise RuntimeError("inventory write failed")
+
+    unit_of_work.inventory.reserve_inputs = fail_reservation
+
+    with pytest.raises(RuntimeError, match="inventory write failed"):
+        SaveMealPlanUseCase(
+            unit_of_work,
+            _SaveProvider(candidates),
+            _SaveRequestBuilder(request),
+        ).execute(payload, user_id=1)
+
+    assert unit_of_work.commits == 0
+    assert unit_of_work.rollbacks == 1
 
 
 def test_save_v3_rejects_tampered_leftover_adjustment():
@@ -705,7 +743,9 @@ def test_save_v3_rejects_tampered_leftover_adjustment():
 
     with pytest.raises(ConflictError, match="PLAN_ADJUSTMENTS_CHANGED"):
         SaveMealPlanUseCase(
-            _SaveRepository(), _SaveProvider(candidates), _SaveRequestBuilder(request)
+            _SaveUnitOfWork(_SaveRepository()),
+            _SaveProvider(candidates),
+            _SaveRequestBuilder(request),
         ).execute(tampered, user_id=1)
 
 
@@ -731,7 +771,9 @@ def test_save_v3_rejects_changed_price_or_purchase_rule_fingerprint():
 
     with pytest.raises(ConflictError, match="PLAN_SOURCE_CHANGED"):
         SaveMealPlanUseCase(
-            _SaveRepository(), _SaveProvider(changed_candidates), _SaveRequestBuilder(request)
+            _SaveUnitOfWork(_SaveRepository()),
+            _SaveProvider(changed_candidates),
+            _SaveRequestBuilder(request),
         ).execute(payload, user_id=1)
 
 
