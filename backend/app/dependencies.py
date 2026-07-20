@@ -6,8 +6,6 @@ from sqlmodel import Session
 
 from app.core.database import get_session
 from app.core.deps import get_current_user
-from app.core.config import settings
-
 # ── identity ──────────────────────────────────────────────────────────────
 from app.modules.identity.repository import SqlUserRepository
 from app.modules.identity.use_cases import (
@@ -117,7 +115,10 @@ def get_deactivate_meal_use_case(s: Session = Depends(get_session)) -> Deactivat
 # ── meal_planning ─────────────────────────────────────────────────────────
 from app.modules.meal_planning.dish_candidate_repository import SqlDishCandidateProvider
 from app.modules.meal_planning.repository import SqlMealPlanRepository
+from app.modules.meal_planning.unit_of_work import SqlMealPlanUnitOfWork
 from app.modules.inventory.repository import SqlInventoryRepository
+from app.modules.inventory.unit_of_work import SqlInventoryUnitOfWork
+from app.modules.inventory.use_cases import ListInventoryLotsUseCase, UpdateInventoryLotUseCase
 from app.modules.meal_planning.use_cases import (
     BuildPlanRequestUseCase, DeleteMealPlanUseCase, GenerateMealPlanUseCase, GetMealPlanUseCase,
     ListMealPlansUseCase, SaveMealPlanUseCase,
@@ -126,12 +127,11 @@ from app.modules.meal_planning.use_cases import (
 
 def get_save_meal_plan_use_case(s: Session = Depends(get_session)) -> SaveMealPlanUseCase:
     return SaveMealPlanUseCase(
-        SqlMealPlanRepository(s),
+        SqlMealPlanUnitOfWork(s),
         SqlDishCandidateProvider(s),
         BuildPlanRequestUseCase(
             SqlUserProfileRepository(s), SqlExclusionRepository(s), SqlInventoryRepository(s)
         ),
-        SqlInventoryRepository(s),
     )
 
 def get_list_meal_plans_use_case(s: Session = Depends(get_session)) -> ListMealPlansUseCase:
@@ -141,7 +141,7 @@ def get_get_meal_plan_use_case(s: Session = Depends(get_session)) -> GetMealPlan
     return GetMealPlanUseCase(SqlMealPlanRepository(s))
 
 def get_delete_meal_plan_use_case(s: Session = Depends(get_session)) -> DeleteMealPlanUseCase:
-    return DeleteMealPlanUseCase(SqlMealPlanRepository(s), SqlInventoryRepository(s))
+    return DeleteMealPlanUseCase(SqlMealPlanUnitOfWork(s))
 
 def get_generate_meal_plan_use_case(s: Session = Depends(get_session)) -> GenerateMealPlanUseCase:
     return GenerateMealPlanUseCase(SqlDishCandidateProvider(s))
@@ -152,21 +152,56 @@ def get_build_plan_request_use_case(s: Session = Depends(get_session)) -> BuildP
     )
 
 
+def get_list_inventory_lots_use_case(
+    s: Session = Depends(get_session),
+) -> ListInventoryLotsUseCase:
+    return ListInventoryLotsUseCase(SqlInventoryRepository(s))
+
+
+def get_update_inventory_lot_use_case(
+    s: Session = Depends(get_session),
+) -> UpdateInventoryLotUseCase:
+    return UpdateInventoryLotUseCase(SqlInventoryUnitOfWork(s))
+
+
 # ── shopping lists ────────────────────────────────────────────────────────
-from app.modules.shopping_lists.repository import SqlShoppingListRepository, SqlShoppingShareRepository
-from app.modules.shopping_lists.use_cases import BuildShoppingListUseCase
+from app.modules.shopping_lists.repository import SqlShoppingShareRepository
+from app.modules.shopping_lists.unit_of_work import SqlShoppingListUnitOfWork
+from app.modules.shopping_lists.use_cases import (
+    BuildShoppingListUseCase,
+    GetActiveShoppingShareUseCase,
+    GetOrCreateShoppingShareUseCase,
+    RevokeShoppingShareUseCase,
+    UpdateShoppingItemUseCase,
+)
 
 
 def get_build_shopping_list_use_case(s: Session = Depends(get_session)) -> BuildShoppingListUseCase:
-    return BuildShoppingListUseCase(SqlShoppingListRepository(s))
+    return BuildShoppingListUseCase(SqlShoppingListUnitOfWork(s))
 
 
-def get_shopping_list_repository(s: Session = Depends(get_session)) -> SqlShoppingListRepository:
-    return SqlShoppingListRepository(s)
+def get_update_shopping_item_use_case(
+    s: Session = Depends(get_session),
+) -> UpdateShoppingItemUseCase:
+    return UpdateShoppingItemUseCase(SqlShoppingListUnitOfWork(s))
 
 
-def get_shopping_share_repository(s: Session = Depends(get_session)) -> SqlShoppingShareRepository:
-    return SqlShoppingShareRepository(s)
+def get_or_create_shopping_share_use_case(
+    s: Session = Depends(get_session),
+) -> GetOrCreateShoppingShareUseCase:
+    return GetOrCreateShoppingShareUseCase(SqlShoppingListUnitOfWork(s))
+
+
+def get_active_shopping_share_use_case(
+    s: Session = Depends(get_session),
+) -> GetActiveShoppingShareUseCase:
+    return GetActiveShoppingShareUseCase(SqlShoppingShareRepository(s))
+
+
+def get_revoke_shopping_share_use_case(
+    s: Session = Depends(get_session),
+) -> RevokeShoppingShareUseCase:
+    return RevokeShoppingShareUseCase(SqlShoppingListUnitOfWork(s))
 
 
 # ── nutrition ─────────────────────────────────────────────────────────────

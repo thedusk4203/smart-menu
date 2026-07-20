@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.shared.enums import ActivityLevel, ExclusionReason, FitnessGoal, Gender
 
 
 class ProfileResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     user_id: int
     full_name: str | None
     gender: Gender | None
@@ -17,10 +19,6 @@ class ProfileResponse(BaseModel):
     meals_per_day: int
     daily_calorie_target: float | None
     daily_budget: float | None
-
-    class Config:
-        from_attributes = True
-
 
 class ProfileUpdate(BaseModel):
     full_name: str | None = None
@@ -41,9 +39,8 @@ class ExclusionCreate(BaseModel):
 
 
 class ExclusionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     ingredient_id: int
     reason: ExclusionReason
-
-    class Config:
-        from_attributes = True

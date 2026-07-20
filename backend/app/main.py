@@ -47,7 +47,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="Smart Menu API",
-    description="API backend cho á»©ng dá»¥ng láº­p thá»±c Ä‘Æ¡n theo ngÃ¢n sÃ¡ch & dinh dÆ°á»¡ng",
+    description="API backend cho ứng dụng lập thực đơn theo ngân sách và dinh dưỡng",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -63,9 +63,7 @@ app.add_middleware(
 
 @app.exception_handler(AppException)
 def handle_app_exception(request: Request, exc: AppException) -> JSONResponse:
-    """Map má»i domain exception (NotFoundError/ConflictError/...) sang HTTP
-    response. Use case/domain layer khÃ´ng phá»¥ thuá»™c FastAPI â€” chá»‰ cÃ³ Ä‘iá»ƒm
-    nÃ y má»›i biáº¿t tá»›i HTTP."""
+    """Map domain exception sang HTTP tại duy nhất application boundary này."""
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 

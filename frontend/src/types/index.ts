@@ -273,7 +273,7 @@ export interface PlanPurchaseItem {
   storage_splits: Array<{ mode: string; quantity: number; expiry_day: number }>;
 }
 export interface PlanData {
-  schema_version?: 1 | 2 | 3;
+  schema_version: 3;
   algorithm_version?: string;
   plan_signature?: string;
   source_fingerprint?: string;

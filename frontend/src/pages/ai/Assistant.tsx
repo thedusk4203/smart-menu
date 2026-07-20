@@ -2,31 +2,24 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import toast from "react-hot-toast";
 import {
-  History,
-  Leaf,
   PanelLeft,
   Plus,
-  RefreshCw,
   Send,
   ShieldCheck,
   Sparkles,
-  Trash2,
-  User,
   X,
 } from "lucide-react";
 import { aiApi } from "../../api/aiApi";
+import { ConversationRail } from "./assistant/ConversationRail";
+import { MAX_CONVERSATIONS, MAX_TURNS } from "./assistant/constants";
+import { MessageBubble, TurnMessages } from "./assistant/TurnMessages";
 import type {
   ChatStreamEvent,
   ConversationDetail,
   ConversationSummary,
-  ConversationTurn,
 } from "../../api/aiApi";
-import { ChatMarkdown } from "../../components/domain/ChatMarkdown";
 import { ApiError } from "../../lib/apiClient";
-import { ConfirmDialog, PageHeader, Spinner } from "../../components/ui";
-
-const MAX_CONVERSATIONS = 10;
-const MAX_TURNS = 20;
+import { ConfirmDialog, PageHeader } from "../../components/ui";
 
 const SAMPLE_QUESTIONS = [
   "Gợi ý món ăn giàu đạm, ít calo?",
@@ -35,127 +28,8 @@ const SAMPLE_QUESTIONS = [
   "Nên ăn bao nhiêu tinh bột mỗi ngày?",
 ];
 
-const formatConversationTime = (value: string) =>
-  new Intl.DateTimeFormat("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
-
 const errorMessage = (error: unknown) =>
   error instanceof ApiError ? error.message : "Có lỗi xảy ra. Vui lòng thử lại.";
-
-interface ConversationRailProps {
-  conversations: ConversationSummary[];
-  selectedId: number | null;
-  loading: boolean;
-  deletingId: number | null;
-  disabled: boolean;
-  onSelect: (id: number) => void;
-  onNew: () => void;
-  onDelete: (id: number) => void;
-}
-
-function ConversationRail({
-  conversations,
-  selectedId,
-  loading,
-  deletingId,
-  disabled,
-  onSelect,
-  onNew,
-  onDelete,
-}: ConversationRailProps) {
-  const atLimit = conversations.length >= MAX_CONVERSATIONS;
-
-  return (
-    <div className="flex h-full min-h-0 flex-col bg-sand-50">
-      <div className="border-b border-sand-200 p-3">
-        <button
-          type="button"
-          onClick={onNew}
-          disabled={atLimit || disabled}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Plus className="h-4 w-4" /> Cuộc trò chuyện mới
-        </button>
-        {atLimit && (
-          <p className="mt-2 text-xs leading-5 text-gray-600">
-            Đã đủ 10 cuộc. Hãy xóa một cuộc trước khi tạo mới.
-          </p>
-        )}
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Danh sách cuộc trò chuyện">
-        {loading ? (
-          <div className="space-y-2 p-1" aria-label="Đang tải lịch sử">
-            {[1, 2, 3].map((item) => (
-              <div key={item} className="h-20 animate-pulse rounded-xl bg-sand-200 motion-reduce:animate-none" />
-            ))}
-          </div>
-        ) : conversations.length === 0 ? (
-          <div className="px-3 py-10 text-center">
-            <History className="mx-auto h-7 w-7 text-gray-500" />
-            <p className="mt-3 text-sm font-medium text-gray-700">Chưa có lịch sử</p>
-            <p className="mt-1 text-xs leading-5 text-gray-600">
-              Cuộc trò chuyện sẽ tự lưu sau câu hỏi đầu tiên.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-1">
-            {conversations.map((conversation) => {
-              const selected = conversation.id === selectedId;
-              return (
-                <div
-                  key={conversation.id}
-                  className={`group flex items-start gap-1 rounded-xl border p-1 transition-colors ${
-                    selected
-                      ? "border-brand-200 bg-brand-50"
-                      : "border-transparent hover:border-sand-200 hover:bg-white"
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => onSelect(conversation.id)}
-                    disabled={disabled}
-                    className="min-w-0 flex-1 rounded-lg px-2 py-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
-                    aria-current={selected ? "true" : undefined}
-                  >
-                    <span className="block truncate text-sm font-medium text-gray-800">
-                      {conversation.title}
-                    </span>
-                    <span className="mt-1 block truncate text-xs text-gray-600">
-                      {conversation.last_message_preview || "Chưa có câu trả lời"}
-                    </span>
-                    <span className="mt-1.5 flex items-center gap-2 text-[11px] text-gray-600">
-                      <span>{conversation.turn_count}/20 câu</span>
-                      <span aria-hidden="true">·</span>
-                      <span>{formatConversationTime(conversation.updated_at)}</span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(conversation.id)}
-                    disabled={disabled || deletingId === conversation.id}
-                    aria-label={`Xóa cuộc trò chuyện ${conversation.title}`}
-                    className="mt-1 rounded-lg p-2 text-red-700 opacity-60 transition hover:bg-red-50 hover:text-red-800 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 group-hover:opacity-100 disabled:cursor-wait"
-                  >
-                    {deletingId === conversation.id ? (
-                      <Spinner className="h-4 w-4" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 type ActiveStream = {
   mode: "chat" | "retry";
@@ -668,123 +542,6 @@ export function Assistant() {
         message={`Xóa cuộc trò chuyện “${conversations.find((item) => item.id === confirmingDeleteId)?.title || "này"}”?`}
         confirmLabel="Xóa"
       />
-    </div>
-  );
-}
-
-function TurnMessages({
-  turn,
-  isLatest,
-  retrying,
-  streaming,
-  streamingContent,
-  onRetry,
-}: {
-  turn: ConversationTurn;
-  isLatest: boolean;
-  retrying: boolean;
-  streaming: boolean;
-  streamingContent: string | null;
-  onRetry: () => void;
-}) {
-  const content = streaming && streamingContent ? streamingContent : turn.assistant_content;
-  return (
-    <>
-      <MessageBubble role="user" content={turn.user_content} />
-      {content && (
-        <MessageBubble
-          role="assistant"
-          content={content}
-          streaming={streaming}
-          action={
-            isLatest && !streaming && turn.status !== "failed" ? (
-              <button
-                type="button"
-                onClick={onRetry}
-                disabled={retrying || turn.status === "pending"}
-                className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-brand-800 hover:bg-brand-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:cursor-wait disabled:opacity-60"
-                aria-label="Tạo lại câu trả lời cho câu hỏi gần nhất"
-              >
-                {retrying ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                Thử lại
-              </button>
-            ) : undefined
-          }
-        />
-      )}
-      {streaming && !content && (
-        <MessageBubble role="assistant" content="" streaming />
-      )}
-      {streaming && !streamingContent && turn.assistant_content && (
-        <div className="ml-10 flex items-center gap-2 text-sm text-gray-600" role="status">
-          <Spinner className="h-4 w-4" /> Menuto đang tạo lại câu trả lời...
-        </div>
-      )}
-      {turn.status === "failed" && (
-        <div className="ml-10 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800">
-          <p>{turn.assistant_content ? "Menuto chưa thể tạo lại câu trả lời; nội dung cũ được giữ lại." : "Menuto chưa trả lời được câu hỏi này."}</p>
-          {isLatest && (
-            <button
-              type="button"
-              onClick={onRetry}
-              disabled={retrying}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 text-xs font-medium text-red-800 shadow-sm hover:bg-red-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:cursor-wait disabled:opacity-60"
-            >
-              {retrying ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              Retry câu hỏi
-            </button>
-          )}
-        </div>
-      )}
-      {turn.status === "pending" && !streaming && (
-        <div className="flex items-center gap-2 text-sm text-gray-600" role="status">
-          <Spinner className="h-4 w-4" /> Menuto đang trả lời...
-        </div>
-      )}
-    </>
-  );
-}
-
-function MessageBubble({
-  role,
-  content,
-  action,
-  streaming = false,
-}: {
-  role: "user" | "assistant";
-  content: string;
-  action?: React.ReactNode;
-  streaming?: boolean;
-}) {
-  const isUser = role === "user";
-  return (
-    <div className={`flex items-start gap-2.5 ${isUser ? "flex-row-reverse" : ""}`}>
-      <div
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-          isUser ? "bg-sand-200 text-gray-700" : "bg-brand-100 text-brand-700"
-        }`}
-      >
-        {isUser ? <User className="h-4 w-4" /> : <Leaf className="h-4 w-4" />}
-      </div>
-      <div
-        className={`min-w-0 max-w-[84%] rounded-2xl px-4 py-2.5 text-sm leading-6 sm:max-w-[78%] ${
-          isUser ? "bg-brand-600 text-white" : "bg-sand-100 text-gray-800"
-        }`}
-      >
-        {content ? (
-          isUser ? (
-            <p className="whitespace-pre-wrap break-words">{content}</p>
-          ) : (
-            <ChatMarkdown content={content} streaming={streaming} />
-          )
-        ) : streaming ? (
-          <span className="inline-flex items-center gap-2 text-gray-600" role="status">
-            <Spinner className="h-4 w-4" /> Menuto đang trả lời...
-          </span>
-        ) : null}
-        {streaming && content && <span className="ml-1 inline-block h-4 w-1 animate-pulse rounded-full bg-brand-500 align-[-2px] motion-reduce:animate-none" aria-hidden="true" />}
-        {action}
-      </div>
     </div>
   );
 }

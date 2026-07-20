@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlmodel import Session
 
-from app.core.database import get_session
 from app.core.deps import get_current_user, require_super_admin
 from app.dependencies import (
     get_create_empty_profile_use_case,

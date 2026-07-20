@@ -7,8 +7,6 @@ variables.
 """
 from __future__ import annotations
 
-import hashlib
-import json
 import math
 import time
 from dataclasses import dataclass
@@ -28,6 +26,9 @@ from app.modules.meal_planning.domain import (
     StructuredWarning,
 )
 from app.modules.meal_planning.jit_scheduler import JitProcurementScheduler
+from app.modules.meal_planning.optimizer_contracts import V3OptimizationResult
+from app.modules.meal_planning.plan_fingerprint import source_fingerprint
+from app.modules.meal_planning.procurement_ledger import build_daily_ledger
 from app.modules.meal_planning.quality import DEFAULT_QUALITY_POLICY
 from app.shared.enums import DishType, MealType
 
@@ -49,26 +50,6 @@ def _scaled_ceil(value: float, *factors: float | int) -> int:
     for factor in factors:
         scaled *= Decimal(str(factor))
     return int((scaled * _N_SCALE).to_integral_value(rounding=ROUND_CEILING))
-
-
-@dataclass(frozen=True)
-class V3OptimizationResult:
-    days: list[list[ComposedMeal]]
-    nutrition_score: int
-    solver_time_ms: int
-    solver_status: str
-    timed_out_with_solution: bool
-    procurement_plan: dict[str, Any]
-    adjustments: list[dict[str, Any]]
-    base_nutrition: list[dict[str, float]]
-    final_nutrition: list[dict[str, float]]
-    warnings: list[StructuredWarning]
-    diversity_tier: str
-    source_fingerprint: str
-
-    @property
-    def purchase_cost(self) -> float:
-        return float(self.procurement_plan["cost_summary"]["purchase_cost"])
 
 
 @dataclass
@@ -430,7 +411,7 @@ class ProcurementCpSatOptimizer:
             increment = int(round(float(ingredient.purchase_increment) * _Q_SCALE))
             price = float(ingredient.price_per_default_unit)
             max_demand = 0
-            for day, slot, pool in positions:
+            for _day, _slot, pool in positions:
                 max_demand += max(
                     (
                         int(round(item.quantity * _Q_SCALE))
@@ -847,92 +828,13 @@ class ProcurementCpSatOptimizer:
             },
             "shopping_days": sorted({item["purchase_day"] for item in purchase_items}),
         }
-        if request.ledger_enabled:
-            procurement["ledger_version"] = 2
-            procurement["daily_ledger"] = self._build_daily_ledger(request, supply_items)
+        procurement["ledger_version"] = 2
+        procurement["daily_ledger"] = build_daily_ledger(request, supply_items)
         for item in supply_items:
             for key in tuple(item):
                 if key.startswith("_"):
                     item.pop(key, None)
         return procurement, adjustments, base_nutrition, final_nutrition
-
-    @staticmethod
-    def _build_daily_ledger(
-        request: PlanRequest,
-        supply_items: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
-        """Build an auditable opening + purchase - use - expiry = closing ledger."""
-        balances = {item["item_key"]: 0.0 for item in supply_items}
-        result: list[dict[str, Any]] = []
-        for day in range(1, request.days + 1):
-            rows: list[dict[str, Any]] = []
-            for item in supply_items:
-                key = item["item_key"]
-                source_kind = item["source_kind"]
-                available_day = int(item["_available_day"])
-                if source_kind == "inventory" and available_day == day:
-                    balances[key] += float(item["starting_quantity"])
-                opening = round(balances[key], 2)
-                purchase = 0.0
-                if source_kind == "purchase" and available_day == day:
-                    purchase = float(item["purchase_quantity"])
-                    balances[key] += purchase
-                allocations = [
-                    dict(allocation)
-                    for allocation in item["allocations"]
-                    if int(allocation["day"]) == day
-                ]
-                used = round(sum(float(value["quantity"]) for value in allocations), 2)
-                balances[key] = max(0.0, round(balances[key] - used, 2))
-                expiry_days = [
-                    int(split["expiry_day"])
-                    for split in item["storage_splits"]
-                    if float(split["quantity"]) > 0
-                ]
-                final_expiry = max(expiry_days) if expiry_days else request.days + 1
-                expired = 0.0
-                if final_expiry == day and balances[key] > 0:
-                    expired = round(balances[key], 2)
-                    balances[key] = 0.0
-                closing = round(balances[key], 2)
-                if opening <= 0 and purchase <= 0 and used <= 0 and expired <= 0 and closing <= 0:
-                    continue
-                rows.append({
-                    "item_key": key,
-                    "source_kind": source_kind,
-                    "inventory_lot_id": item.get("inventory_lot_id"),
-                    "ingredient_id": item["ingredient_id"],
-                    "name": item["name"],
-                    "unit": item["unit"],
-                    "opening_quantity": opening,
-                    "purchase_quantity": round(purchase, 2),
-                    "usage_quantity": used,
-                    "expired_quantity": expired,
-                    "closing_quantity": closing,
-                    "unit_value": item["price_per_default_unit"],
-                    "purchase_cost": item["purchase_cost"] if purchase > 0 else 0,
-                    "allocations": allocations,
-                })
-            result.append({
-                "day": day,
-                "items": rows,
-                "totals": {
-                    "opening_value": round(sum(
-                        row["opening_quantity"] * row["unit_value"] for row in rows
-                    )),
-                    "purchase_cost": round(sum(row["purchase_cost"] for row in rows)),
-                    "usage_value": round(sum(
-                        row["usage_quantity"] * row["unit_value"] for row in rows
-                    )),
-                    "expired_value": round(sum(
-                        row["expired_quantity"] * row["unit_value"] for row in rows
-                    )),
-                    "closing_value": round(sum(
-                        row["closing_quantity"] * row["unit_value"] for row in rows
-                    )),
-                },
-            })
-        return result
 
     def _absorb_small_leftovers(
         self,
@@ -1085,28 +987,4 @@ class ProcurementCpSatOptimizer:
 
     @staticmethod
     def source_fingerprint(request: PlanRequest, days: list[list[ComposedMeal]]) -> str:
-        payload = {
-            "request": {
-                "days": request.days,
-                "meals_per_day": request.meals_per_day,
-                "budget_limit": request.budget_limit,
-                "targets": [
-                    request.target_calories,
-                    request.target_protein_g,
-                    request.target_fat_g,
-                    request.target_carb_g,
-                ],
-                "inventory_fingerprint": request.inventory_fingerprint,
-            },
-            "inventory_lots": [lot.__dict__ for lot in request.inventory_lots],
-            "dishes": [
-                {
-                    "id": dish.dish_id,
-                    "nutrition": [dish.calories, dish.protein_g, dish.fat_g, dish.carb_g],
-                    "ingredients": [ingredient.__dict__ for ingredient in dish.ingredients],
-                }
-                for day in days for meal in day for dish in meal.dishes
-            ],
-        }
-        encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str).encode("utf-8")
-        return hashlib.sha256(encoded).hexdigest()
+        return source_fingerprint(request, days)

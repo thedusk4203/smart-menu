@@ -49,13 +49,13 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   try {
     res = await fetch(`${BASE_URL}${path}`, { method, headers, body: payload });
   } catch {
-    throw new ApiError(0, "Khong ket noi duoc may chu. Kiem tra backend co dang chay khong.");
+    throw new ApiError(0, "Không kết nối được máy chủ. Kiểm tra backend có đang chạy không.");
   }
 
   if (res.status === 401) {
     clearToken();
     const data = await res.json().catch(() => null);
-    throw new ApiError(401, data?.detail ?? "Phien dang nhap da het han.");
+    throw new ApiError(401, data?.detail ?? "Phiên đăng nhập đã hết hạn.");
   }
 
   if (res.status === 204) return undefined as T;
@@ -68,7 +68,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         ? detail
         : Array.isArray(detail)
           ? detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join("; ")
-          : `Loi ${res.status}`;
+          : `Lỗi ${res.status}`;
     throw new ApiError(res.status, message);
   }
   return data as T;
@@ -94,23 +94,23 @@ export async function streamSse(
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
-    throw new ApiError(0, "Khong ket noi duoc may chu. Kiem tra backend co dang chay khong.");
+    throw new ApiError(0, "Không kết nối được máy chủ. Kiểm tra backend có đang chạy không.");
   }
 
   if (response.status === 401) {
     clearToken();
     const data = await response.json().catch(() => null);
-    throw new ApiError(401, data?.detail ?? "Phien dang nhap da het han.");
+    throw new ApiError(401, data?.detail ?? "Phiên đăng nhập đã hết hạn.");
   }
   if (!response.ok) {
     const data = await response.json().catch(() => null);
     const detail = data?.detail;
     throw new ApiError(
       response.status,
-      typeof detail === "string" ? detail : `Loi ${response.status}`,
+      typeof detail === "string" ? detail : `Lỗi ${response.status}`,
     );
   }
-  if (!response.body) throw new ApiError(0, "May chu khong mo duoc luong tra loi.");
+  if (!response.body) throw new ApiError(0, "Máy chủ không mở được luồng trả lời.");
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -137,7 +137,7 @@ export async function streamSse(
           onEvent({ event, data: JSON.parse(rawData) });
         } catch (error) {
           if (error instanceof ApiError) throw error;
-          throw new ApiError(0, "May chu tra ve du lieu streaming khong hop le.");
+          throw new ApiError(0, "Máy chủ trả về dữ liệu streaming không hợp lệ.");
         }
       }
       if (done) break;
@@ -161,13 +161,13 @@ async function requestDownload(path: string): Promise<DownloadFile> {
   try {
     res = await fetch(`${BASE_URL}${path}`, { headers });
   } catch {
-    throw new ApiError(0, "Khong ket noi duoc may chu. Kiem tra backend co dang chay khong.");
+    throw new ApiError(0, "Không kết nối được máy chủ. Kiểm tra backend có đang chạy không.");
   }
 
   if (!res.ok) {
     const data = await res.json().catch(() => null);
     if (res.status === 401) clearToken();
-    throw new ApiError(res.status, typeof data?.detail === "string" ? data.detail : `Loi ${res.status}`);
+    throw new ApiError(res.status, typeof data?.detail === "string" ? data.detail : `Lỗi ${res.status}`);
   }
   const disposition = res.headers.get("Content-Disposition") || "";
   const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || null;

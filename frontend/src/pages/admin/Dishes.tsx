@@ -13,112 +13,16 @@ import { Badge, Button, Card, ConfirmDialog, Modal, PageHeader, SelectField, Tex
 import { ApiError } from "../../lib/apiClient";
 import { COOKING_METHOD_LABELS, DISH_TYPE_LABELS } from "../../lib/labels";
 import { formatDate, formatKcal, formatVND } from "../../lib/format";
-import type { AdminDish, AdminDishWrite } from "../../types/admin";
+import type { AdminDish } from "../../types/admin";
 import type { CookingMethod, DishType } from "../../types";
+import { IngredientEditorRow } from "./DishIngredientEditorRow";
+import { EMPTY_FORM, dishToForm as toForm, dishToPayload as toPayload } from "./dishForm";
+import type { DishForm, FormIngredient } from "./dishForm";
 
 const LIMIT = 20;
 const DISH_TYPE_OPTIONS = Object.entries(DISH_TYPE_LABELS).map(([value, label]) => ({ value, label }));
 const METHOD_OPTIONS = Object.entries(COOKING_METHOD_LABELS).map(([value, label]) => ({ value, label }));
 
-interface FormIngredient {
-  ingredient_id: number;
-  name: string;
-  quantity: string;
-  unit: string;
-  max_extra_quantity: string;
-  extra_step_quantity: string;
-}
-interface DishForm { name: string; dish_type: DishType; cooking_method: CookingMethod | ""; description: string; instructions: string; tags: string; is_active: boolean; ingredients: FormIngredient[]; }
-const EMPTY_FORM: DishForm = { name: "", dish_type: "savory", cooking_method: "", description: "", instructions: "", tags: "", is_active: true, ingredients: [] };
-
-function toForm(item: AdminDish): DishForm {
-  return { name: item.name, dish_type: item.dish_type, cooking_method: item.cooking_method || "", description: item.description || "", instructions: item.instructions || "", tags: item.tags.join(", "), is_active: item.is_active, ingredients: item.ingredients.map((ingredient) => ({ ingredient_id: ingredient.ingredient_id, name: ingredient.name, quantity: String(ingredient.quantity), unit: ingredient.unit, max_extra_quantity: String(ingredient.max_extra_quantity || 0), extra_step_quantity: ingredient.extra_step_quantity == null ? "" : String(ingredient.extra_step_quantity) })) };
-}
-
-function toPayload(form: DishForm): AdminDishWrite {
-  return { name: form.name.trim(), dish_type: form.dish_type, cooking_method: form.cooking_method || null, description: form.description.trim() || null, instructions: form.instructions.trim() || null, tags: form.tags.split(",").map((tag) => tag.trim()).filter(Boolean), is_active: form.is_active, ingredients: form.ingredients.map((ingredient) => ({ ingredient_id: ingredient.ingredient_id, quantity: Number(ingredient.quantity), unit: ingredient.unit.trim(), max_extra_quantity: Number(ingredient.max_extra_quantity || 0), extra_step_quantity: ingredient.max_extra_quantity && ingredient.extra_step_quantity ? Number(ingredient.extra_step_quantity) : null })) };
-}
-
-function IngredientEditorRow({
-  item,
-  onChange,
-  onRemove,
-}: {
-  item: FormIngredient;
-  onChange: (patch: Partial<FormIngredient>) => void;
-  onRemove: () => void;
-}) {
-  const flexible = Number(item.max_extra_quantity) > 0;
-  return (
-    <li className="grid gap-3 p-3 sm:grid-cols-[minmax(10rem,1fr)_6rem_5rem_7rem_7rem_2.5rem] sm:items-end">
-      <div>
-        <p className="font-medium text-gray-900">{item.name}</p>
-        <p className="mt-1 text-xs text-gray-500">
-          Chỉ nhập lượng tăng nếu món có thể hấp thụ phần nguyên liệu còn rất ít.
-        </p>
-      </div>
-      <label className="text-xs font-medium text-gray-600">
-        Định lượng
-        <input
-          aria-label={`Định lượng ${item.name}`}
-          type="number"
-          min="0.01"
-          step="0.01"
-          value={item.quantity}
-          onChange={(event) => onChange({ quantity: event.target.value })}
-          className="mt-1 h-10 w-full rounded-lg border border-sand-200 px-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-400"
-        />
-      </label>
-      <label className="text-xs font-medium text-gray-600">
-        Đơn vị
-        <input
-          aria-label={`Đơn vị ${item.name}`}
-          value={item.unit}
-          onChange={(event) => onChange({ unit: event.target.value })}
-          className="mt-1 h-10 w-full rounded-lg border border-sand-200 px-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-400"
-        />
-      </label>
-      <label className="text-xs font-medium text-gray-600">
-        Tăng tối đa
-        <input
-          aria-label={`Lượng tăng tối đa ${item.name}`}
-          type="number"
-          min="0"
-          step="0.01"
-          value={item.max_extra_quantity}
-          onChange={(event) => onChange({
-            max_extra_quantity: event.target.value,
-            extra_step_quantity: Number(event.target.value) > 0 ? item.extra_step_quantity : "",
-          })}
-          className="mt-1 h-10 w-full rounded-lg border border-sand-200 px-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-400"
-        />
-      </label>
-      <label className="text-xs font-medium text-gray-600">
-        Bước tăng
-        <input
-          aria-label={`Bước tăng ${item.name}`}
-          type="number"
-          min="0.01"
-          max={item.max_extra_quantity || undefined}
-          step="0.01"
-          value={item.extra_step_quantity}
-          disabled={!flexible}
-          required={flexible}
-          onChange={(event) => onChange({ extra_step_quantity: event.target.value })}
-          className="mt-1 h-10 w-full rounded-lg border border-sand-200 px-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:bg-sand-50 disabled:text-gray-400"
-        />
-      </label>
-      <button
-        type="button"
-        onClick={onRemove}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-red-700 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
-        aria-label={`Bỏ ${item.name}`}
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
-    </li>
-  );
-}
 
 export function AdminDishes() {
   const [params, setParams] = useSearchParams();

@@ -4,8 +4,9 @@ from dataclasses import replace
 from datetime import date, timedelta
 from zoneinfo import ZoneInfo
 
-from app.core.config import settings
 from app.core.exceptions import ConflictError, ValidationAppError
+from app.modules.inventory.domain import PersistedPlanInventory
+from app.modules.inventory.ports import InventoryRepositoryPort
 from app.modules.meal_planning import constraint_checker, procurement_checker
 from app.modules.meal_planning.composition import slots_for
 from app.modules.meal_planning.domain import ComposedMeal, MealPlanEntity, PlanRequest, ValidationResult
@@ -17,11 +18,11 @@ from app.modules.meal_planning.exceptions import (
 )
 from app.modules.meal_planning.planner import DishPlanner
 from app.modules.meal_planning.optimizer_v3 import ProcurementCpSatOptimizer
-from app.modules.inventory.repository import SqlInventoryRepository
 from app.modules.meal_planning.ports import (
     DishCandidateProviderPort,
     MealPlannerPort,
     MealPlanRepositoryPort,
+    MealPlanUnitOfWorkPort,
 )
 from app.modules.meal_planning.schemas import MealPlanCreate
 from app.modules.nutrition.calculator import NutritionCalculator
@@ -34,15 +35,15 @@ class SaveMealPlanUseCase:
 
     def __init__(
         self,
-        repo: MealPlanRepositoryPort,
+        unit_of_work: MealPlanUnitOfWorkPort,
         candidate_provider: DishCandidateProviderPort,
         build_request: "BuildPlanRequestUseCase",
-        inventory_repo: SqlInventoryRepository | None = None,
     ) -> None:
-        self._repo = repo
+        self._uow = unit_of_work
+        self._repo = unit_of_work.plans
         self._candidates = candidate_provider
         self._build_request = build_request
-        self._inventory = inventory_repo
+        self._inventory = unit_of_work.inventory
 
     def execute(self, data: MealPlanCreate, *, user_id: int) -> MealPlanEntity:
         first_slots = tuple(meal.slot for meal in data.days[0].meals)
@@ -130,16 +131,25 @@ class SaveMealPlanUseCase:
         name = data.name or f"Thực đơn {datetime.now(ZoneInfo('Asia/Ho_Chi_Minh')).strftime('%H:%M %d/%m/%Y')}"
         try:
             saved = self._repo.create(replace(entity, name=name))
-            if self._inventory is not None and saved.plan_data.get("procurement", {}).get("ledger_version") == 2:
+            if saved.plan_data.get("procurement", {}).get("ledger_version") == 2:
+                if saved.id is None or saved.start_date is None or saved.end_date is None:
+                    raise ValueError("Meal plan đã lưu thiếu định danh hoặc khoảng ngày")
                 self._inventory.verify_fingerprint(
                     user_id, saved.start_date, saved.end_date, request.inventory_fingerprint
                 )
-                self._inventory.reserve_inputs(saved)
-                self._inventory.create_ending_lots(saved)
-            self._repo.commit()
+                inventory_plan = PersistedPlanInventory(
+                    plan_id=saved.id,
+                    user_id=saved.user_id,
+                    start_date=saved.start_date,
+                    end_date=saved.end_date,
+                    plan_data=saved.plan_data,
+                )
+                self._inventory.reserve_inputs(inventory_plan)
+                self._inventory.create_ending_lots(inventory_plan)
+            self._uow.commit()
             return saved
         except Exception:
-            self._repo.rollback()
+            self._uow.rollback()
             raise
 
 
@@ -163,20 +173,20 @@ class GetMealPlanUseCase:
 
 
 class DeleteMealPlanUseCase:
-    def __init__(self, repo: MealPlanRepositoryPort, inventory_repo: SqlInventoryRepository | None = None) -> None:
-        self._repo = repo
-        self._inventory = inventory_repo
+    def __init__(self, unit_of_work: MealPlanUnitOfWorkPort) -> None:
+        self._uow = unit_of_work
+        self._repo = unit_of_work.plans
+        self._inventory = unit_of_work.inventory
 
     def execute(self, plan_id: int) -> None:
         if self._repo.get(plan_id) is None:
             raise MealPlanNotFoundError(plan_id)
         try:
-            if self._inventory is not None:
-                self._inventory.release_plan(plan_id)
+            self._inventory.release_plan(plan_id)
             self._repo.delete(plan_id)
-            self._repo.commit()
+            self._uow.commit()
         except Exception:
-            self._repo.rollback()
+            self._uow.rollback()
             raise
 
 
@@ -207,7 +217,7 @@ class BuildPlanRequestUseCase:
         self,
         profile_repo: UserProfileRepositoryPort,
         exclusion_repo: ExclusionRepositoryPort,
-        inventory_repo: SqlInventoryRepository | None = None,
+        inventory_repo: InventoryRepositoryPort | None = None,
     ) -> None:
         self._profiles = profile_repo
         self._exclusions = exclusion_repo
@@ -271,8 +281,7 @@ class BuildPlanRequestUseCase:
         excluded = list({exclusion.ingredient_id for exclusion in self._exclusions.list_by_user(user_id)})
         inventory_lots = ()
         inventory_fingerprint = None
-        ledger_enabled = settings.meal_planner_v3_ledger_enabled
-        if ledger_enabled and self._inventory is not None and start_date is not None:
+        if self._inventory is not None and start_date is not None:
             inventory_lots, inventory_fingerprint = self._inventory.snapshots_for_plan(
                 user_id, start_date, start_date + timedelta(days=resolved_days - 1)
             )
@@ -290,5 +299,4 @@ class BuildPlanRequestUseCase:
             previous_plan_signature=previous_plan_signature,
             inventory_lots=inventory_lots,
             inventory_fingerprint=inventory_fingerprint,
-            ledger_enabled=ledger_enabled,
         )

@@ -59,23 +59,29 @@ class CandidateSelector:
             ]
             chosen: dict[int, DishCandidate] = {}
 
-            def add(sequence: list[DishCandidate], limit: int) -> None:
-                added = 0
-                for item in sequence:
-                    if item.dish_id in chosen:
-                        continue
-                    chosen[item.dish_id] = item
-                    added += 1
-                    if len(chosen) >= cap or added >= limit:
-                        break
-
-            add(cheapest, min(required_uses, cap) if request.budget_limit is not None else 2)
-            add(tagged, max(2, cap // 4))
-            add(best_by_method, cap)
-            add(spread, spread_count)
-            add(nutrition_ranked, cap)
+            self._add(chosen, cap, cheapest, min(required_uses, cap) if request.budget_limit is not None else 2)
+            self._add(chosen, cap, tagged, max(2, cap // 4))
+            self._add(chosen, cap, best_by_method, cap)
+            self._add(chosen, cap, spread, spread_count)
+            self._add(chosen, cap, nutrition_ranked, cap)
             shortlisted.extend(chosen.values())
         return sorted(shortlisted, key=lambda item: item.dish_id)
+
+    @staticmethod
+    def _add(
+        chosen: dict[int, DishCandidate],
+        cap: int,
+        sequence: list[DishCandidate],
+        limit: int,
+    ) -> None:
+        added = 0
+        for item in sequence:
+            if item.dish_id in chosen:
+                continue
+            chosen[item.dish_id] = item
+            added += 1
+            if len(chosen) >= cap or added >= limit:
+                break
 
     def _meal_nutrition_score(self, request: PlanRequest, dish: DishCandidate) -> float:
         divisor = float(request.meals_per_day)

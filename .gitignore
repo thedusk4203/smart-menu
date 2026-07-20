@@ -4,6 +4,7 @@
 node_modules/
 dist/
 coverage/
+.coverage
 *.tsbuildinfo
 *.log
 __pycache__/

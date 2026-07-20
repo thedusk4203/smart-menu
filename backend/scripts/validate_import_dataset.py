@@ -5,7 +5,6 @@ import json
 import os
 import re
 import sys
-from datetime import date
 
 # Add backend to path to import app modules
 backend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -26,7 +25,7 @@ def load_rows_from_file(filepath):
         result = []
         for r in rows[1:]:
             if any(cell is not None and str(cell).strip() for cell in r):
-                row_dict = dict(zip(headers, r))
+                row_dict = dict(zip(headers, r, strict=False))
                 result.append(row_dict)
         return result
     elif ext == ".csv":
@@ -270,7 +269,6 @@ def run_database_and_planner_validation(database_url, ing_file, dish_file, temp_
     print("Running Database and Planner Validation on QA stack...")
     from sqlmodel import create_engine, Session, text
     from app.modules.admin.use_cases import AdminService
-    from app.shared.enums import UserRole
     
     # 1. Connect and bootstrap
     engine = create_engine(database_url)

@@ -8,8 +8,12 @@ from jose import JWTError, jwt
 
 from app.core.deps import get_current_user
 from app.dependencies import (
-    get_build_shopping_list_use_case, get_get_meal_plan_use_case,
-    get_shopping_list_repository, get_shopping_share_repository,
+    get_active_shopping_share_use_case,
+    get_build_shopping_list_use_case,
+    get_get_meal_plan_use_case,
+    get_or_create_shopping_share_use_case,
+    get_revoke_shopping_share_use_case,
+    get_update_shopping_item_use_case,
 )
 from app.core.config import settings
 from app.modules.identity.domain import UserEntity
@@ -17,7 +21,13 @@ from app.modules.meal_planning.use_cases import GetMealPlanUseCase
 from app.modules.shopping_lists.schemas import (
     PublicShoppingListResponse, PurchaseUpdate, ShoppingListResponse, ShoppingShareResponse,
 )
-from app.modules.shopping_lists.use_cases import BuildShoppingListUseCase
+from app.modules.shopping_lists.use_cases import (
+    BuildShoppingListUseCase,
+    GetActiveShoppingShareUseCase,
+    GetOrCreateShoppingShareUseCase,
+    RevokeShoppingShareUseCase,
+    UpdateShoppingItemUseCase,
+)
 
 
 router = APIRouter(prefix="/api/meal-plans", tags=["shopping-lists"])
@@ -85,7 +95,7 @@ def update_shopping_item(
     current_user: UserEntity = Depends(get_current_user),
     plans: GetMealPlanUseCase = Depends(get_get_meal_plan_use_case),
     build: BuildShoppingListUseCase = Depends(get_build_shopping_list_use_case),
-    lists=Depends(get_shopping_list_repository),
+    update_item: UpdateShoppingItemUseCase = Depends(get_update_shopping_item_use_case),
 ):
     plan = plans.execute(plan_id)
     _ensure_owner(plan, current_user)
@@ -93,7 +103,7 @@ def update_shopping_item(
     visible = build.execute(plan, day, resolved_scope)
     if item_id not in {item.id for item in visible.items if item.id is not None}:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Không tìm thấy item trong phạm vi danh sách")
-    if lists.set_purchased(plan_id, item_id, data.is_purchased) is None:
+    if update_item.execute(plan_id, item_id, data.is_purchased) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Không tìm thấy nguyên liệu trong danh sách")
     return build.execute(plan, day, resolved_scope)
 
@@ -106,17 +116,16 @@ def share_shopping_list(
     current_user: UserEntity = Depends(get_current_user),
     plans: GetMealPlanUseCase = Depends(get_get_meal_plan_use_case),
     build: BuildShoppingListUseCase = Depends(get_build_shopping_list_use_case),
-    shares=Depends(get_shopping_share_repository),
+    create_share: GetOrCreateShoppingShareUseCase = Depends(
+        get_or_create_shopping_share_use_case
+    ),
 ):
     plan = plans.execute(plan_id)
     _ensure_owner(plan, current_user)
     explicit_scope = scope if isinstance(scope, str) else None
     resolved_scope = explicit_scope or ("usage_day" if day is not None else "all")
-    if int(plan.plan_data.get("schema_version", 1)) >= 3 or explicit_scope is not None:
-        build.execute(plan, day, resolved_scope)
-    else:
-        build.execute(plan, day)
-    share = shares.get_or_create(plan_id)
+    build.execute(plan, day, resolved_scope)
+    share = create_share.execute(plan_id)
     return ShoppingShareResponse(
         token=_share_token(share, day, resolved_scope),
         expires_at=share["expires_at"],
@@ -130,11 +139,13 @@ def revoke_shopping_share(
     plan_id: int,
     current_user: UserEntity = Depends(get_current_user),
     plans: GetMealPlanUseCase = Depends(get_get_meal_plan_use_case),
-    shares=Depends(get_shopping_share_repository),
+    revoke_share: RevokeShoppingShareUseCase = Depends(
+        get_revoke_shopping_share_use_case
+    ),
 ):
     plan = plans.execute(plan_id)
     _ensure_owner(plan, current_user)
-    shares.revoke(plan_id)
+    revoke_share.execute(plan_id)
 
 
 @public_router.get("/{token}", response_model=PublicShoppingListResponse)
@@ -142,10 +153,10 @@ def public_shopping_list(
     token: str,
     build: BuildShoppingListUseCase = Depends(get_build_shopping_list_use_case),
     plans: GetMealPlanUseCase = Depends(get_get_meal_plan_use_case),
-    shares=Depends(get_shopping_share_repository),
+    get_share: GetActiveShoppingShareUseCase = Depends(get_active_shopping_share_use_case),
 ):
     share_id, day, scope = _read_share_token(token, include_scope=True)
-    share = shares.get_active(share_id)
+    share = get_share.execute(share_id)
     if share is None or share["expires_at"] <= datetime.now(timezone.utc):
         raise HTTPException(status.HTTP_410_GONE, "Liên kết chia sẻ đã hết hạn hoặc đã bị thu hồi")
     result = build.execute(plans.execute(share["meal_plan_id"]), day, scope)
@@ -159,18 +170,18 @@ def update_public_shopping_item(
     data: PurchaseUpdate,
     build: BuildShoppingListUseCase = Depends(get_build_shopping_list_use_case),
     plans: GetMealPlanUseCase = Depends(get_get_meal_plan_use_case),
-    shares=Depends(get_shopping_share_repository),
-    lists=Depends(get_shopping_list_repository),
+    get_share: GetActiveShoppingShareUseCase = Depends(get_active_shopping_share_use_case),
+    update_item: UpdateShoppingItemUseCase = Depends(get_update_shopping_item_use_case),
 ):
     share_id, day, scope = _read_share_token(token, include_scope=True)
-    share = shares.get_active(share_id)
+    share = get_share.execute(share_id)
     if share is None or share["expires_at"] <= datetime.now(timezone.utc):
         raise HTTPException(status.HTTP_410_GONE, "Liên kết chia sẻ đã hết hạn hoặc đã bị thu hồi")
     plan = plans.execute(share["meal_plan_id"])
     visible = build.execute(plan, day, scope)
     if item_id not in {item.id for item in visible.items if item.id is not None}:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Không tìm thấy item trong phạm vi liên kết")
-    if lists.set_purchased(plan.id, item_id, data.is_purchased) is None:
+    if update_item.execute(plan.id, item_id, data.is_purchased) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Không tìm thấy nguyên liệu trong danh sách")
     result = build.execute(plan, day, scope)
     return PublicShoppingListResponse(**result.model_dump(), expires_at=share["expires_at"])

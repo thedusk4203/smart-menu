@@ -24,14 +24,13 @@ export function MealPlanView({ planData, totalCost, totalCalories, budgetLimit, 
   const averageCalories = calories / numDays;
   const target = planData.nutrition_target;
   const overBudget = budgetLimit != null && cost > budgetLimit;
-  const isV3 = planData.schema_version === 3;
   const costSummary = planData.cost_summary;
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Số ngày" value={days.length} icon={Calendar} tone="brand" />
-        <StatCard label={isV3 ? "Cần chi để mua" : "Tổng chi phí"} value={formatVND(cost)} icon={Wallet} tone={overBudget ? "rose" : "accent"} sub={budgetLimit != null ? `Ngân sách: ${formatVND(budgetLimit)}` : "Không giới hạn"} />
+        <StatCard label="Cần chi để mua" value={formatVND(cost)} icon={Wallet} tone={overBudget ? "rose" : "accent"} sub={budgetLimit != null ? `Ngân sách: ${formatVND(budgetLimit)}` : "Không giới hạn"} />
         <StatCard label="Tổng calo" value={formatKcal(calories)} icon={Flame} tone="amber" />
         <StatCard label="Calo TB/ngày" value={formatKcal(Math.round(averageCalories))} icon={Target} tone="sky" />
       </div>
@@ -40,7 +39,7 @@ export function MealPlanView({ planData, totalCost, totalCalories, budgetLimit, 
         <section className="overflow-hidden rounded-2xl border border-brand-200 bg-white shadow-sm" aria-label="Mục tiêu dinh dưỡng">
           <div className="flex items-center justify-between gap-3 bg-brand-700 px-4 py-3 text-white">
             <div className="flex items-center gap-2"><Target className="h-4 w-4" /><h2 className="text-sm font-semibold">La bàn dinh dưỡng mỗi ngày</h2></div>
-            <span className="text-xs text-brand-100">{isV3 ? "Sau điều chỉnh tận dụng phần dư" : "CP-SAT tối ưu theo tổng ngày"}</span>
+            <span className="text-xs text-brand-100">Sau điều chỉnh tận dụng phần dư</span>
           </div>
           <div className="grid grid-cols-2 divide-x divide-y divide-sand-100 sm:grid-cols-4 sm:divide-y-0">
             {[
@@ -56,7 +55,7 @@ export function MealPlanView({ planData, totalCost, totalCalories, budgetLimit, 
         </section>
       )}
 
-      {isV3 && costSummary && (
+      {costSummary && (
         <section className="grid gap-3 rounded-2xl border border-sand-200 bg-white p-4 shadow-sm sm:grid-cols-3" aria-label="Chi tiết mua và tận dụng">
           <div><p className="text-xs text-gray-500">Giá trị sẽ dùng</p><p className="mt-1 font-semibold text-gray-900">{formatVND(costSummary.consumption_value)}</p></div>
           <div><p className="text-xs text-gray-500">Còn lại cuối kỳ</p><p className="mt-1 font-semibold text-sky-800">{formatVND(costSummary.ending_carryover_value)}</p></div>
@@ -64,7 +63,7 @@ export function MealPlanView({ planData, totalCost, totalCalories, budgetLimit, 
         </section>
       )}
 
-      {isV3 && (planData.adjustments?.length ?? 0) > 0 && (
+      {(planData.adjustments?.length ?? 0) > 0 && (
         <section className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
           <h2 className="text-sm font-semibold text-brand-900">Phần dư được thêm vào món sau</h2>
           <ul className="mt-2 space-y-1.5 text-sm text-brand-800">

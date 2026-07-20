@@ -139,8 +139,8 @@ export interface ShoppingListResponse {
   plan_name?: string | null;
   day?: number | null;
   date?: string | null;
-  schema_version: number;
-  shopping_schema_version: number;
+  schema_version: 3;
+  shopping_schema_version: 3;
   scope: ShoppingScope;
   items: ShoppingListItem[];
   total_estimated_cost: number;

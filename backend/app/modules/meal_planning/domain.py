@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
+from app.modules.inventory.domain import InventoryLotSnapshot
 from app.shared.enums import CookingMethod, DishType, MealType
 
 
@@ -197,23 +198,6 @@ class PlanRequest:
     previous_plan_signature: str | None = None
     inventory_lots: tuple["InventoryLotSnapshot", ...] = ()
     inventory_fingerprint: str | None = None
-    ledger_enabled: bool = False
-
-
-@dataclass(frozen=True)
-class InventoryLotSnapshot:
-    """Lot kho khả dụng được chuẩn hóa tương đối theo ngày bắt đầu plan."""
-
-    lot_id: int
-    ingredient_id: int
-    name: str
-    quantity: float
-    unit: str
-    purchase_increment: float
-    available_day: int
-    expiry_day: int
-    storage_mode: str
-    cost_basis_per_unit: float = 0.0
 
 
 @dataclass(frozen=True)

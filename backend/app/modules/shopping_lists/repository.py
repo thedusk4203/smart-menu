@@ -5,8 +5,10 @@ from uuid import uuid4
 
 from sqlalchemy import text
 
+from app.modules.shopping_lists.ports import ShoppingListRepositoryPort, ShoppingShareRepositoryPort
 
-class SqlShoppingListRepository:
+
+class SqlShoppingListRepository(ShoppingListRepositoryPort):
     """Materializes the immutable plan snapshot once, while preserving checks."""
 
     def __init__(self, session) -> None:
@@ -39,7 +41,6 @@ class SqlShoppingListRepository:
                     "scheduled_day": item.get("scheduled_day"),
                 },
             )
-        self._session.commit()
         return self.list_items(plan_id)
 
     def list_items(self, plan_id: int) -> list[dict]:
@@ -61,11 +62,10 @@ class SqlShoppingListRepository:
                     RETURNING id, ingredient_id, total_quantity AS quantity, unit, estimated_cost, is_purchased"""),
             {"plan_id": plan_id, "item_id": item_id, "purchased": purchased},
         ).first()
-        self._session.commit()
         return dict(row._mapping) if row else None
 
 
-class SqlShoppingShareRepository:
+class SqlShoppingShareRepository(ShoppingShareRepositoryPort):
     def __init__(self, session) -> None:
         self._session = session
 
@@ -88,7 +88,6 @@ class SqlShoppingShareRepository:
                     VALUES (CAST(:id AS uuid), :plan_id, :expires_at) RETURNING *"""),
             {"id": share_id, "plan_id": plan_id, "expires_at": expires_at},
         ).first()
-        self._session.commit()
         return dict(created._mapping)
 
     def get_active(self, share_id: str) -> dict | None:
@@ -105,4 +104,3 @@ class SqlShoppingShareRepository:
             text("UPDATE shopping_list_shares SET revoked_at=NOW() WHERE meal_plan_id=:plan_id AND revoked_at IS NULL"),
             {"plan_id": plan_id},
         )
-        self._session.commit()

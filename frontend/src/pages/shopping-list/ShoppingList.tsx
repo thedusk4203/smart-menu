@@ -21,7 +21,6 @@ export function ShoppingList() {
   const [selectedId, setSelectedId] = useState("");
   const [selectedDay, setSelectedDay] = useState("all");
   const [viewMode, setViewMode] = useState<"ledger" | "purchase">("ledger");
-  const [ledgerAvailable, setLedgerAvailable] = useState(false);
   const [items, setItems] = useState<ShoppingListItem[]>([]);
   const [purchaseItems, setPurchaseItems] = useState<ShoppingPurchaseItem[]>([]);
   const [carryoverUsage, setCarryoverUsage] = useState<CarryoverUsage[]>([]);
@@ -68,9 +67,6 @@ export function ShoppingList() {
       setCarryoverUsage(shoppingList.carryover_usage ?? []);
       setLeftovers(shoppingList.leftovers ?? []);
       setDailyLedger(shoppingList.daily_ledger ?? []);
-      const supportsLedger = shoppingList.shopping_schema_version >= 3;
-      setLedgerAvailable(supportsLedger);
-      if (!supportsLedger) setViewMode("purchase");
       setWarnings(shoppingList.warnings);
       setTotalEstimatedCost(shoppingList.total_estimated_cost);
     } catch (err) {
@@ -85,7 +81,6 @@ export function ShoppingList() {
     setSelectedId(value);
     setSelectedDay("all");
     setViewMode("ledger");
-    setLedgerAvailable(false);
     setShareLink("");
     setShareExpiresAt("");
     if (value) {
@@ -94,7 +89,6 @@ export function ShoppingList() {
       buildRequest.current += 1;
       setItems([]);
       setPurchaseItems([]); setCarryoverUsage([]); setLeftovers([]); setDailyLedger([]);
-      setLedgerAvailable(false);
       setWarnings([]);
       setTotalEstimatedCost(0);
       setChecked({});
@@ -107,11 +101,8 @@ export function ShoppingList() {
     setShareLink("");
     setShareExpiresAt("");
     if (selectedId) {
-      const plan = plans.find((item) => String(item.id) === selectedId);
       const day = value === "all" ? undefined : Number(value);
-      const scope = plan?.plan_data.schema_version === 3
-        ? (day ? (viewMode === "ledger" ? "usage_day" : "purchase_day") : "all")
-        : undefined;
+      const scope = day ? (viewMode === "ledger" ? "usage_day" : "purchase_day") : "all";
       buildList(Number(selectedId), day, scope);
     }
   };
@@ -129,7 +120,7 @@ export function ShoppingList() {
     const next = !checked[key];
     setChecked((current) => ({ ...current, [key]: next }));
     const day = selectedDay === "all" ? undefined : Number(selectedDay);
-    const scope = selectedPlan?.plan_data.schema_version === 3 ? (day ? (viewMode === "ledger" ? "usage_day" : "purchase_day") : "all") : undefined;
+    const scope = day ? (viewMode === "ledger" ? "usage_day" : "purchase_day") : "all";
     try { await mealPlanApi.updateShoppingItem(Number(selectedId), item.id, next, day, scope); }
     catch (err) { setChecked((current) => ({ ...current, [key]: !next })); toast.error(err instanceof ApiError ? err.message : "Không thể cập nhật danh sách"); }
   };
@@ -139,7 +130,7 @@ export function ShoppingList() {
     setSharing(true);
     try {
       const day = selectedDay === "all" ? undefined : Number(selectedDay);
-      const scope = selectedPlan?.plan_data.schema_version === 3 ? (day ? (viewMode === "ledger" ? "usage_day" : "purchase_day") : "all") : undefined;
+      const scope = day ? (viewMode === "ledger" ? "usage_day" : "purchase_day") : "all";
       const share = await mealPlanApi.shareShoppingList(Number(selectedId), day, scope);
       if (day !== undefined && share.day !== day) {
         throw new ApiError(409, STALE_BACKEND_MESSAGE);
@@ -171,7 +162,7 @@ export function ShoppingList() {
     : dayOptions.find((option) => option.value === selectedDay)?.label ?? `Ngày ${selectedDay}`;
   const doneCount = items.filter((it) => checked[it.item_key ?? `${it.ingredient_id}__${it.unit}`]).length;
   const groupedItems: Array<{ key: string; label: string | null; items: ShoppingListItem[] }> = (() => {
-    if (selectedPlan?.plan_data.schema_version !== 3 || selectedDay !== "all") {
+    if (selectedDay !== "all") {
       return [{ key: "visible", label: null, items }];
     }
     const groups = new Map<string, { key: string; label: string; items: ShoppingListItem[] }>();
@@ -245,7 +236,7 @@ export function ShoppingList() {
               />
             )}
           </div>
-          {selectedPlan?.plan_data.schema_version === 3 && ledgerAvailable && (
+          {selectedPlan && (
             <div className="no-print mb-5 inline-flex rounded-xl border border-sand-200 bg-white p-1" aria-label="Chế độ danh sách đi chợ">
               <button type="button" onClick={() => onSelectMode("ledger")} className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium ${viewMode === "ledger" ? "bg-brand-600 text-white" : "text-gray-600 hover:bg-sand-50"}`}><CalendarDays className="h-4 w-4" /> Dòng tồn kho</button>
               <button type="button" onClick={() => onSelectMode("purchase")} className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium ${viewMode === "purchase" ? "bg-brand-600 text-white" : "text-gray-600 hover:bg-sand-50"}`}><ShoppingCart className="h-4 w-4" /> Lịch mua</button>

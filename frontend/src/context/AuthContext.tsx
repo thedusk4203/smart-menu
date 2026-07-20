@@ -85,6 +85,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 // eslint-disable-next-line react-refresh/only-export-components
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth phai duoc dung trong AuthProvider");
+  if (!ctx) throw new Error("useAuth phải được dùng trong AuthProvider");
   return ctx;
 }
