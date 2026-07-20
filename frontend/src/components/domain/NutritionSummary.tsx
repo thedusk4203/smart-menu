@@ -4,10 +4,10 @@ import { formatKcal, formatGram, formatNumber } from "../../lib/format";
 import type { NutritionTarget } from "../../types";
 
 function bmiLabel(bmi: number): string {
-  if (bmi < 18.5) return "Thiếu cân";
-  if (bmi < 23) return "Bình thường";
-  if (bmi < 25) return "Thừa cân";
-  return "Béo phì";
+  if (bmi < 18.5) return "Dưới khoảng tham khảo";
+  if (bmi < 23) return "Trong khoảng tham khảo";
+  if (bmi < 25) return "Trên khoảng tham khảo";
+  return "Cao hơn khoảng tham khảo";
 }
 
 export function NutritionSummary({ target }: { target: NutritionTarget }) {
@@ -21,10 +21,10 @@ export function NutritionSummary({ target }: { target: NutritionTarget }) {
       )}
 
       <div className="grid grid-cols-2 gap-3">
-        <StatCard label="BMR" value={formatKcal(target.bmr)} icon={Flame} tone="accent" sub="Trao đổi cơ bản" compact />
-        <StatCard label="TDEE" value={formatKcal(target.tdee)} icon={Activity} tone="sky" sub="Tiêu hao/ngày" compact />
+        <StatCard label="Năng lượng khi nghỉ" value={formatKcal(target.bmr)} icon={Flame} tone="accent" sub="Ước tính tối thiểu" compact />
+        <StatCard label="Năng lượng mỗi ngày" value={formatKcal(target.tdee)} icon={Activity} tone="sky" sub="Theo mức vận động" compact />
         <StatCard
-          label="Calo mục tiêu"
+          label="Năng lượng mục tiêu"
           value={formatKcal(target.target_calories)}
           icon={Flame}
           tone="brand"
@@ -32,7 +32,7 @@ export function NutritionSummary({ target }: { target: NutritionTarget }) {
           compact
         />
         <StatCard
-          label="BMI"
+          label="Chỉ số cân nặng (BMI)"
           value={formatNumber(target.bmi, 1)}
           icon={Scale}
           tone="indigo"
@@ -60,6 +60,9 @@ export function NutritionSummary({ target }: { target: NutritionTarget }) {
           ))}
         </ul>
       )}
+      <p className="text-xs leading-5 text-gray-500">
+        Các số liệu là ước tính để hỗ trợ lập thực đơn, không thay thế tư vấn y tế hoặc chẩn đoán chuyên môn.
+      </p>
     </div>
   );
 }

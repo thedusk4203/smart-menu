@@ -4,7 +4,7 @@ import { LockKeyhole, Plus, Search, ShieldCheck, UnlockKeyhole, UserPlus } from 
 import toast from "react-hot-toast";
 import { adminApi } from "../../api/adminApi";
 import { useAuth } from "../../context/AuthContext";
-import { ApiError } from "../../lib/apiClient";
+import { adminFeedbackMessage, toUserFeedback, type UserFeedback } from "../../lib/userFeedback";
 import { ROLE_LABELS } from "../../lib/labels";
 import { Button, Card, Modal, PageHeader, SelectField, TextField } from "../../components/ui";
 import { AdminEmptyState, AdminErrorState, AdminTableSkeleton } from "../../components/admin/AdminStates";
@@ -29,7 +29,7 @@ export function Users() {
   const [status, setStatus] = useState("");
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<UserFeedback | null>(null);
   const [savingId, setSavingId] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -37,13 +37,13 @@ export function Users() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError("");
+    setError(null);
     try {
       const page = await adminApi.users({ search: search.trim() || undefined, role, is_active: status || undefined, limit: LIMIT, offset });
       setItems(page.items);
       setTotal(page.total);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Không thể tải danh sách người dùng.");
+      setError(toUserFeedback(err, "admin_action", "admin"));
     } finally {
       setLoading(false);
     }
@@ -61,7 +61,7 @@ export function Users() {
       setItems((current) => current.map((item) => item.id === target.id ? updated : item));
       toast.success(`Đã đổi vai trò của ${target.email}.`);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Không thể đổi vai trò.");
+      toast.error(adminFeedbackMessage(err));
     } finally {
       setSavingId(null);
     }
@@ -74,7 +74,7 @@ export function Users() {
       setItems((current) => current.map((item) => item.id === target.id ? updated : item));
       toast.success(updated.is_active ? "Đã mở khóa tài khoản." : "Đã khóa tài khoản.");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Không thể cập nhật trạng thái.");
+      toast.error(adminFeedbackMessage(err));
     } finally {
       setSavingId(null);
     }
@@ -96,7 +96,7 @@ export function Users() {
       setForm({ email: "", password: "", full_name: "", role: "user" });
       toast.success("Đã tạo người dùng mới.");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Không thể tạo người dùng.");
+      toast.error(adminFeedbackMessage(err));
     } finally {
       setCreating(false);
     }
@@ -130,7 +130,7 @@ export function Users() {
       </div>
 
       <Card bodyClassName="p-0">
-        {loading ? <AdminTableSkeleton /> : error ? <AdminErrorState message={error} onRetry={load} /> : items.length === 0 ? (
+        {loading ? <AdminTableSkeleton /> : error ? <AdminErrorState feedback={error} onRetry={load} /> : items.length === 0 ? (
           <AdminEmptyState icon={UserPlus} title="Không tìm thấy người dùng" description="Thử đổi từ khóa hoặc bộ lọc để xem dữ liệu khác." />
         ) : (
           <div className="overflow-x-auto">

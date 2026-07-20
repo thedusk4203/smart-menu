@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearToken, saveToken } from "./auth";
-import { api, ApiError, qs, streamSse } from "./apiClient";
+import { api, qs, streamSse } from "./apiClient";
 
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -34,7 +34,7 @@ describe("api client", () => {
     });
   });
 
-  it("clears an expired token and exposes the backend error", async () => {
+  it("clears an expired token while keeping legacy detail as technical context", async () => {
     saveToken("expired");
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify({ detail: "Phiên đăng nhập đã hết hạn." }), {
@@ -46,7 +46,9 @@ describe("api client", () => {
     await expect(api.get("/api/users/me")).rejects.toMatchObject({
       name: "ApiError",
       status: 401,
-      message: "Phiên đăng nhập đã hết hạn.",
+      message: "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại để tiếp tục.",
+      code: "AUTH_SESSION_EXPIRED",
+      technicalMessage: "Phiên đăng nhập đã hết hạn.",
     });
     expect(localStorage.getItem("smart_menu_token")).toBeNull();
   });
@@ -60,13 +62,40 @@ describe("api client", () => {
     );
     await expect(api.post("/api/meal-plans/generate", {})).rejects.toMatchObject({
       status: 422,
-      message: "days không hợp lệ",
+      code: "VALIDATION_FAILED",
+      message: "Một số thông tin chưa hợp lệ. Hãy kiểm tra rồi thử lại.",
+      technicalMessage: "days không hợp lệ",
     });
 
     fetchMock.mockRejectedValueOnce(new TypeError("offline"));
-    await expect(api.get("/api/health")).rejects.toEqual(
-      new ApiError(0, "Không kết nối được máy chủ. Kiểm tra backend có đang chạy không."),
+    await expect(api.get("/api/health")).rejects.toMatchObject({
+      status: 0,
+      code: "NETWORK_UNAVAILABLE",
+      message: "Smart Menu chưa kết nối được. Kiểm tra mạng rồi thử lại.",
+    });
+  });
+
+  it("parses the additive error envelope and field errors", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({
+        detail: "Validation failed for daily_budget",
+        error: {
+          code: "REQUEST_VALIDATION_FAILED",
+          message: "Ngân sách chưa hợp lệ.",
+          details: { request_id: "req-1" },
+          fields: { daily_budget: "Ngân sách phải lớn hơn 0." },
+        },
+      }), { status: 422, headers: { "Content-Type": "application/json" } }),
     );
+
+    await expect(api.post("/api/profiles/me", {})).rejects.toMatchObject({
+      status: 422,
+      code: "REQUEST_VALIDATION_FAILED",
+      message: "Ngân sách chưa hợp lệ.",
+      technicalMessage: "Validation failed for daily_budget",
+      details: { request_id: "req-1" },
+      fields: { daily_budget: "Ngân sách phải lớn hơn 0." },
+    });
   });
 
   it("handles 204 and unauthenticated public requests", async () => {
@@ -143,7 +172,8 @@ describe("api client", () => {
 
     await expect(api.getDownload("/api/admin/export")).rejects.toMatchObject({
       status: 401,
-      message: "Không có quyền",
+      message: "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại để tiếp tục.",
+      technicalMessage: "Không có quyền",
     });
     expect(localStorage.getItem("smart_menu_token")).toBeNull();
 
@@ -198,7 +228,8 @@ describe("SSE streaming", () => {
 
     await expect(streamSse("/api/ai/chat/stream", {}, vi.fn())).rejects.toMatchObject({
       status: 0,
-      message: "Máy chủ trả về dữ liệu streaming không hợp lệ.",
+      code: "STREAM_DATA_INVALID",
+      message: "Menuto nhận được dữ liệu chưa đúng định dạng. Hãy thử lại.",
     });
   });
 
@@ -209,7 +240,8 @@ describe("SSE streaming", () => {
     );
     await expect(streamSse("/api/ai/chat/stream", {}, vi.fn())).rejects.toMatchObject({
       status: 401,
-      message: "Phiên streaming hết hạn",
+      message: "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại để tiếp tục.",
+      technicalMessage: "Phiên streaming hết hạn",
     });
 
     fetchMock.mockResolvedValueOnce(
@@ -217,7 +249,8 @@ describe("SSE streaming", () => {
     );
     await expect(streamSse("/api/ai/chat/stream", {}, vi.fn())).rejects.toMatchObject({
       status: 503,
-      message: "Provider đang tắt",
+      message: "Dịch vụ đang tạm gián đoạn. Hãy thử lại sau.",
+      technicalMessage: "Provider đang tắt",
     });
 
     fetchMock.mockRejectedValueOnce(new TypeError("offline"));

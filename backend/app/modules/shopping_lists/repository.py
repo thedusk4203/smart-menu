@@ -64,6 +64,18 @@ class SqlShoppingListRepository(ShoppingListRepositoryPort):
         ).first()
         return dict(row._mapping) if row else None
 
+    def set_purchased_many(
+        self, plan_id: int, item_ids: list[int], purchased: bool
+    ) -> int:
+        if not item_ids:
+            return 0
+        result = self._session.execute(
+            text("""UPDATE shopping_lists SET is_purchased = :purchased
+                    WHERE meal_plan_id = :plan_id AND id = ANY(:item_ids)"""),
+            {"plan_id": plan_id, "item_ids": item_ids, "purchased": purchased},
+        )
+        return int(result.rowcount or 0)
+
 
 class SqlShoppingShareRepository(ShoppingShareRepositoryPort):
     def __init__(self, session) -> None:

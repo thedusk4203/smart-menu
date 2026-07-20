@@ -10,6 +10,7 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
 export function Textarea({ label, error, hint, className = "", id, rows = 4, ...props }: TextareaProps) {
   const autoId = useId();
   const fieldId = id ?? autoId;
+  const descriptionId = `${fieldId}-description`;
   return (
     <div className={className}>
       {label && (
@@ -24,11 +25,13 @@ export function Textarea({ label, error, hint, className = "", id, rows = 4, ...
           error ? "border-red-400 focus:ring-red-300" : "border-sand-200"
         }`}
         {...props}
+        aria-invalid={error ? "true" : undefined}
+        aria-describedby={error || hint ? descriptionId : undefined}
       />
       {error ? (
-        <p className="mt-1 text-xs text-red-600">{error}</p>
+        <p id={descriptionId} className="mt-1 text-xs text-red-600">{error}</p>
       ) : hint ? (
-        <p className="mt-1 text-xs text-gray-500">{hint}</p>
+        <p id={descriptionId} className="mt-1 text-xs text-gray-500">{hint}</p>
       ) : null}
     </div>
   );

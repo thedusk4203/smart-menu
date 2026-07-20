@@ -18,8 +18,8 @@ import type {
   ConversationDetail,
   ConversationSummary,
 } from "../../api/aiApi";
-import { ApiError } from "../../lib/apiClient";
-import { ConfirmDialog, PageHeader } from "../../components/ui";
+import { ConfirmDialog, FeedbackBanner, PageHeader } from "../../components/ui";
+import { toUserFeedback, type UserFeedback } from "../../lib/userFeedback";
 
 const SAMPLE_QUESTIONS = [
   "Gợi ý món ăn giàu đạm, ít calo?",
@@ -27,9 +27,6 @@ const SAMPLE_QUESTIONS = [
   "Thực đơn 1500 kcal cho một ngày?",
   "Nên ăn bao nhiêu tinh bột mỗi ngày?",
 ];
-
-const errorMessage = (error: unknown) =>
-  error instanceof ApiError ? error.message : "Có lỗi xảy ra. Vui lòng thử lại.";
 
 type ActiveStream = {
   mode: "chat" | "retry";
@@ -51,6 +48,8 @@ export function Assistant() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [feedback, setFeedback] = useState<UserFeedback | null>(null);
+  const [statusFeedback, setStatusFeedback] = useState<UserFeedback | null>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const historyButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -67,7 +66,7 @@ export function Assistant() {
   const sending = activeStream?.mode === "chat";
   const retrying = activeStream?.mode === "retry";
   const streaming = activeStream !== null;
-  const composerDisabled = enabled === false || streaming || atTurnLimit || unresolvedLastTurn;
+  const composerDisabled = enabled !== true || streaming || atTurnLimit || unresolvedLastTurn;
 
   const refreshList = async () => {
     const list = await aiApi.listConversations();
@@ -81,7 +80,7 @@ export function Assistant() {
     try {
       setConversation(await aiApi.getConversation(id));
     } catch (error) {
-      toast.error(errorMessage(error));
+      setFeedback(toUserFeedback(error, "ai_chat"));
     } finally {
       setConversationLoading(false);
     }
@@ -97,15 +96,17 @@ export function Assistant() {
       if (cancelled) return;
       if (statusResult.status === "fulfilled") {
         setEnabled(statusResult.value.enabled);
+        setStatusFeedback(null);
       } else {
-        setEnabled(false);
+        setEnabled(null);
+        setStatusFeedback(toUserFeedback(statusResult.reason, "ai_status"));
       }
       if (conversationsResult.status === "fulfilled") {
         const list = conversationsResult.value;
         setConversations(list);
         if (list[0]) await openConversation(list[0].id);
       } else {
-        toast.error("Không tải được lịch sử hội thoại.");
+        setFeedback(toUserFeedback(conversationsResult.reason, "ai_chat"));
       }
       if (!cancelled) setHistoryLoading(false);
     };
@@ -202,7 +203,7 @@ export function Assistant() {
         else startNewConversation();
       }
     } catch (error) {
-      toast.error(errorMessage(error));
+      setFeedback(toUserFeedback(error, "ai_chat"));
     } finally {
       setDeletingId(null);
     }
@@ -252,7 +253,7 @@ export function Assistant() {
       setConversation(detail);
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
-      toast.error(errorMessage(error));
+      setFeedback(toUserFeedback(error, "ai_chat"));
       try {
         const list = await refreshList();
         const fallbackId = streamedConversationId ?? list[0]?.id;
@@ -308,7 +309,7 @@ export function Assistant() {
       toast.success("Menuto đã tạo câu trả lời mới.");
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
-      toast.error(errorMessage(error));
+      setFeedback(toUserFeedback(error, "ai_chat"));
       try {
         setConversation(await aiApi.getConversation(selectedId));
       } catch {
@@ -333,20 +334,22 @@ export function Assistant() {
     <div>
       <PageHeader title="Trợ lý Menuto" description="Hỏi đáp về dinh dưỡng và gợi ý món ăn." />
 
-      <div
+      {feedback && <FeedbackBanner feedback={feedback} onDismiss={() => setFeedback(null)} className="mb-4" />}
+
+      {statusFeedback ? <FeedbackBanner feedback={statusFeedback} className="mb-4" /> : <div
         className={`mb-4 flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-sm ${
-          enabled
+          enabled === true
             ? "border-brand-200 bg-brand-50 text-brand-800"
             : "border-accent-200 bg-accent-50 text-accent-800"
         }`}
       >
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
-          {enabled
+          {enabled === true
             ? "Lịch sử chat được lưu tối đa 30 ngày."
             : "AI chưa được quản trị viên kích hoạt. Lịch sử đã lưu vẫn có thể xem lại."}
         </span>
-      </div>
+      </div>}
 
       <div className="flex h-[calc(100vh-13rem)] min-h-[520px] max-h-[780px] overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-sm">
         <aside className="hidden w-72 shrink-0 border-r border-sand-200 lg:block">
@@ -419,7 +422,7 @@ export function Assistant() {
                       key={question}
                       type="button"
                       onClick={() => send(question)}
-                      disabled={enabled === false || streaming || conversations.length >= MAX_CONVERSATIONS}
+                      disabled={enabled !== true || streaming || conversations.length >= MAX_CONVERSATIONS}
                       className="rounded-full border border-sand-200 bg-white px-3 py-1.5 text-xs text-gray-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {question}
@@ -457,7 +460,7 @@ export function Assistant() {
             )}
             {lastTurn?.status === "failed" && (
               <p className="mb-2 text-xs font-medium text-red-700">
-                Hãy retry câu hỏi gần nhất trước khi tiếp tục.
+                Hãy thử lại câu hỏi gần nhất trước khi tiếp tục.
               </p>
             )}
             {streaming && <p className="sr-only" role="status">Menuto đang trả lời.</p>}
@@ -467,7 +470,7 @@ export function Assistant() {
                 id="assistant-message"
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
-                placeholder={enabled === false ? "AI chưa được kích hoạt" : "Nhập câu hỏi của bạn..."}
+                placeholder={enabled === false ? "Menuto chưa được kích hoạt" : enabled === null ? "Chưa kiểm tra được trạng thái Menuto" : "Nhập câu hỏi của bạn..."}
                 disabled={composerDisabled}
                 maxLength={4000}
                 className="min-w-0 flex-1 rounded-xl border border-sand-300 bg-white px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:cursor-not-allowed disabled:bg-sand-100"
@@ -481,6 +484,7 @@ export function Assistant() {
                 <Send className="h-5 w-5" />
               </button>
             </form>
+            <p className="mt-2 text-xs leading-5 text-gray-500">Menuto cung cấp thông tin tham khảo, không thay thế chẩn đoán hoặc tư vấn của chuyên gia y tế.</p>
           </div>
         </section>
       </div>
@@ -539,8 +543,9 @@ export function Assistant() {
         onConfirm={() => confirmingDeleteId !== null && deleteConversation(confirmingDeleteId)}
         loading={deletingId === confirmingDeleteId}
         title="Xóa cuộc trò chuyện"
-        message={`Xóa cuộc trò chuyện “${conversations.find((item) => item.id === confirmingDeleteId)?.title || "này"}”?`}
-        confirmLabel="Xóa"
+        message={`Cuộc trò chuyện “${conversations.find((item) => item.id === confirmingDeleteId)?.title || "này"}” và toàn bộ câu trả lời bên trong sẽ bị xóa vĩnh viễn.`}
+        confirmLabel="Xóa cuộc trò chuyện"
+        cancelLabel="Giữ lại"
       />
     </div>
   );

@@ -25,7 +25,16 @@ export type ChatStreamEvent =
   | { event: "start"; data: { conversation_id: number; turn: ConversationTurn } }
   | { event: "delta"; data: { content: string } }
   | { event: "done"; data: ConversationChatResponse }
-  | { event: "error"; data: { detail: string; conversation_id: number; turn_id: number; retryable: true } };
+  | {
+      event: "error";
+      data: {
+        detail: string;
+        error?: { code: string; message: string; details?: Record<string, unknown> };
+        conversation_id: number;
+        turn_id: number;
+        retryable: true;
+      };
+    };
 export interface ConversationSummary {
   id: number;
   title: string;
@@ -133,13 +142,22 @@ async function consumeChatStream(
   await streamSse(path, body, (raw) => {
     const event = raw as ChatStreamEvent;
     if (event.event === "error") {
-      throw new ApiError(503, event.data.detail);
+      throw new ApiError(503, event.data.error?.message ?? "Menuto chưa thể hoàn tất câu trả lời. Hãy thử lại.", {
+        code: event.data.error?.code ?? "AI_STREAM_FAILED",
+        technicalMessage: event.data.detail,
+        details: event.data.error?.details,
+        retryable: event.data.retryable,
+      });
     }
     onEvent(event);
     if (event.event === "done") completed = event.data;
   }, signal);
   if (!completed) {
-    throw new ApiError(0, "Luồng trả lời kết thúc trước khi hoàn tất.");
+    throw new ApiError(0, "Câu trả lời bị gián đoạn. Hãy thử lại.", {
+      code: "AI_STREAM_INTERRUPTED",
+      technicalMessage: "Luồng trả lời kết thúc trước khi hoàn tất.",
+      retryable: true,
+    });
   }
   return completed;
 }

@@ -1,11 +1,10 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import { Button, TextField } from "../../components/ui";
-import { ApiError } from "../../lib/apiClient";
+import { Button, FeedbackBanner, TextField } from "../../components/ui";
+import { toUserFeedback, type UserFeedback } from "../../lib/userFeedback";
 import { GoogleLoginButton } from "../../components/auth/GoogleLoginButton";
 
 export function Register() {
@@ -18,26 +17,27 @@ export function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<UserFeedback | null>(null);
 
   const passwordError = confirm && confirm !== password ? "Mật khẩu xác nhận không khớp" : undefined;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setFeedback(null);
     if (password !== confirm) {
-      toast.error("Mật khẩu xác nhận không khớp");
+      setFeedback({ title: "Mật khẩu chưa khớp", message: "Nhập lại đúng mật khẩu ở trường xác nhận.", fields: { confirm_password: "Mật khẩu xác nhận chưa khớp." }, retryable: false });
       return;
     }
     if (password.length < 8) {
-      toast.error("Mật khẩu cần tối thiểu 8 ký tự");
+      setFeedback({ title: "Mật khẩu quá ngắn", message: "Mật khẩu cần có ít nhất 8 ký tự.", fields: { password: "Mật khẩu cần có ít nhất 8 ký tự." }, retryable: false });
       return;
     }
     setLoading(true);
     try {
       await register({ email, password, full_name: fullName || undefined });
-      toast.success("Tạo tài khoản thành công!");
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
+      setFeedback(toUserFeedback(err, "register"));
     } finally {
       setLoading(false);
     }
@@ -48,7 +48,9 @@ export function Register() {
       <h1 className="text-2xl font-bold text-gray-900">Tạo tài khoản</h1>
       <p className="mt-1 text-sm text-gray-500">Bắt đầu hành trình ăn uống khoa học.</p>
 
-      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+      {feedback && <FeedbackBanner feedback={feedback} className="mt-5" />}
+
+      <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
         <TextField
           label="Họ và tên"
           value={fullName}
@@ -64,6 +66,7 @@ export function Register() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="ban@email.com"
+          error={feedback?.fields.email}
         />
         <TextField
           label="Mật khẩu"
@@ -73,6 +76,8 @@ export function Register() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Tối thiểu 8 ký tự"
+          hint="Dùng ít nhất 8 ký tự."
+          error={feedback?.fields.password}
           trailingAction={
             <button
               type="button"
@@ -92,7 +97,7 @@ export function Register() {
           required
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
-          error={passwordError}
+          error={feedback?.fields.confirm_password ?? passwordError}
           placeholder="Nhập lại mật khẩu"
           trailingAction={
             <button
@@ -112,7 +117,6 @@ export function Register() {
       </form>
 
       <GoogleLoginButton onAuthenticated={() => {
-        toast.success("Tạo tài khoản thành công!");
         navigate("/dashboard", { replace: true });
       }} />
 

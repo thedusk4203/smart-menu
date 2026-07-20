@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Download, FileSpreadsheet } from "lucide-react";
 import toast from "react-hot-toast";
 import { adminApi } from "../../api/adminApi";
-import { ApiError } from "../../lib/apiClient";
+import { adminFeedbackMessage } from "../../lib/userFeedback";
 import { Button, Modal } from "../ui";
 
 type EntityType = "ingredients" | "dishes";
@@ -36,9 +36,9 @@ export function AdminExportDialog({ entityType, filteredParams, filteredTotal }:
       link.remove();
       URL.revokeObjectURL(url);
       setOpen(false);
-      toast.success("Đã tải file export.");
+      toast.success("Đã tải tệp xuất dữ liệu (export).");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Không thể export dữ liệu.");
+      toast.error(adminFeedbackMessage(err));
     } finally {
       setDownloading(null);
     }
@@ -64,7 +64,7 @@ export function AdminExportDialog({ entityType, filteredParams, filteredTotal }:
           </>
         )}
       >
-        <p className="text-sm leading-6 text-gray-600">File dùng đúng cấu trúc import để bạn có thể chỉnh sửa rồi import lại.</p>
+        <p className="text-sm leading-6 text-gray-600">Tệp dùng đúng cấu trúc nhập dữ liệu (import) để bạn có thể chỉnh sửa rồi nhập lại.</p>
         <fieldset className="mt-4 space-y-2">
           <legend className="text-sm font-semibold text-gray-900">Phạm vi dữ liệu</legend>
           <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-sand-200 px-3 text-sm text-gray-800">

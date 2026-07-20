@@ -217,6 +217,26 @@ class UpdateShoppingItemUseCase:
             raise
 
 
+class UpdateShoppingItemsUseCase:
+    def __init__(self, unit_of_work: ShoppingListUnitOfWorkPort) -> None:
+        self._unit_of_work = unit_of_work
+
+    def execute(self, plan_id: int, item_ids: list[int], purchased: bool) -> bool:
+        unique_ids = list(dict.fromkeys(item_ids))
+        try:
+            updated = self._unit_of_work.shopping_lists.set_purchased_many(
+                plan_id, unique_ids, purchased
+            )
+            if updated != len(unique_ids):
+                self._unit_of_work.rollback()
+                return False
+            self._unit_of_work.commit()
+            return True
+        except Exception:
+            self._unit_of_work.rollback()
+            raise
+
+
 class GetOrCreateShoppingShareUseCase:
     def __init__(self, unit_of_work: ShoppingListUnitOfWorkPort) -> None:
         self._unit_of_work = unit_of_work

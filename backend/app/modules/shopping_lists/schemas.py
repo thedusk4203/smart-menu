@@ -109,6 +109,11 @@ class PurchaseUpdate(BaseModel):
     is_purchased: bool
 
 
+class BulkPurchaseUpdate(BaseModel):
+    item_ids: list[int] = Field(min_length=1, max_length=200)
+    is_purchased: bool
+
+
 class ShoppingShareResponse(BaseModel):
     token: str
     expires_at: datetime

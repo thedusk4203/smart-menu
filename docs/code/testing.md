@@ -17,22 +17,24 @@ Biết test nào bảo vệ rule nào, chạy đúng gate trước khi bàn giao
 | Catalog/data | Dish candidate invariants, typed tags, quality issues, import templates |
 | Planner/shopping | Dish planner, models, shopping list, infeasible/constraint behavior |
 | AI | Request parser, chat template, use cases, provider config, conversations, retention, plan explanation |
-| Frontend | TypeScript compilation, ESLint, release guard, Vite production build |
+| Frontend | Vitest/RTL, API client coverage, TypeScript, ESLint, release guard, Vite build |
 
-Không có ngưỡng coverage số; thay đổi behavior phải có test có ý nghĩa tại module/use-case và regression test cho bug đã thấy.
+Backend đang cấu hình `fail_under=65`; kế hoạch refactor đặt mục tiêu tiếp theo là 70%. Frontend chạy Vitest coverage cho các file được đưa vào suite; coverage cao của `apiClient.ts` không đồng nghĩa toàn bộ UI đã đạt cùng tỷ lệ. Thay đổi behavior vẫn phải có test có ý nghĩa tại module/use-case và regression test cho bug đã thấy.
 
 ## Lệnh bắt buộc
 
 Chạy từ root repository trừ khi ghi khác:
 
 ```powershell
-cd backend; uv run pytest -q
+cd backend; uv run ruff check app scripts
+cd backend; uv run pytest -q --cov --cov-report=term-missing
+cd frontend; npm run test:coverage
 cd frontend; npm run build
 cd frontend; npm run lint
 cd frontend; npm run check:release
 ```
 
-Production build đã bao gồm `tsc -b` trước Vite. Khi docs ghi số lượng test, chạy lại ở thời điểm authoring; baseline 13/07/2026 là 189 passed với 3 warning không làm fail.
+Production build đã bao gồm `tsc -b` trước Vite. Baseline tự động ngày 20/07/2026: backend 217 test pass, coverage 67,63%; frontend 17 test pass; Ruff, TypeScript, ESLint, release guard và Vite build đều pass. Browser smoke chưa được chạy lại trong lượt refactor này.
 
 ## Thêm regression test
 

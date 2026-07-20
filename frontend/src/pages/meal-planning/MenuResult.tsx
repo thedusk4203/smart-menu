@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -7,9 +7,10 @@ import { useAuth } from "../../context/AuthContext";
 import { mealPlanApi, isInfeasible } from "../../api/mealPlanApi";
 import { aiApi } from "../../api/aiApi";
 import type { PlanExplanation, SwapSuggestion } from "../../api/aiApi";
-import { PageHeader, Button, Card, EmptyState, TextField, Textarea, Modal } from "../../components/ui";
+import { PageHeader, Button, Card, EmptyState, TextField, Textarea, Modal, FeedbackBanner } from "../../components/ui";
 import { MealPlanView } from "../../components/domain/MealPlanView";
-import { ApiError } from "../../lib/apiClient";
+import { planNoticeText } from "../../lib/domainMessages";
+import { toUserFeedback, type UserFeedback } from "../../lib/userFeedback";
 import { defaultMealPlanName, todayISO } from "../../lib/format";
 import type { GeneratedMealPlan, GenerateParams, MealType, PlanDish } from "../../types";
 
@@ -34,6 +35,20 @@ export function MenuResult() {
   const [swapSuggestions, setSwapSuggestions] = useState<SwapSuggestion[]>([]);
   const [swapTarget, setSwapTarget] = useState<{ day: number; mealType: MealType; dish: PlanDish } | null>(null);
   const [swapNote, setSwapNote] = useState("Món tương tự, phù hợp ngân sách");
+  const [feedback, setFeedback] = useState<UserFeedback | null>(null);
+  const swapSuggestionsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (swapSuggestions.length === 0) return;
+    const frame = window.requestAnimationFrame(() => {
+      const region = swapSuggestionsRef.current;
+      if (!region) return;
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      region.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+      region.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [swapSuggestions]);
 
   if (!plan) {
     return (
@@ -59,6 +74,7 @@ export function MenuResult() {
   const regenerate = async () => {
     if (!user) return;
     setRegenerating(true);
+    setFeedback(null);
     try {
       const seed = Math.floor(Math.random() * 1e9);
       const result = await mealPlanApi.generate({
@@ -67,7 +83,7 @@ export function MenuResult() {
         previous_plan_signature: plan.plan_data.plan_signature,
       });
       if (isInfeasible(result)) {
-        toast.error(result.reasons[0]?.message ?? "Không thể tạo thực đơn khác.");
+        setFeedback({ title: "Chưa tạo được phương án khác", message: planNoticeText(result.reasons[0] ?? { code: "NO_SOLUTION" }), fields: {}, retryable: true });
         return;
       }
       setPlan(result);
@@ -75,7 +91,7 @@ export function MenuResult() {
       setExplanation(null);
       toast.success("Đã tạo thực đơn mới.");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
+      setFeedback(toUserFeedback(err, "regenerate_menu"));
     } finally {
       setRegenerating(false);
     }
@@ -84,6 +100,7 @@ export function MenuResult() {
   const save = async () => {
     if (!user) return;
     setSaving(true);
+    setFeedback(null);
     try {
       await mealPlanApi.save({
         name: name.trim() || defaultMealPlanName(),
@@ -108,7 +125,7 @@ export function MenuResult() {
       toast.success("Đã lưu thực đơn.");
       navigate("/history");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
+      setFeedback(toUserFeedback(err, "save_menu"));
     } finally {
       setSaving(false);
     }
@@ -117,7 +134,7 @@ export function MenuResult() {
   const explain = async () => {
     setExplaining(true);
     try { const result = await aiApi.explainPlan({ plan_data: plan.plan_data, total_cost: plan.total_cost, total_calories: plan.total_calories, budget_limit: plan.budget_limit }); setExplanation(result); }
-    catch (err) { toast.error(err instanceof ApiError ? err.message : "AI đang tạm không khả dụng."); }
+    catch (err) { setFeedback(toUserFeedback(err, "ai_chat")); }
     finally { setExplaining(false); }
   };
 
@@ -133,9 +150,9 @@ export function MenuResult() {
     try {
       const result = await aiApi.suggestSwap({ day, meal_type: mealType, target_dish_id: dish.dish_id, plan, note: swapNote.trim() });
       setSwapSuggestions(result);
-      if (!result.length) toast("Không có món thay thế nào giữ được toàn bộ ràng buộc.");
+      if (!result.length) toast("Chưa có món thay thế nào giữ được toàn bộ điều kiện đã chọn.");
       setSwapTarget(null);
-    } catch (err) { toast.error(err instanceof ApiError ? err.message : "Không thể tìm món thay thế."); }
+    } catch (err) { setFeedback(toUserFeedback(err, "ai_chat")); }
     finally { setSwapping(false); }
   };
 
@@ -150,6 +167,8 @@ export function MenuResult() {
           </Button>
         }
       />
+
+      {feedback && <FeedbackBanner feedback={feedback} onDismiss={() => setFeedback(null)} className="mb-5" />}
 
       <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-sand-200 bg-white p-4 shadow-sm sm:flex-row sm:items-end">
         <TextField
@@ -171,7 +190,7 @@ export function MenuResult() {
       </div>
 
       {explanation && <Card title="Phân tích thực đơn" icon={<Sparkles className="h-5 w-5" />} className="mb-5"><div aria-live="polite"><p className="max-w-3xl text-sm leading-6 text-gray-700">{explanation.summary}</p><div className="mt-4 grid gap-4 border-y border-sand-200 py-4 md:grid-cols-2"><div><h4 className="text-sm font-semibold text-gray-900">Ngân sách</h4><p className="mt-1 text-sm leading-6 text-gray-600">{explanation.budget_assessment}</p></div><div><h4 className="text-sm font-semibold text-gray-900">Dinh dưỡng</h4><p className="mt-1 text-sm leading-6 text-gray-600">{explanation.nutrition_assessment}</p></div></div><div className="mt-4 grid gap-5 lg:grid-cols-3"><ExplanationList title="Điểm phù hợp" items={explanation.highlights} icon={<CheckCircle2 className="h-4 w-4 text-brand-600" />} /><ExplanationList title="Điểm cần lưu ý" items={explanation.cautions} icon={<CircleAlert className="h-4 w-4 text-accent-600" />} emptyText="Không có cảnh báo đáng chú ý." /><ExplanationList title="Gợi ý tiếp theo" items={explanation.recommendations} icon={<Lightbulb className="h-4 w-4 text-sky-600" />} /></div><p className="mt-4 text-xs leading-5 text-gray-500">Phân tích chỉ dùng số liệu của thực đơn đã kiểm tra và không thay thế tư vấn y tế. Yêu cầu AI được lưu tối đa 30 ngày để hỗ trợ vận hành.</p></div></Card>}
-      {(swapping || swapSuggestions.length > 0) && <Card title="Phương án đổi món đã kiểm tra" className="mb-5"><div className="space-y-2">{swapping ? <p className="text-sm text-gray-500">Đang xếp hạng và kiểm tra toàn bộ thực đơn...</p> : swapSuggestions.map(item => <button key={item.dish_id} onClick={() => { setPlan(item.plan); setExplanation(null); setSwapSuggestions([]); toast.success(`Đã đổi sang ${item.name}.`); }} className="block w-full rounded-xl border border-sand-200 p-3 text-left hover:border-brand-300 hover:bg-brand-50"><span className="font-medium text-gray-800">{item.name}</span><span className="mt-1 block text-sm text-gray-500">{item.reason}</span><span className="mt-1 block text-xs font-medium text-brand-700">Chọn phương án này</span></button>)}</div></Card>}
+      {(swapping || swapSuggestions.length > 0) && <div ref={swapSuggestionsRef} tabIndex={-1} className="scroll-mt-24 focus:outline-none" aria-live="polite"><Card title="Phương án đổi món đã kiểm tra" className="mb-5"><div className="space-y-2">{swapping ? <p className="text-sm text-gray-500">Đang xếp hạng và kiểm tra toàn bộ thực đơn...</p> : swapSuggestions.map(item => <button key={item.dish_id} onClick={() => { setPlan(item.plan); setExplanation(null); setSwapSuggestions([]); toast.success(`Đã đổi sang ${item.name}.`); }} className="block w-full rounded-xl border border-sand-200 p-3 text-left transition-colors hover:border-brand-300 hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"><span className="font-medium text-gray-800">{item.name}</span><span className="mt-1 block text-sm text-gray-500">{item.reason}</span><span className="mt-1 block text-xs font-medium text-brand-700">Chọn phương án này</span></button>)}</div></Card></div>}
 
       <MealPlanView
         planData={plan.plan_data}

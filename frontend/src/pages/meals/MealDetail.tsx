@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import toast from "react-hot-toast";
 import { ArrowLeft, Beef, ChefHat, Droplet, Flame, Utensils, Wallet, Wheat } from "lucide-react";
 import { dishApi } from "../../api/dishApi";
-import { Badge, Button, Card, EmptyState, FullPageSpinner, PageHeader, StatCard } from "../../components/ui";
+import { Badge, Button, Card, EmptyState, FeedbackBanner, FullPageSpinner, PageHeader, StatCard } from "../../components/ui";
 import { ApiError } from "../../lib/apiClient";
 import { COOKING_METHOD_LABELS, DISH_TYPE_LABELS, DISH_TYPE_STYLES } from "../../lib/labels";
 import { formatGram, formatKcal, formatNumber, formatVND } from "../../lib/format";
 import type { DishDetail } from "../../types";
+import { toUserFeedback, type UserFeedback } from "../../lib/userFeedback";
 
 export function MealDetail() {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +15,7 @@ export function MealDetail() {
   const [dish, setDish] = useState<DishDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [feedback, setFeedback] = useState<UserFeedback | null>(null);
 
   useEffect(() => {
     const dishId = Number(id);
@@ -28,8 +29,8 @@ export function MealDetail() {
       try {
         setDish(await dishApi.get(dishId));
       } catch (err) {
-        setNotFound(true);
-        toast.error(err instanceof ApiError ? err.message : "Không thể tải món ăn.");
+        if (err instanceof ApiError && err.status === 404) setNotFound(true);
+        else setFeedback(toUserFeedback(err, "load_catalog"));
       } finally {
         setLoading(false);
       }
@@ -37,6 +38,10 @@ export function MealDetail() {
   }, [id]);
 
   if (loading) return <FullPageSpinner />;
+
+  if (feedback) {
+    return <div><PageHeader title="Chi tiết món ăn" /><FeedbackBanner feedback={feedback} /><Button variant="secondary" className="mt-4" onClick={() => navigate("/meals")}><ArrowLeft className="h-4 w-4" /> Quay lại danh sách</Button></div>;
+  }
 
   if (notFound || !dish) {
     return (

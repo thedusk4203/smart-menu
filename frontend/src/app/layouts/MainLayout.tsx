@@ -8,7 +8,7 @@ import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
 import { ProtectedRoute } from "../../components/route/ProtectedRoute";
 import { ROLE_LABELS } from "../../lib/labels";
-import { ApiError } from "../../lib/apiClient";
+import { feedbackMessage } from "../../lib/userFeedback";
 
 interface NavItem {
   to: string;
@@ -46,13 +46,13 @@ export function MainLayout() {
       toast.success("Đã đăng xuất.");
       navigate("/login");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Có lỗi xảy ra");
+      toast.error(feedbackMessage(err));
     }
   };
 
   return (
-    <div className="min-h-screen bg-sand-50">
-      <header className="sticky top-0 z-30 border-b border-sand-200 bg-white/90 backdrop-blur">
+    <div className="app-shell min-h-screen bg-sand-50">
+      <header className="no-print sticky top-0 z-30 border-b border-sand-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
           <NavLink to="/dashboard" className="flex items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-white">
@@ -77,7 +77,7 @@ export function MainLayout() {
       </header>
 
       {/* Nav ngang cho man hinh nho */}
-      <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pt-4 lg:hidden">
+      <nav className="no-print mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pt-4 lg:hidden">
         {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.to}
@@ -94,8 +94,8 @@ export function MainLayout() {
         ))}
       </nav>
 
-      <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6">
-        <aside className="hidden w-56 shrink-0 lg:block">
+      <div className="app-content-shell mx-auto flex max-w-7xl gap-6 px-4 py-6">
+        <aside className="no-print hidden w-56 shrink-0 lg:block">
           <nav className="sticky top-20 space-y-1">
             {NAV_ITEMS.map((item) => (
               <NavLink key={item.to} to={item.to} className={({ isActive }) => linkClass(isActive)}>
@@ -106,7 +106,7 @@ export function MainLayout() {
           </nav>
         </aside>
 
-        <main className="min-w-0 flex-1">
+        <main className="app-main min-w-0 flex-1">
           <Outlet />
         </main>
       </div>

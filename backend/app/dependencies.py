@@ -173,6 +173,7 @@ from app.modules.shopping_lists.use_cases import (
     GetOrCreateShoppingShareUseCase,
     RevokeShoppingShareUseCase,
     UpdateShoppingItemUseCase,
+    UpdateShoppingItemsUseCase,
 )
 
 
@@ -184,6 +185,12 @@ def get_update_shopping_item_use_case(
     s: Session = Depends(get_session),
 ) -> UpdateShoppingItemUseCase:
     return UpdateShoppingItemUseCase(SqlShoppingListUnitOfWork(s))
+
+
+def get_update_shopping_items_use_case(
+    s: Session = Depends(get_session),
+) -> UpdateShoppingItemsUseCase:
+    return UpdateShoppingItemsUseCase(SqlShoppingListUnitOfWork(s))
 
 
 def get_or_create_shopping_share_use_case(

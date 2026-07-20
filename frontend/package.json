@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "check:ui-copy": "node scripts/ui-copy-check.mjs",
     "check:release": "node scripts/release-check.mjs",
     "preview": "vite preview"
   },

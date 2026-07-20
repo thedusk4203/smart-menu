@@ -2,6 +2,7 @@ import { AlertTriangle, Calendar, Flame, RefreshCw, Target, Wallet } from "lucid
 import { Badge, StatCard } from "../ui";
 import { DISH_TYPE_LABELS, MEAL_TYPE_LABELS, MEAL_TYPE_STYLES } from "../../lib/labels";
 import { formatGram, formatKcal, formatVND } from "../../lib/format";
+import { isUserVisiblePlanNotice, planNoticeText } from "../../lib/domainMessages";
 import type { DishType, MealType, PlanData, PlanDish } from "../../types";
 
 interface MealPlanViewProps {
@@ -13,7 +14,7 @@ interface MealPlanViewProps {
 }
 
 function warningText(warning: PlanData["warnings"][number]) {
-  return typeof warning === "string" ? warning : warning.message;
+  return typeof warning === "string" ? warning : planNoticeText(warning);
 }
 
 export function MealPlanView({ planData, totalCost, totalCalories, budgetLimit, onSwap }: MealPlanViewProps) {
@@ -25,6 +26,7 @@ export function MealPlanView({ planData, totalCost, totalCalories, budgetLimit, 
   const target = planData.nutrition_target;
   const overBudget = budgetLimit != null && cost > budgetLimit;
   const costSummary = planData.cost_summary;
+  const visibleWarnings = (planData.warnings ?? []).filter(isUserVisiblePlanNotice);
 
   return (
     <div className="space-y-5">
@@ -72,14 +74,14 @@ export function MealPlanView({ planData, totalCost, totalCalories, budgetLimit, 
         </section>
       )}
 
-      {(overBudget || planData.warnings?.length > 0) && (
+      {(overBudget || visibleWarnings.length > 0) && (
         <ul className="space-y-2">
           {overBudget && <li className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span>Tổng chi phí vượt ngân sách {formatVND(cost - budgetLimit!)}.</span></li>}
-          {planData.warnings?.map((warning, index) => <li key={index} className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span>{warningText(warning)}</span></li>)}
+          {visibleWarnings.map((warning, index) => <li key={typeof warning === "string" ? `${warning}-${index}` : `${warning.code}-${index}`} className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span>{warningText(warning)}</span></li>)}
         </ul>
       )}
 
-      {planData.metrics && <p className="text-xs text-gray-500">Lệch calo trung bình {planData.metrics.average_calorie_deviation_pct}% · Thiếu đạm {planData.metrics.protein_shortage_pct}% · Solver {planData.metrics.solver_time_ms} ms</p>}
+      {planData.metrics && <p className="text-xs text-gray-500">Chênh lệch năng lượng trung bình {planData.metrics.average_calorie_deviation_pct}% · Mức thiếu đạm {planData.metrics.protein_shortage_pct}%</p>}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {days.map((day) => (

@@ -13,7 +13,10 @@ from app.modules.shopping_lists.router import (
     _share_token,
     share_shopping_list,
 )
-from app.modules.shopping_lists.use_cases import BuildShoppingListUseCase
+from app.modules.shopping_lists.use_cases import (
+    BuildShoppingListUseCase,
+    UpdateShoppingItemsUseCase,
+)
 
 
 class FakeShoppingListRepository:
@@ -26,6 +29,12 @@ class FakeShoppingListRepository:
             {**item, "id": index, "is_purchased": item["ingredient_id"] == 1}
             for index, item in enumerate(items, start=1)
         ]
+
+    def set_purchased_many(
+        self, plan_id: int, item_ids: list[int], purchased: bool
+    ) -> int:
+        self.updated_many = (plan_id, item_ids, purchased)
+        return len(item_ids)
 
 
 class FakeShoppingUnitOfWork:
@@ -256,6 +265,34 @@ def test_v3_shopping_list_exposes_purchase_blocks_pantry_and_cost_hierarchy():
     assert result.summary["visible_purchase_cost"] == 5_000
     assert len(repository.materialized_items) == 3
     assert unit_of_work.commits == 1
+
+
+def test_bulk_purchase_update_deduplicates_ids_and_commits_once():
+    repository = FakeShoppingListRepository()
+    unit_of_work = FakeShoppingUnitOfWork(repository)
+
+    updated = UpdateShoppingItemsUseCase(unit_of_work).execute(
+        plan_id=12, item_ids=[1, 2, 1], purchased=True
+    )
+
+    assert updated is True
+    assert repository.updated_many == (12, [1, 2], True)
+    assert unit_of_work.commits == 1
+    assert unit_of_work.rollbacks == 0
+
+
+def test_bulk_purchase_update_rolls_back_when_any_item_is_missing():
+    repository = FakeShoppingListRepository()
+    repository.set_purchased_many = lambda plan_id, item_ids, purchased: 1
+    unit_of_work = FakeShoppingUnitOfWork(repository)
+
+    updated = UpdateShoppingItemsUseCase(unit_of_work).execute(
+        plan_id=12, item_ids=[1, 2], purchased=True
+    )
+
+    assert updated is False
+    assert unit_of_work.commits == 0
+    assert unit_of_work.rollbacks == 1
 
 
 def test_v3_usage_day_distinguishes_new_purchase_from_fridge_carryover():

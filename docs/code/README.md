@@ -52,7 +52,8 @@ flowchart LR
 | Frontend routes khai báo | 24 |
 | OpenAPI paths / operations / schemas | 75 / 103 / 112 |
 | PostgreSQL tables / views / enums | 23 / 5 / 10 |
-| Backend tests gần nhất | 207 passed |
+| Backend tests gần nhất | 217 passed; coverage 67,63% (gate 65%) |
+| Frontend tests gần nhất | 17 passed; API client 95% statement / 84% branch |
 
 Các số này là baseline, không phải hằng số. Khi code thay đổi, chạy lại kiểm kê trong [testing](testing.md) và cập nhật tài liệu liên quan.
 

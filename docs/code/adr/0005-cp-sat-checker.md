@@ -22,7 +22,7 @@ Planner V3 mở rộng cùng boundary này sang procurement:
 - phần dư chỉ được thêm vào lần dùng sau khi không quá 20% bước mua, không phát sinh block, đúng giới hạn linh hoạt do admin duyệt và không làm nutrition score xấu đi;
 - snapshot V3 lưu fingerprint, procurement, base/final nutrition và adjustment; save reload dữ liệu rồi giải lại selection cố định trước khi persist.
 
-`regular` tham gia tối ưu mua, `pantry` chỉ tạo checklist giả định có sẵn và `ignored` không tạo shopping item. Planner V3 là contract duy nhất; dữ liệu mua thiếu làm generation thất bại có cấu trúc. Cờ `MEAL_PLANNER_V3_LEDGER_ENABLED` chỉ rollout ledger xuyên nhiều plan, không chọn phiên bản planner.
+`regular` tham gia tối ưu mua, `pantry` chỉ tạo checklist giả định có sẵn và `ignored` không tạo shopping item. Planner V3 là contract duy nhất; dữ liệu mua thiếu làm generation thất bại có cấu trúc. Feature flag ledger đã bị xóa: runtime V3 luôn tạo procurement ledger xuyên nhiều plan.
 
 ## Consequences
 

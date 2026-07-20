@@ -7,7 +7,7 @@ import { adminApi } from "../../api/adminApi";
 import { AdminEmptyState, AdminErrorState, AdminTableSkeleton } from "../../components/admin/AdminStates";
 import { AdminPagination } from "../../components/admin/AdminPagination";
 import { Badge, Button, Card, Modal, PageHeader, SelectField } from "../../components/ui";
-import { ApiError } from "../../lib/apiClient";
+import { adminFeedbackMessage, toUserFeedback, type UserFeedback } from "../../lib/userFeedback";
 import { formatDate } from "../../lib/format";
 import type { ImportConflict, ImportJob, ImportPreview } from "../../types/admin";
 
@@ -34,7 +34,7 @@ export function AdminImports() {
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<UserFeedback | null>(null);
 
   const conflicts = preview?.conflicts ?? [];
   const selectedCount = conflicts.filter((conflict) => replaceRows.includes(conflict.row)).length;
@@ -48,13 +48,13 @@ export function AdminImports() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError("");
+    setError(null);
     try {
       const page = await adminApi.importJobs({ limit: LIMIT, offset });
       setItems(page.items);
       setTotal(page.total);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Không thể tải lịch sử import.");
+      setError(toUserFeedback(err, "admin_action", "admin"));
     } finally {
       setLoading(false);
     }
@@ -78,7 +78,7 @@ export function AdminImports() {
       URL.revokeObjectURL(url);
       toast.success("Đã tải file mẫu.");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Không thể tải file mẫu.");
+      toast.error(adminFeedbackMessage(err));
     } finally {
       setDownloadFormat(null);
     }
@@ -96,13 +96,13 @@ export function AdminImports() {
       if (!result.can_commit) {
         toast.error("File có lỗi; hãy sửa rồi kiểm tra lại.");
       } else if (result.conflicts.length > 0) {
-        toast("Chọn các bản ghi được phép thay thế trước khi import.", { icon: "⚠️" });
+        toast("Chọn các bản ghi được phép thay thế trước khi nhập dữ liệu (import).", { icon: "⚠️" });
         setConflictDialogOpen(true);
       } else {
-        toast.success("File hợp lệ, sẵn sàng import.");
+        toast.success("Tệp hợp lệ, sẵn sàng nhập dữ liệu (import).");
       }
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Không thể đọc file import.");
+      toast.error(adminFeedbackMessage(err));
     } finally {
       setLoadingPreview(false);
     }
@@ -113,7 +113,7 @@ export function AdminImports() {
     setCommitting(true);
     try {
       const result = await adminApi.commitImport(preview.job_id, rowsToReplace);
-      toast.success(`Đã import: thêm ${result.created}, cập nhật ${result.updated}, bỏ qua ${result.skipped}.`);
+      toast.success(`Đã nhập dữ liệu: thêm ${result.created}, cập nhật ${result.updated}, bỏ qua ${result.skipped}.`);
       setConflictDialogOpen(false);
       setPreview(null);
       setFile(null);
@@ -121,7 +121,7 @@ export function AdminImports() {
       if (fileRef.current) fileRef.current.value = "";
       await load();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Không thể commit import.");
+      toast.error(adminFeedbackMessage(err));
     } finally {
       setCommitting(false);
     }

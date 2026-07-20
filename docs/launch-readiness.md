@@ -1,22 +1,25 @@
 # Trạng thái sẵn sàng trình diễn
 
-**Kết luận ngày 13/07/2026:** phù hợp demo đồ án/local có kiểm soát; chưa được đánh giá như một dịch vụ Internet công cộng.
+**Kết luận tự động ngày 20/07/2026:** refactor hiện vượt các quality gate đã cấu hình và phù hợp demo/local có kiểm soát; chưa được đánh giá như một dịch vụ Internet công cộng.
 
 ## Bằng chứng vừa chạy
 
 | Kiểm tra | Kết quả |
 | --- | --- |
-| Backend `pytest -q` | **189 passed**, 3 cảnh báo không làm test fail |
+| Backend `pytest -q --cov` | **217 passed**, coverage **67,63%**, vượt gate 65% |
+| Backend Ruff | Pass |
 | TypeScript `tsc -b` | Pass |
 | ESLint | Pass |
 | Release guard | Pass |
-| Vite production build | Pass, 1.666 module |
-| Bundle chính | 337,10 kB; gzip 108,16 kB |
-| Kiểm tra browser thủ công | Các luồng User/Admin, planner, shopping list, chia sẻ mobile và lịch sử Menuto chạy được; phát hiện giới hạn responsive ở ngăn lịch sử Menuto 390 px |
+| Frontend Vitest coverage | **17 passed**; `apiClient.ts`: 95% statement, 84% branch, 82,6% function, 100% line |
+| Vite production build | Pass, 2.753 module |
+| Bundle chính | 342,50 kB; gzip 109,62 kB |
+| Chunk Assistant | 246,46 kB; gzip 78,35 kB |
+| Kiểm tra browser thủ công | Chưa chạy lại trong lượt xác minh refactor này; bằng chứng browser phía dưới là kết quả cũ cần refresh trước demo |
 
-Ba cảnh báo pytest gồm hai cảnh báo Pydantic về `class Config` cũ và một cảnh báo không ghi được `.pytest_cache`; không có test thất bại.
+Một cảnh báo pytest do sandbox không ghi được `.pytest_cache`; không có test thất bại. Kế hoạch đặt mục tiêu coverage 70%, nhưng cấu hình hiện tại mới `fail_under=65` và kết quả thực tế là 67,63%.
 
-## Trạng thái đã xác minh thủ công
+## Trạng thái đã xác minh thủ công trước refactor
 
 - Đăng nhập email và nút Google khi có cấu hình.
 - Hồ sơ hoàn chỉnh, preview nhu cầu dinh dưỡng và nguyên liệu loại trừ.

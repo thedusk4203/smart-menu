@@ -163,11 +163,25 @@ class ChatStream:
             raise
         except Exception as exc:
             fail()
-            detail = exc.detail if isinstance(exc, AppException) else "Menuto chưa thể hoàn tất câu trả lời."
+            if isinstance(exc, AppException):
+                detail = exc.detail
+                error = {
+                    "code": exc.code,
+                    "message": exc.user_message,
+                    "details": exc.details,
+                }
+            else:
+                detail = "Menuto chưa thể hoàn tất câu trả lời."
+                error = {
+                    "code": "AI_STREAM_FAILED",
+                    "message": "Menuto chưa thể hoàn tất câu trả lời. Hãy thử lại.",
+                    "details": {},
+                }
             yield {
                 "event": "error",
                 "data": {
                     "detail": detail,
+                    "error": error,
                     "conversation_id": self.conversation_id,
                     "turn_id": int(self.turn["id"]),
                     "retryable": True,

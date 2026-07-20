@@ -15,6 +15,11 @@ class ShoppingListRepositoryPort(ABC):
         self, plan_id: int, item_id: int, purchased: bool
     ) -> dict | None: ...
 
+    @abstractmethod
+    def set_purchased_many(
+        self, plan_id: int, item_ids: list[int], purchased: bool
+    ) -> int: ...
+
 
 class ShoppingShareRepositoryPort(ABC):
     @abstractmethod

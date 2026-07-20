@@ -4,7 +4,7 @@ import { Eye, EyeOff, Pencil, Plus, Search, Salad, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useSearchParams } from "react-router-dom";
 import { adminApi } from "../../api/adminApi";
-import { ApiError } from "../../lib/apiClient";
+import { adminFeedbackMessage, toUserFeedback, type UserFeedback } from "../../lib/userFeedback";
 import { FOOD_GROUP_LABELS, FOOD_GROUP_STYLES } from "../../lib/labels";
 import { formatDate, formatVND } from "../../lib/format";
 import { Badge, Button, Card, ConfirmDialog, Modal, MoneyField, NumberField, PageHeader, SelectField, TextField } from "../../components/ui";
@@ -36,7 +36,7 @@ export function AdminIngredients() {
   const [quality, setQuality] = useState(params.get("quality") || "");
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<UserFeedback | null>(null);
   const [editing, setEditing] = useState<AdminIngredient | null>(null);
   const [form, setForm] = useState<IngredientForm>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
@@ -46,12 +46,12 @@ export function AdminIngredients() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true); setError("");
+    setLoading(true); setError(null);
     try {
       const page = await adminApi.ingredients({ search: search.trim() || undefined, food_group: group, status, quality, limit: LIMIT, offset });
       setItems(page.items); setTotal(page.total);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Không thể tải nguyên liệu.");
+      setError(toUserFeedback(err, "admin_action", "admin"));
     } finally { setLoading(false); }
   }, [group, offset, quality, search, status]);
 
@@ -78,7 +78,7 @@ export function AdminIngredients() {
         setOpen(true);
       })
       .catch((err) => {
-        if (active) toast.error(err instanceof ApiError ? err.message : "Không thể tải nguyên liệu.");
+        if (active) toast.error(adminFeedbackMessage(err));
       })
       .finally(() => {
         if (active) clearEditParam();
@@ -89,7 +89,7 @@ export function AdminIngredients() {
   const openCreate = () => { setEditing(null); setForm(EMPTY_FORM); setOpen(true); };
   const openEdit = async (item: AdminIngredient) => {
     try { const detail = await adminApi.ingredient(item.id); setEditing(detail); setForm(toForm(detail)); setOpen(true); }
-    catch (err) { toast.error(err instanceof ApiError ? err.message : "Không thể tải nguyên liệu."); }
+    catch (err) { toast.error(adminFeedbackMessage(err)); }
   };
   const save = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true);
@@ -99,7 +99,7 @@ export function AdminIngredients() {
       setItems((current) => editing ? current.map((item) => item.id === result.id ? result : item) : [result, ...current]);
       if (!editing) setTotal((value) => value + 1);
       setOpen(false); toast.success(editing ? "Đã cập nhật nguyên liệu." : "Đã thêm nguyên liệu.");
-    } catch (err) { toast.error(err instanceof ApiError ? err.message : "Không thể lưu nguyên liệu."); }
+    } catch (err) { toast.error(adminFeedbackMessage(err)); }
     finally { setSaving(false); }
   };
   const toggle = async (item: AdminIngredient) => {
@@ -108,7 +108,7 @@ export function AdminIngredients() {
       const updated = await adminApi.setIngredientActive(item.id, !item.is_active);
       setItems((current) => current.map((value) => value.id === item.id ? updated : value));
       toast.success(updated.is_active ? "Đã khôi phục nguyên liệu." : "Đã ẩn nguyên liệu khỏi dữ liệu mới.");
-    } catch (err) { toast.error(err instanceof ApiError ? err.message : "Không thể đổi trạng thái."); }
+    } catch (err) { toast.error(adminFeedbackMessage(err)); }
     finally { setSavingId(null); }
   };
   const deleteIngredient = async () => {
@@ -120,7 +120,7 @@ export function AdminIngredients() {
       setTotal((value) => Math.max(0, value - 1));
       setOpen(false); setEditing(null); setDeleting(null);
       toast.success("Đã xóa nguyên liệu.");
-    } catch (err) { toast.error(err instanceof ApiError ? err.message : "Không thể xóa nguyên liệu."); }
+    } catch (err) { toast.error(adminFeedbackMessage(err)); }
     finally { setDeletingId(null); }
   };
   const setQualityFilter = (value: string) => { setQuality(value); setOffset(0); setParams(value ? { quality: value } : {}); };
@@ -149,13 +149,13 @@ export function AdminIngredients() {
           <section className="border-t border-sand-200 pt-5"><h3 className="font-semibold text-gray-900">Thêm mốc giá</h3><p className="mt-1 text-sm text-gray-600">Lưu một mốc mới, không ghi đè lịch sử giá trước đó.</p><div className="mt-3 grid gap-4 sm:grid-cols-2"><MoneyField label="Giá gốc" min="0" value={form.price} onValueChange={(price) => setForm({ ...form, price })} /><TextField label="Đơn vị giá" value={form.price_unit} onChange={(e) => setForm({ ...form, price_unit: e.target.value })} /><MoneyField label={`Giá quy đổi / ${form.default_unit || "đơn vị"}`} min="0" value={form.price_per_default_unit} maxFractionDigits={4} hint="Dùng để tính chi phí món; không phải giá niêm yết." onValueChange={(price_per_default_unit) => setForm({ ...form, price_per_default_unit })} /><TextField label="Nguồn giá" value={form.price_source} placeholder="Chợ, siêu thị, khảo sát..." onChange={(e) => setForm({ ...form, price_source: e.target.value })} /></div></section>
           <section className="border-t border-sand-200 pt-5">
             <h3 className="font-semibold text-gray-900">Mua và bảo quản</h3>
-            <p className="mt-1 text-sm text-gray-600">Quy tắc này quyết định số tiền thật phải mua và thời gian planner được tận dụng phần dư.</p>
+            <p className="mt-1 text-sm text-gray-600">Quy tắc này quyết định số tiền thật phải mua và thời gian hệ thống được tận dụng phần dư.</p>
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
               <SelectField
                 label="Chế độ mua"
                 value={form.purchase_mode}
                 options={[
-                  { value: "regular", label: "Mua theo block" },
+                  { value: "regular", label: "Mua theo quy cách đóng gói (block)" },
                   { value: "pantry", label: "Pantry — giả định có sẵn" },
                   { value: "ignored", label: "Không mua / không hiển thị" },
                 ]}
@@ -164,7 +164,7 @@ export function AdminIngredients() {
               {form.purchase_mode === "regular" && <NumberField label={`Bước mua (${form.default_unit || "đơn vị"})`} min="0.01" step="0.01" value={form.purchase_increment} onChange={(e) => setForm({ ...form, purchase_increment: e.target.value })} />}
             </div>
             {form.purchase_mode === "regular" && <>
-              {form.purchase_increment && form.price_per_default_unit && <p className="mt-3 rounded-xl bg-brand-50 px-3 py-2 text-sm text-brand-800">Giá mỗi block: {formatVND(Number(form.purchase_increment) * Number(form.price_per_default_unit))}</p>}
+              {form.purchase_increment && form.price_per_default_unit && <p className="mt-3 rounded-xl bg-brand-50 px-3 py-2 text-sm text-brand-800">Giá mỗi quy cách đóng gói: {formatVND(Number(form.purchase_increment) * Number(form.price_per_default_unit))}</p>}
               <div className="mt-3 grid gap-4 sm:grid-cols-3">
                 <NumberField label="Nhiệt độ phòng" suffix="ngày" min="0" step="1" value={form.room_shelf_life_days} onChange={(e) => setForm({ ...form, room_shelf_life_days: e.target.value })} />
                 <NumberField label="Ngăn mát" suffix="ngày" min="0" step="1" value={form.fridge_shelf_life_days} onChange={(e) => setForm({ ...form, fridge_shelf_life_days: e.target.value })} />

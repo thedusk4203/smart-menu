@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { adminApi } from "../../api/adminApi";
-import { ApiError } from "../../lib/apiClient";
+import { adminFeedbackMessage } from "../../lib/userFeedback";
 import {
   Badge, Button, Card, ConfirmDialog, Modal, PageHeader, SelectField,
   Textarea, TextField,
@@ -48,7 +48,7 @@ const PROMPT_OPTIONS: Array<{
   {
     value: "explain_plan",
     label: "Giải thích thực đơn",
-    description: "Tạo phân tích có căn cứ từ số liệu planner đã kiểm tra.",
+    description: "Tạo phân tích có căn cứ từ số liệu đã được hệ thống lập thực đơn kiểm tra.",
     contractSensitive: true,
   },
   {
@@ -109,7 +109,7 @@ export function AISettings() {
     try {
       await Promise.all([fetchProvidersAndLogs(), fetchPrompts()]);
     } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "Không thể tải cấu hình AI.");
+      toast.error(adminFeedbackMessage(error));
     } finally { setLoading(false); }
   }, [fetchPrompts, fetchProvidersAndLogs]);
   useEffect(() => { load(); }, [load]);
@@ -129,9 +129,9 @@ export function AISettings() {
     event.preventDefault(); setBusy("save");
     try {
       await persistDraft();
-      toast.success(editing ? "Đã cập nhật draft." : "Đã tạo provider draft.");
+      toast.success(editing ? "Đã cập nhật bản nháp (draft)." : "Đã tạo nhà cung cấp AI dạng bản nháp (provider draft).");
       setOpen(false); await fetchProvidersAndLogs();
-    } catch (error) { toast.error(error instanceof ApiError ? error.message : "Không thể lưu provider."); }
+    } catch (error) { toast.error(adminFeedbackMessage(error)); }
     finally { setBusy(null); }
   };
   const testDraft = async () => {
@@ -155,7 +155,7 @@ export function AISettings() {
       else toast.error(message);
       await fetchProvidersAndLogs();
     } catch (error) {
-      const message = error instanceof ApiError ? error.message : "Không thể test provider.";
+      const message = adminFeedbackMessage(error);
       setTestFeedback({ success: false, message });
       toast.error(message);
     } finally { setBusy(null); }
@@ -163,7 +163,7 @@ export function AISettings() {
   const action = async (id: number, fn: () => Promise<unknown>, success: string) => {
     setBusy(id);
     try { await fn(); toast.success(success); await fetchProvidersAndLogs(); }
-    catch (error) { toast.error(error instanceof ApiError ? error.message : "Thao tác thất bại."); }
+    catch (error) { toast.error(adminFeedbackMessage(error)); }
     finally { setBusy(null); }
   };
   const testProvider = async (item: LLMProvider) => {
@@ -173,7 +173,7 @@ export function AISettings() {
       if (result.provider.test_status === "success") toast.success("Provider hoạt động và structured output hợp lệ.");
       else toast.error(result.provider.last_test_error ?? "Provider không vượt qua kiểm tra.");
       await fetchProvidersAndLogs();
-    } catch (error) { toast.error(error instanceof ApiError ? error.message : "Không thể test provider."); }
+    } catch (error) { toast.error(adminFeedbackMessage(error)); }
     finally { setBusy(null); }
   };
   const discoverModels = async (item: LLMProvider) => {
@@ -189,12 +189,12 @@ export function AISettings() {
         setOpen(true);
         toast(`Đã chọn ${selected}. Bạn có thể đổi model trong form trước khi lưu.`);
       }
-    } catch (error) { toast.error(error instanceof ApiError ? error.message : "Không thể tải danh sách model."); }
+    } catch (error) { toast.error(adminFeedbackMessage(error)); }
     finally { setBusy(null); }
   };
   const viewLog = async (id: number) => {
     try { setLogDetail(await adminApi.aiLog(id)); }
-    catch (error) { toast.error(error instanceof ApiError ? error.message : "Không thể tải log."); }
+    catch (error) { toast.error(adminFeedbackMessage(error)); }
   };
 
   const currentPrompt = prompts.find(item => item.feature === selectedPromptFeature);
@@ -217,7 +217,7 @@ export function AISettings() {
   };
   const savePrompt = async () => {
     if (!currentPromptDraft.trim()) {
-      toast.error("System prompt không được để trống.");
+      toast.error("Chỉ dẫn hệ thống (system prompt) không được để trống.");
       return;
     }
     setPromptBusy("save");
@@ -225,9 +225,9 @@ export function AISettings() {
       const updated = await adminApi.updateAISystemPrompt(selectedPromptFeature, currentPromptDraft);
       setPrompts(current => current.map(item => item.feature === updated.feature ? updated : item));
       setPromptDrafts(current => ({ ...current, [updated.feature]: updated.content }));
-      toast.success("Đã lưu system prompt. Nội dung mới áp dụng từ request kế tiếp.");
+      toast.success("Đã lưu chỉ dẫn hệ thống (system prompt). Nội dung mới áp dụng từ yêu cầu (request) kế tiếp.");
     } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "Không thể lưu system prompt.");
+      toast.error(adminFeedbackMessage(error));
     } finally { setPromptBusy(null); }
   };
   const resetPrompt = async () => {
@@ -237,22 +237,22 @@ export function AISettings() {
       const reset = await adminApi.resetAISystemPrompt(selectedPromptFeature);
       setPrompts(current => current.map(item => item.feature === reset.feature ? reset : item));
       setPromptDrafts(current => ({ ...current, [reset.feature]: reset.content }));
-      toast.success("Đã khôi phục system prompt mặc định.");
+      toast.success("Đã khôi phục chỉ dẫn hệ thống (system prompt) mặc định.");
     } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "Không thể khôi phục system prompt.");
+      toast.error(adminFeedbackMessage(error));
     } finally { setPromptBusy(null); }
   };
 
   return <div>
-    <PageHeader title="AI & LLM Provider" description="Cấu hình, kiểm tra và theo dõi provider dùng cho các tính năng AI."
-      actions={<Button onClick={startCreate}><Plus className="h-4 w-4" /> Thêm provider</Button>} />
+    <PageHeader title="AI & nhà cung cấp mô hình (LLM provider)" description="Cấu hình, kiểm tra và theo dõi nhà cung cấp mô hình dùng cho các tính năng AI."
+      actions={<Button onClick={startCreate}><Plus className="h-4 w-4" /> Thêm nhà cung cấp</Button>} />
     <div className="mb-6 grid gap-4 lg:grid-cols-2">
       {providers.map((item) => <Card key={item.id} title={<span className="flex items-center gap-2">{item.name}
         {item.is_active && <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs text-brand-700">Đang dùng</span>}</span>}
         icon={<Bot className="h-5 w-5" />}>
         <dl className="grid grid-cols-2 gap-3 text-sm">
-          <div><dt className="text-gray-500">Provider</dt><dd className="font-medium">{item.provider_type}</dd></div>
-          <div><dt className="text-gray-500">Model</dt><dd className="font-medium break-all">{item.model}</dd></div>
+          <div><dt className="text-gray-500">Nhà cung cấp (provider)</dt><dd className="font-medium">{item.provider_type}</dd></div>
+          <div><dt className="text-gray-500">Mô hình (model)</dt><dd className="font-medium break-all">{item.model}</dd></div>
           <div><dt className="text-gray-500">API key</dt><dd>{item.masked_api_key ?? "Không có"}</dd></div>
           <div><dt className="text-gray-500">Kiểm tra</dt><dd className={item.test_status === "success" ? "text-brand-700" : item.test_status === "failed" ? "text-red-600" : "text-gray-500"}>{item.test_status}</dd></div>
         </dl>
@@ -270,7 +270,7 @@ export function AISettings() {
       {!loading && providers.length === 0 && <Card><div className="py-10 text-center text-sm text-gray-500"><KeyRound className="mx-auto mb-3 h-8 w-8" />Chưa có provider do admin quản lý.</div></Card>}
     </div>
 
-    <Card className="mb-6" title="System prompt AI" icon={<MessageSquareText className="h-5 w-5" />}
+    <Card className="mb-6" title="Chỉ dẫn hệ thống (system prompt)" icon={<MessageSquareText className="h-5 w-5" />}
       action={currentPrompt && <Badge className={currentPrompt.is_custom ? "bg-brand-100 text-brand-800" : "bg-sand-100 text-gray-700"}>{currentPrompt.is_custom ? "Đã tùy chỉnh" : "Mặc định"}</Badge>}>
       <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-sm text-amber-900">
         <div className="flex items-start gap-2.5">
@@ -292,7 +292,7 @@ export function AISettings() {
           </p>
         </div>
         <div>
-          <Textarea label="Nội dung system prompt" rows={15} value={currentPromptDraft}
+          <Textarea label="Nội dung chỉ dẫn hệ thống" rows={15} value={currentPromptDraft}
             maxLength={20_000} spellCheck={false} disabled={!currentPrompt || promptBusy !== null}
             onChange={event => setPromptDrafts(current => ({ ...current, [selectedPromptFeature]: event.target.value }))}
             hint={`${new Intl.NumberFormat("vi-VN").format(currentPromptDraft.length)} / 20.000 ký tự`} />
@@ -311,19 +311,19 @@ export function AISettings() {
       </div>
     </Card>
 
-    <Card title="Nhật ký AI — lưu 30 ngày" icon={<Activity className="h-5 w-5" />} action={<Button size="sm" variant="secondary" onClick={() => action(0, () => adminApi.purgeAILogs(new Date(Date.now() - 30 * 86400000).toISOString()), "Đã dọn log quá hạn.")}>Dọn log quá hạn</Button>}>
+    <Card title="Nhật ký AI (log) — lưu 30 ngày" icon={<Activity className="h-5 w-5" />} action={<Button size="sm" variant="secondary" onClick={() => action(0, () => adminApi.purgeAILogs(new Date(Date.now() - 30 * 86400000).toISOString()), "Đã dọn nhật ký quá hạn.")}>Dọn nhật ký quá hạn</Button>}>
       <div className="overflow-x-auto"><table className="min-w-[720px] w-full text-left text-sm"><thead><tr className="border-b border-sand-200 text-gray-500"><th className="pb-2">Thời gian</th><th>Feature</th><th>Model</th><th>Trạng thái</th><th>Latency</th><th /></tr></thead>
         <tbody>{logs.map(log => <tr key={log.id} className="border-b border-sand-100"><td className="py-3">{new Date(log.created_at).toLocaleString("vi-VN")}</td><td>{log.feature}</td><td>{log.model}</td><td>{log.status === "success" ? <span className="text-brand-700">Thành công</span> : <span className="text-red-600">Lỗi</span>}</td><td>{log.latency_ms} ms</td><td><button className="text-brand-700 hover:underline" onClick={() => viewLog(log.id)}>Chi tiết</button></td></tr>)}</tbody></table></div>
     </Card>
 
-    <Modal open={open} onClose={() => setOpen(false)} title={editing ? "Sửa provider draft" : "Thêm LLM provider"}
-      footer={<><Button variant="secondary" onClick={() => setOpen(false)}>Hủy</Button><Button type="button" variant="secondary" loading={busy === "test"} disabled={busy !== null && busy !== "test"} onClick={testDraft}><TestTube2 className="h-4 w-4" /> Test kết nối</Button>{testFeedback?.success ? <Button type="button" onClick={() => setOpen(false)}>Xong</Button> : <Button type="submit" form="ai-provider-form" loading={busy === "save"} disabled={busy !== null && busy !== "save"}>Lưu draft</Button>}</>}>
+    <Modal open={open} onClose={() => setOpen(false)} title={editing ? "Sửa nhà cung cấp dạng bản nháp (draft)" : "Thêm nhà cung cấp LLM"}
+      footer={<><Button variant="secondary" onClick={() => setOpen(false)}>Hủy</Button><Button type="button" variant="secondary" loading={busy === "test"} disabled={busy !== null && busy !== "test"} onClick={testDraft}><TestTube2 className="h-4 w-4" /> Kiểm tra kết nối</Button>{testFeedback?.success ? <Button type="button" onClick={() => setOpen(false)}>Xong</Button> : <Button type="submit" form="ai-provider-form" loading={busy === "save"} disabled={busy !== null && busy !== "save"}>Lưu bản nháp</Button>}</>}>
       <form id="ai-provider-form" onSubmit={save} className="space-y-4">
         <TextField label="Tên hiển thị" required value={form.name} onChange={event => changeForm({ name: event.target.value })} />
         <SelectField label="Provider" value={form.provider_type} options={[{value:"openai",label:"OpenAI"},{value:"deepseek",label:"DeepSeek"},{value:"lmstudio",label:"LM Studio"},{value:"google",label:"Google Gemini"},{value:"custom",label:"Custom OpenAI-compatible"}]}
           onChange={event => { const provider_type = event.target.value as LLMProviderType; changeForm({ provider_type, base_url: PRESETS[provider_type] || form.base_url }); }} />
         <TextField label="Base URL" required value={form.base_url} onChange={event => changeForm({ base_url: event.target.value })} />
-        <TextField label="Model" required value={form.model} onChange={event => changeForm({ model: event.target.value })} />
+        <TextField label="Mô hình (model)" required value={form.model} onChange={event => changeForm({ model: event.target.value })} />
         <TextField label="API key" type="password" value={form.api_key ?? ""} onChange={event => changeForm({ api_key: event.target.value })} hint={editing?.has_api_key ? "Để trống để giữ key hiện tại." : "LM Studio local có thể để trống."} />
         <TextField label="Timeout (giây)" type="number" min={1} max={300} value={form.timeout_seconds} onChange={event => changeForm({ timeout_seconds: Number(event.target.value) })} />
         {testFeedback && <div role="status" className={`rounded-xl border px-3.5 py-3 text-sm ${testFeedback.success ? "border-brand-200 bg-brand-50 text-brand-800" : "border-red-200 bg-red-50 text-red-700"}`}>
@@ -332,7 +332,7 @@ export function AISettings() {
         </div>}
       </form>
     </Modal>
-    <Modal open={!!logDetail} onClose={() => setLogDetail(null)} title={`AI log #${logDetail?.id ?? ""}`} size="lg">
+    <Modal open={!!logDetail} onClose={() => setLogDetail(null)} title={`Nhật ký AI #${logDetail?.id ?? ""}`} size="lg">
       {logDetail && <div className="space-y-4 text-sm"><div className="flex gap-4"><span>{logDetail.feature}</span><span>{logDetail.model}</span><span>{logDetail.latency_ms} ms</span></div><div><p className="mb-1 font-semibold">Request</p><pre className="max-h-64 overflow-auto rounded-xl bg-gray-950 p-3 text-xs text-gray-100">{JSON.stringify(logDetail.request_data, null, 2)}</pre></div><div><p className="mb-1 font-semibold">Response</p><pre className="max-h-64 overflow-auto rounded-xl bg-gray-950 p-3 text-xs text-gray-100">{JSON.stringify(logDetail.response_data, null, 2)}</pre></div></div>}
     </Modal>
     <ConfirmDialog open={pendingPromptFeature !== null} onClose={() => setPendingPromptFeature(null)}
@@ -340,7 +340,7 @@ export function AISettings() {
       message="Nội dung prompt đang chỉnh chưa được lưu. Nếu chuyển tính năng, các thay đổi này sẽ bị bỏ."
       confirmLabel="Bỏ thay đổi" />
     <ConfirmDialog open={promptResetOpen} onClose={() => setPromptResetOpen(false)}
-      onConfirm={resetPrompt} loading={promptBusy === "reset"} title="Khôi phục system prompt mặc định"
+      onConfirm={resetPrompt} loading={promptBusy === "reset"} title="Khôi phục chỉ dẫn hệ thống mặc định"
       message={`Bỏ nội dung tùy chỉnh của “${currentPromptOption.label}” và dùng lại prompt mặc định trong code?`}
       confirmLabel="Khôi phục mặc định" />
   </div>;
