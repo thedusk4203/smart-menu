@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -10,6 +10,7 @@ from app.modules.ai.exceptions import AIResponseValidationError, AIUnavailableEr
 from app.modules.ai.ports import AIClientPort, AIMessage
 from app.modules.ai.schemas import ChatRequest, ParseMenuRequest, SwapSuggestionRequest
 from app.modules.ai.use_cases import ChatUseCase, ParseMenuRequestUseCase, SuggestSwapUseCase
+from app.modules.inventory.repository import SqlInventoryRepository
 from app.modules.meal_planning.domain import DishCandidate, PlanRequest
 from app.shared.enums import DishType
 
@@ -203,11 +204,16 @@ class _FakeCandidateProvider:
 
 
 class _FakeBuildPlanRequest:
-    def execute(self, user_id, **_kwargs):
+    def __init__(self, *, meals_per_day: int = 1) -> None:
+        self.meals_per_day = meals_per_day
+        self.last_kwargs = None
+
+    def execute(self, user_id, **kwargs):
+        self.last_kwargs = kwargs
         return PlanRequest(
             user_id=user_id,
             days=1,
-            meals_per_day=1,
+            meals_per_day=self.meals_per_day,
             budget_limit=100_000,
             target_calories=500,
             target_protein_g=20,
@@ -317,3 +323,70 @@ def test_custom_swap_note_sends_target_and_budget_context_to_llm(monkeypatch):
         "remaining": 80_000,
     }
     assert len(payload["candidates"]) == 2
+
+
+def test_swap_uses_original_plan_start_date_when_rebuilding_inventory(monkeypatch):
+    monkeypatch.setattr(
+        "app.modules.ai.use_cases.constraint_checker.validate_plan",
+        lambda *_args, **_kwargs: SimpleNamespace(is_feasible=True),
+    )
+    builder = _FakeBuildPlanRequest()
+    target = _dish(1, "Gà kho", cost=20_000, calories=300)
+    use_case = SuggestSwapUseCase(
+        _FakeAIClient(),
+        _FakeCandidateProvider(target, [_dish(2, "Gà hấp", cost=18_000, calories=280)]),
+        builder,
+    )
+    request = _swap_request("Món tương tự, phù hợp ngân sách")
+    request.plan["start_date"] = "2026-07-20"
+
+    use_case.execute(request, user_id=7)
+
+    assert builder.last_kwargs["start_date"] == date(2026, 7, 20)
+
+
+def test_v3_swap_omits_unpersistable_preview_when_procurement_cannot_rebuild(monkeypatch):
+    monkeypatch.setattr(
+        "app.modules.ai.use_cases.constraint_checker.validate_plan",
+        lambda *_args, **_kwargs: SimpleNamespace(is_feasible=True),
+    )
+    monkeypatch.setattr(
+        "app.modules.ai.use_cases.ProcurementCpSatOptimizer.solve",
+        lambda *_args, **_kwargs: None,
+    )
+    target = _dish(1, "Gà kho", cost=20_000, calories=300)
+    use_case = SuggestSwapUseCase(
+        _FakeAIClient(),
+        _FakeCandidateProvider(target, [_dish(2, "Gà hấp", cost=18_000, calories=280)]),
+        _FakeBuildPlanRequest(meals_per_day=2),
+    )
+    request = _swap_request("Món tương tự, phù hợp ngân sách")
+    request.plan["start_date"] = "2026-07-20"
+    request.plan["plan_data"]["schema_version"] = 3
+
+    result = use_case.execute(request, user_id=7)
+
+    assert result == []
+
+
+def test_swap_dependency_builds_request_with_inventory_repository(monkeypatch):
+    import app.dependencies as dependencies
+
+    class _PromptStore:
+        def __init__(self, _session) -> None:
+            pass
+
+        def get_effective(self, _feature: str) -> str:
+            return "swap prompt"
+
+    session = object()
+    monkeypatch.setattr(dependencies, "_get_ai_client", lambda *_args: _FakeAIClient())
+    monkeypatch.setattr(dependencies, "SystemPromptStore", _PromptStore)
+
+    use_case = dependencies.get_ai_suggest_swap_use_case(
+        session, SimpleNamespace(id=7)
+    )
+
+    inventory = use_case._build_request._inventory
+    assert isinstance(inventory, SqlInventoryRepository)
+    assert inventory._session is session

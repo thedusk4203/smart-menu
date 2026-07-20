@@ -7,13 +7,26 @@ from app.shared.enums import DishType
 
 
 def has_valid_data(candidate: DishCandidate) -> bool:
-    """Planner-ready means complete recipe, nutrition, price and positive totals."""
+    """Planner-ready means complete recipe/nutrition and non-negative usage value.
+
+    Pantry/ignored ingredients can make a valid dish cost zero, so price
+    readiness is checked per regular ingredient instead of via dish total.
+    """
     return (
         bool(candidate.ingredient_ids)
         and len(candidate.ingredient_ids) == len(candidate.ingredients)
         and candidate.calories > 0
-        and candidate.estimated_cost > 0
-        and all(ingredient.quantity > 0 and ingredient.estimated_cost >= 0 for ingredient in candidate.ingredients)
+        and candidate.estimated_cost >= 0
+        and all(
+            ingredient.quantity > 0
+            and ingredient.estimated_cost >= 0
+            and (
+                ingredient.purchase_mode != "regular"
+                or ingredient.price_per_default_unit is None
+                or ingredient.price_per_default_unit >= 0
+            )
+            for ingredient in candidate.ingredients
+        )
     )
 
 

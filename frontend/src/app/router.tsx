@@ -5,6 +5,8 @@ import { MainLayout } from "./layouts/MainLayout";
 import { AdminLayout } from "./layouts/AdminLayout";
 import { AdminRoute } from "../components/route/AdminRoute";
 import { UserRoute } from "../components/route/UserRoute";
+import { RouteErrorBoundary } from "./RouteErrorBoundary";
+import { isDynamicImportError } from "./lazyImportRecovery";
 const Welcome = lazy(() => import("../pages/Welcome").then(({ Welcome }) => ({ default: Welcome })));
 const Login = lazy(() => import("../pages/auth/Login").then(({ Login }) => ({ default: Login })));
 const Register = lazy(() => import("../pages/auth/Register").then(({ Register }) => ({ default: Register })));
@@ -17,8 +19,23 @@ const Ingredients = lazy(() => import("../pages/ingredients/Ingredients").then((
 const Meals = lazy(() => import("../pages/meals/Meals").then(({ Meals }) => ({ default: Meals })));
 const MealDetail = lazy(() => import("../pages/meals/MealDetail").then(({ MealDetail }) => ({ default: MealDetail })));
 const ShoppingList = lazy(() => import("../pages/shopping-list/ShoppingList").then(({ ShoppingList }) => ({ default: ShoppingList })));
+const InventoryLots = lazy(() => import("../pages/inventory/InventoryLots").then(({ InventoryLots }) => ({ default: InventoryLots })));
 const PublicShoppingList = lazy(() => import("../pages/shopping-list/PublicShoppingList").then(({ PublicShoppingList }) => ({ default: PublicShoppingList })));
-const Assistant = lazy(() => import("../pages/ai/Assistant").then(({ Assistant }) => ({ default: Assistant })));
+const ASSISTANT_RETRY_KEY = "smart-menu:lazy-retry:assistant";
+const Assistant = lazy(async () => {
+  try {
+    const module = await import("../pages/ai/Assistant");
+    window.sessionStorage.removeItem(ASSISTANT_RETRY_KEY);
+    return { default: module.Assistant };
+  } catch (error) {
+    if (isDynamicImportError(error) && !window.sessionStorage.getItem(ASSISTANT_RETRY_KEY)) {
+      window.sessionStorage.setItem(ASSISTANT_RETRY_KEY, "1");
+      window.location.reload();
+      return new Promise<never>(() => undefined);
+    }
+    throw error;
+  }
+});
 const Users = lazy(() => import("../pages/admin/Users").then(({ Users }) => ({ default: Users })));
 const AdminDashboard = lazy(() => import("../pages/admin/Dashboard").then(({ AdminDashboard }) => ({ default: AdminDashboard })));
 const AdminIngredients = lazy(() => import("../pages/admin/Ingredients").then(({ AdminIngredients }) => ({ default: AdminIngredients })));
@@ -29,10 +46,11 @@ const AISettings = lazy(() => import("../pages/admin/AISettings").then(({ AISett
 const AdminTags = lazy(() => import("../pages/admin/Tags").then(({ AdminTags }) => ({ default: AdminTags })));
 
 export const router = createBrowserRouter([
-  { path: "/", element: <Welcome /> },
-  { path: "/share/shopping-list/:token", element: <PublicShoppingList /> },
+  { path: "/", element: <Welcome />, errorElement: <RouteErrorBoundary /> },
+  { path: "/share/shopping-list/:token", element: <PublicShoppingList />, errorElement: <RouteErrorBoundary /> },
   {
     element: <AuthLayout />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       { path: "/login", element: <Login /> },
       { path: "/register", element: <Register /> },
@@ -40,6 +58,7 @@ export const router = createBrowserRouter([
   },
   {
     element: <UserRoute />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
         element: <MainLayout />,
@@ -53,6 +72,7 @@ export const router = createBrowserRouter([
           { path: "/meals", element: <Meals /> },
           { path: "/meals/:id", element: <MealDetail /> },
           { path: "/shopping-list", element: <ShoppingList /> },
+          { path: "/inventory", element: <InventoryLots /> },
           { path: "/ai-chat", element: <Assistant /> },
         ],
       },
@@ -60,6 +80,7 @@ export const router = createBrowserRouter([
   },
   {
     element: <AdminRoute />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
         element: <AdminLayout />,
@@ -76,5 +97,5 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  { path: "*", element: <Navigate to="/" replace /> },
+  { path: "*", element: <Navigate to="/" replace />, errorElement: <RouteErrorBoundary /> },
 ]);

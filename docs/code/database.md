@@ -20,7 +20,7 @@ Hiểu dữ liệu nguồn, derived view và quy trình thay đổi schema an to
 | AI/Admin | `llm_provider_configs`, `ai_request_logs`, `ai_conversations`, `ai_conversation_turns`, `import_jobs`, `audit_logs` |
 | Views | `v_ingredients_full`, `v_meals_full`, `v_dishes_full`, `v_dish_candidates`, `v_meal_plan_summary` |
 
-Có 9 enum nghiệp vụ, gồm role, gender, activity level, physical goal, meal/dish type, cooking method, food group và exclusion reason. Không hard-code enum mới ở frontend nếu database/backend chưa hỗ trợ.
+Có thêm enum `ingredient_purchase_mode` (`regular`, `pantry`, `ignored`) bên cạnh các enum role, profile, meal/dish, cooking method, food group và exclusion reason. Không hard-code enum mới ở frontend nếu database/backend chưa hỗ trợ.
 
 ## Quan hệ quan trọng
 
@@ -39,7 +39,7 @@ erDiagram
     ai_conversations ||--o{ ai_conversation_turns : has
 ```
 
-`v_dish_candidates` là boundary dữ liệu quan trọng: chỉ dishes active có công thức, ingredient active, giá/nutrition hợp lệ và tổng dương mới đi vào catalog User/planner. Không đổi query planner sang bảng `dishes` thô để “sửa nhanh” một missing candidate.
+`v_dish_candidates` là boundary dữ liệu quan trọng: chỉ dishes active có công thức, ingredient active, nutrition hợp lệ và dữ liệu giá phù hợp với `purchase_mode` mới đi vào catalog User/planner. View mang theo bước mua, hạn bảo quản, mật độ dinh dưỡng và giới hạn tăng công thức cho Planner V3. Không đổi query planner sang bảng `dishes` thô để “sửa nhanh” một missing candidate.
 
 ## Baseline và migration
 
@@ -50,7 +50,7 @@ erDiagram
 
 ## Snapshot và dữ liệu dẫn xuất
 
-`meal_plans.plan_data` lưu snapshot plan để lịch sử không thay đổi ngầm khi catalog đổi. Giá/nutrition hiển thị cho candidate được tính từ ingredient recipe và price snapshot. `shopping_lists` materialize trạng thái mua; share token không cấp quyền đọc toàn bộ plan/user profile.
+`meal_plans.plan_data` lưu snapshot plan để lịch sử không thay đổi ngầm khi catalog đổi. Snapshot V3 còn lưu fingerprint nguồn, block mua, allocation, storage, base/final nutrition và adjustment. Giá/nutrition hiển thị cho candidate được tính từ ingredient recipe và price snapshot. `shopping_lists` materialize trạng thái mua theo `item_key` để cùng một ingredient có nhiều ngày mua vẫn giữ checkbox độc lập; share token không cấp quyền đọc toàn bộ plan/user profile.
 
 ## Khi nào phải cập nhật tài liệu này
 

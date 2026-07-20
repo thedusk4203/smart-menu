@@ -11,12 +11,12 @@ Gom nguyên liệu từ thực đơn đã lưu, theo dõi món đã mua, in danh
 ## Điều kiện trước khi bắt đầu
 
 - User đã lưu ít nhất một thực đơn.
-- Thực đơn V2 có snapshot công thức; thực đơn cũ có thể dùng công thức hiện tại và hiển thị cảnh báo.
+- Thực đơn mới được tạo bằng Planner V3 và có ledger tồn kho. Thực đơn V3 cũ chưa có ledger vẫn mở được ở chế độ lịch mua.
 
 ## Các bước thực hiện
 
 1. Mở **Đi chợ** và chọn một thực đơn đã lưu.
-2. Ở **Chọn ngày đi chợ**, chọn **Tất cả** hoặc một ngày cụ thể. Hệ thống gộp cùng nguyên liệu/đơn vị, tính lại định lượng và chi phí theo phạm vi.
+2. Chọn **Dòng tồn kho** để xem tồn đầu ngày, mua mới, sử dụng, hết hạn và tồn cuối ngày; hoặc chọn **Lịch mua** để chỉ xem lượng cần mua mới. Có thể lọc theo ngày khi cần.
 3. Tích ô trước nguyên liệu đã mua. Bộ đếm cập nhật và trạng thái được lưu theo **nguyên liệu của toàn thực đơn**: tích ở một ngày cũng làm nguyên liệu đó hiện đã mua ở ngày khác/toàn bộ.
 4. Chọn **In danh sách** nếu cần bản giấy.
 5. Chọn **Chia sẻ**. Kiểm tra câu mô tả phạm vi, thời điểm hết hạn và lưu ý quyền của người có link; chọn **Sao chép link**.

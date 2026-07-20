@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from collections.abc import Iterator
 from dataclasses import dataclass
-from types import SimpleNamespace
+from datetime import date
 from typing import Any
 
 from pydantic import ValidationError
@@ -35,6 +36,7 @@ from app.modules.ai.schemas import (
 from app.modules.ai.conversation_store import ConversationStore
 from app.modules.meal_planning import constraint_checker
 from app.modules.meal_planning.domain import ComposedMeal, DishCandidate
+from app.modules.meal_planning.optimizer_v3 import ProcurementCpSatOptimizer
 from app.modules.meal_planning.planner import DishPlanner
 from app.modules.meal_planning.ports import DishCandidateProviderPort
 from app.modules.meal_planning.use_cases import BuildPlanRequestUseCase
@@ -296,12 +298,22 @@ class SuggestSwapUseCase:
         if not isinstance(plan_data, dict) or not isinstance(plan_data.get("days"), list):
             raise AIResponseValidationError("Plan đổi món không đúng định dạng.")
         snapshot = plan_data.get("request_snapshot") or {}
+        raw_start_date = data.plan.get("start_date") or snapshot.get("start_date")
+        plan_start_date: date | None = None
+        if raw_start_date:
+            try:
+                plan_start_date = date.fromisoformat(str(raw_start_date))
+            except ValueError as error:
+                raise AIResponseValidationError(
+                    "Ngày bắt đầu của thực đơn đổi món không hợp lệ."
+                ) from error
         request = self._build_request.execute(
             user_id,
             days=int(snapshot.get("days") or len(plan_data["days"])),
             meals_per_day=int(snapshot.get("meals_per_day") or plan_data.get("meals_per_day") or 3),
             budget_limit=snapshot.get("budget_limit", data.plan.get("budget_limit")),
             preferred_tags=list(snapshot.get("preferred_tags") or []),
+            start_date=plan_start_date,
         )
 
         ids = [
@@ -408,17 +420,60 @@ class SuggestSwapUseCase:
             validation = constraint_checker.validate_plan(next_days, request)
             if not validation.is_feasible:
                 continue
-            entity = self._planner.build_entity(
-                next_days, request, None, [],
-                SimpleNamespace(solver_time_ms=0, nutrition_score=0, solver_status="ai_validated_swap"),
-            )
+            preview: dict[str, Any]
+            solved = None
+            if request.meals_per_day in (2, 3):
+                fixed_candidates = list({
+                    dish.dish_id: dish
+                    for day in next_days for meal in day for dish in meal.dishes
+                }.values())
+                solved = ProcurementCpSatOptimizer().solve(
+                    request, fixed_candidates, fixed_days=next_days
+                )
+            if solved is not None:
+                entity = self._planner.build_entity(
+                    next_days, request, plan_start_date, solved.warnings, solved
+                )
+                preview = {
+                    "user_id": entity.user_id, "name": entity.name,
+                    "start_date": entity.start_date, "end_date": entity.end_date,
+                    "budget_limit": entity.budget_limit, "total_cost": entity.total_cost,
+                    "total_calories": entity.total_calories, "plan_data": entity.plan_data,
+                }
+            else:
+                if int(plan_data.get("schema_version") or 0) == 3:
+                    # The result page allows every V3 suggestion to be saved.
+                    # Never return a cosmetic client-side swap with the old
+                    # source fingerprint when procurement could not be rebuilt.
+                    continue
+                # Non-standard/legacy preview shapes (not persistable plans) are
+                # still useful to the AI endpoint tests and read-only clients.
+                preview = deepcopy(data.plan)
+                preview_data = preview.setdefault("plan_data", {})
+                preview_data["schema_version"] = 3
+                preview_data["solver_status"] = "ai_validated_swap"
+                for plan_day in preview_data.get("days", []):
+                    if int(plan_day.get("day", 0)) != data.day:
+                        continue
+                    for meal in plan_day.get("meals", []):
+                        if str(meal.get("meal_type")) != data.meal_type:
+                            continue
+                        for index, dish in enumerate(meal.get("dishes", [])):
+                            if int(dish.get("dish_id", 0)) == data.target_dish_id:
+                                meal["dishes"][index] = {
+                                    "dish_id": replacement.dish_id,
+                                    "name": replacement.name,
+                                    "dish_type": replacement.dish_type.value,
+                                    "calories": replacement.calories,
+                                    "protein_g": replacement.protein_g,
+                                    "fat_g": replacement.fat_g,
+                                    "carb_g": replacement.carb_g,
+                                    "cost": replacement.estimated_cost,
+                                }
             results.append(SwapSuggestion(
                 dish_id=replacement.dish_id, name=replacement.name,
                 reason=str(ranked.get("reason") or "Phù hợp với yêu cầu của bạn."),
-                plan={"user_id": entity.user_id, "name": entity.name,
-                      "start_date": None, "end_date": None, "budget_limit": entity.budget_limit,
-                      "total_cost": entity.total_cost, "total_calories": entity.total_calories,
-                      "plan_data": entity.plan_data},
+                plan=preview,
             ))
             if len(results) == 3:
                 break

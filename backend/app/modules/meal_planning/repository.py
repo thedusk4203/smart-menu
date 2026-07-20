@@ -26,7 +26,7 @@ class SqlMealPlanRepository(MealPlanRepositoryPort):
             total_calories=plan.total_calories, plan_data=plan.plan_data,
         )
         self._session.add(row)
-        self._session.commit()
+        self._session.flush()
         self._session.refresh(row)
         return _to_entity(row)
 
@@ -44,4 +44,10 @@ class SqlMealPlanRepository(MealPlanRepositoryPort):
         row = self._session.get(MealPlanModel, plan_id)
         if row:
             self._session.delete(row)
-            self._session.commit()
+            self._session.flush()
+
+    def commit(self) -> None:
+        self._session.commit()
+
+    def rollback(self) -> None:
+        self._session.rollback()

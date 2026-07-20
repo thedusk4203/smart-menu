@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.deps import get_current_user
@@ -44,7 +47,7 @@ def save_plan(
     current_user: UserEntity = Depends(get_current_user),
     use_case: SaveMealPlanUseCase = Depends(get_save_meal_plan_use_case),
 ):
-    """Lưu dish selection bằng cách reload candidate và tự dựng snapshot V2."""
+    """Lưu dish selection bằng cách reload candidate và tự dựng snapshot V3."""
     return use_case.execute(data, user_id=current_user.id).__dict__
 
 
@@ -60,6 +63,7 @@ def generate_plan(
 ):
     """Sinh thực đơn tự động (không tự lưu) cho người dùng hiện tại (JWT).
     Trả thực đơn vừa sinh, hoặc {status: "infeasible", reasons: [...]}."""
+    start_date = data.start_date or datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date()
     request = build_request.execute(
         current_user.id,
         days=data.days,
@@ -67,8 +71,9 @@ def generate_plan(
         budget_limit=data.budget_limit,
         preferred_tags=data.preferred_tags,
         previous_plan_signature=data.previous_plan_signature,
+        start_date=start_date,
     )
-    result = generate.execute(request, seed=data.seed)
+    result = generate.execute(request, start_date=start_date, seed=data.seed)
 
     if isinstance(result, ValidationResult):
         reasons = [reason.__dict__ for reason in result.infeasible_reasons]

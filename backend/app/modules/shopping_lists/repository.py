@@ -6,44 +6,6 @@ from uuid import uuid4
 from sqlalchemy import text
 
 
-class SqlLegacyDishRecipeProvider:
-    """Chỉ phục vụ plan V1; plan V2 luôn đọc snapshot, không đọc recipe hiện tại."""
-
-    def __init__(self, session) -> None:
-        self._session = session
-
-    def load_ingredients(self, dish_ids: list[int]) -> list[dict]:
-        if not dish_ids:
-            return []
-        rows = self._session.execute(
-            text(
-                """SELECT di.dish_id, di.ingredient_id, i.name, di.quantity, di.unit,
-                          COALESCE(di.quantity * lp.price_per_default_unit, 0) AS estimated_cost
-                   FROM dish_ingredients di
-                   JOIN ingredients i ON i.id = di.ingredient_id
-                   LEFT JOIN LATERAL (
-                       SELECT price_per_default_unit FROM price_snapshots ps
-                       WHERE ps.ingredient_id = di.ingredient_id
-                       ORDER BY ps.recorded_at DESC LIMIT 1
-                   ) lp ON TRUE
-                   WHERE di.dish_id = ANY(:dish_ids)
-                   ORDER BY di.dish_id, di.id"""
-            ),
-            {"dish_ids": dish_ids},
-        ).fetchall()
-        return [
-            {
-                "dish_id": row.dish_id,
-                "ingredient_id": row.ingredient_id,
-                "name": row.name,
-                "quantity": float(row.quantity),
-                "unit": row.unit,
-                "estimated_cost": float(row.estimated_cost),
-            }
-            for row in rows
-        ]
-
-
 class SqlShoppingListRepository:
     """Materializes the immutable plan snapshot once, while preserving checks."""
 
@@ -51,15 +13,31 @@ class SqlShoppingListRepository:
         self._session = session
 
     def ensure_items(self, plan_id: int, items: list[dict]) -> list[dict]:
-        existing = self.list_items(plan_id)
-        if existing or not items:
-            return existing
         for item in items:
+            item_key = item.get("item_key") or f"purchase:{item['ingredient_id']}:{item['unit']}"
             self._session.execute(
                 text("""INSERT INTO shopping_lists
-                         (meal_plan_id, ingredient_id, total_quantity, unit, estimated_cost)
-                         VALUES (:plan_id, :ingredient_id, :quantity, :unit, :estimated_cost)"""),
-                {"plan_id": plan_id, **item},
+                         (meal_plan_id, ingredient_id, total_quantity, unit, estimated_cost,
+                          item_key, item_kind, scheduled_day)
+                         VALUES (:plan_id, :ingredient_id, :quantity, :unit, :estimated_cost,
+                                 :item_key, :item_kind, :scheduled_day)
+                         ON CONFLICT (meal_plan_id, item_key) DO UPDATE SET
+                           ingredient_id=EXCLUDED.ingredient_id,
+                           total_quantity=EXCLUDED.total_quantity,
+                           unit=EXCLUDED.unit,
+                           estimated_cost=EXCLUDED.estimated_cost,
+                           item_kind=EXCLUDED.item_kind,
+                           scheduled_day=EXCLUDED.scheduled_day"""),
+                {
+                    "plan_id": plan_id,
+                    "ingredient_id": item["ingredient_id"],
+                    "quantity": item["quantity"],
+                    "unit": item["unit"],
+                    "estimated_cost": item.get("estimated_cost", 0),
+                    "item_key": item_key,
+                    "item_kind": item.get("item_kind", "purchase"),
+                    "scheduled_day": item.get("scheduled_day"),
+                },
             )
         self._session.commit()
         return self.list_items(plan_id)
@@ -67,9 +45,11 @@ class SqlShoppingListRepository:
     def list_items(self, plan_id: int) -> list[dict]:
         rows = self._session.execute(
             text("""SELECT sl.id, sl.ingredient_id, i.name, sl.total_quantity AS quantity,
-                          sl.unit, sl.estimated_cost, sl.is_purchased
+                          sl.unit, sl.estimated_cost, sl.is_purchased,
+                          sl.item_key, sl.item_kind, sl.scheduled_day
                    FROM shopping_lists sl JOIN ingredients i ON i.id = sl.ingredient_id
-                   WHERE sl.meal_plan_id = :plan_id ORDER BY i.name, sl.unit"""),
+                   WHERE sl.meal_plan_id = :plan_id
+                   ORDER BY COALESCE(sl.scheduled_day, 0), i.name, sl.unit"""),
             {"plan_id": plan_id},
         ).fetchall()
         return [dict(row._mapping) for row in rows]

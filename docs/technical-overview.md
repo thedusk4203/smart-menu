@@ -47,9 +47,9 @@ flowchart LR
     C --> P["Tiền kiểm khả thi"]
     P --> S1["CP-SAT: tìm nghiệm cứng"]
     S1 --> S2["Tối ưu dinh dưỡng"]
-    S2 --> S3["Tối ưu đa dạng / ưu tiên / chi phí"]
+    S2 --> S3["Tối ưu tiền mua / FEFO / đa dạng"]
     S3 --> V["Constraint Checker độc lập"]
-    V --> SNAP["Snapshot V2 + cảnh báo"]
+    V --> SNAP["Snapshot V3 + procurement ledger"]
 ```
 
 - 2 bữa/ngày: bữa trưa và bữa tối.

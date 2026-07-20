@@ -211,6 +211,13 @@ export interface PlanIngredientSnapshot {
   quantity: number;
   unit: string;
   estimated_cost: number;
+  purchase_mode?: "regular" | "pantry" | "ignored";
+  purchase_increment?: number | null;
+  base_quantity?: number;
+  extra_quantity?: number;
+  actual_quantity?: number;
+  adjustment_reason?: "leftover_absorption" | null;
+  nutrition_delta?: { calories: number; protein_g: number; fat_g: number; carb_g: number };
 }
 export interface PlanDish {
   dish_id: number;
@@ -224,16 +231,8 @@ export interface PlanDish {
   cost?: number;
   tags?: string[];
   ingredients?: PlanIngredientSnapshot[];
-  // Dữ liệu V1 có role/sort_order từ mâm cũ; chỉ dùng để hiển thị lịch sử.
-  role?: DishType;
-  sort_order?: number;
 }
 export interface PlannedMeal {
-  // Compatibility schema_version=1: plan history cũ từng tham chiếu meal_set.
-  // Không có luồng V2 nào đọc/ghi hai field này.
-  meal_id?: number | null;
-  meal_set_id?: number;
-  candidate_type?: "dynamic_meal" | "meal_set" | "meal";
   name: string;
   meal_type: MealType;
   components?: string[];
@@ -251,12 +250,54 @@ export interface PlannedDay {
   day_calories: number;
   day_cost: number;
 }
+export interface PlanCostSummary {
+  purchase_cost: number;
+  consumption_value: number;
+  expired_waste_value: number;
+  ending_carryover_value: number;
+}
+export interface PlanPurchaseItem {
+  item_key: string;
+  ingredient_id: number;
+  name: string;
+  unit: string;
+  purchase_day: number;
+  purchase_increment: number;
+  block_count: number;
+  purchase_quantity: number;
+  required_quantity: number;
+  purchase_cost: number;
+  remaining_quantity: number;
+  expired_waste_quantity: number;
+  carryover_quantity: number;
+  storage_splits: Array<{ mode: string; quantity: number; expiry_day: number }>;
+}
 export interface PlanData {
-  schema_version?: 1 | 2;
+  schema_version?: 1 | 2 | 3;
   algorithm_version?: string;
   plan_signature?: string;
+  source_fingerprint?: string;
   days: PlannedDay[];
   nutrition_target?: { calories: number; protein_g: number; fat_g: number; carb_g: number };
+  cost_summary?: PlanCostSummary;
+  procurement?: {
+    purchase_items: PlanPurchaseItem[];
+    pantry_checks: Array<{ item_key: string; ingredient_id: number; name: string; quantity: number; unit: string }>;
+    shopping_days: number[];
+  };
+  adjustments?: Array<{
+    day: number;
+    slot: MealType;
+    dish_id: number;
+    ingredient_id: number;
+    base_quantity: number;
+    extra_quantity: number;
+    actual_quantity: number;
+    unit: string;
+    nutrition_delta: { calories: number; protein_g: number; fat_g: number; carb_g: number };
+  }>;
+  base_nutrition?: Array<{ calories: number; protein_g: number; fat_g: number; carb_g: number }>;
+  final_nutrition?: Array<{ calories: number; protein_g: number; fat_g: number; carb_g: number }>;
   metrics?: {
     average_calorie_deviation_pct: number;
     maximum_calorie_deviation_pct: number;
@@ -302,6 +343,7 @@ export interface GenerateParams {
   preferred_tags?: string[];
   seed?: number;
   previous_plan_signature?: string;
+  start_date?: string;
 }
 
 export interface ListParams {

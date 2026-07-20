@@ -74,7 +74,7 @@ CREATE TYPE exclusion_reason AS ENUM (
 );
 
 -- Phân loại nội tại của dish. `side` được giữ trong enum cho dữ liệu catalogue
--- nhưng không tham gia Dish Planner V2.
+-- nhưng không tham gia Planner V3.
 CREATE TYPE dish_type AS ENUM (
     'staple',              -- Tinh bột (cơm, gạo lứt...)
     'savory',              -- Món mặn (thịt/cá/đậu kho, xào...)
@@ -83,6 +83,10 @@ CREATE TYPE dish_type AS ENUM (
     'side',                -- Món phụ khác
     'breakfast'            -- Món ăn sáng gọn
 );
+
+-- Cách một nguyên liệu tham gia lịch mua của Dish Planner V3.
+-- `ignored` chỉ loại khỏi procurement, không loại khỏi dinh dưỡng/dị ứng.
+CREATE TYPE ingredient_purchase_mode AS ENUM ('regular', 'pantry', 'ignored');
 
 -- ============================================================
 -- PHẦN 2: HÀM TỰ ĐỘNG CẬP NHẬT updated_at
@@ -160,10 +164,36 @@ CREATE TABLE ingredients (
     -- để khớp nutrition_facts (vốn tính trên 100g).
     --   g  -> 1     | ml (dầu) -> ~0.92 | quả (trứng) -> ~55 ...
     grams_per_unit  NUMERIC(10,4)   NOT NULL DEFAULT 1 CHECK (grams_per_unit > 0),
+    purchase_mode   ingredient_purchase_mode NOT NULL DEFAULT 'regular',
+    purchase_increment NUMERIC(10,2) CHECK (purchase_increment IS NULL OR purchase_increment > 0),
+    room_shelf_life_days SMALLINT CHECK (room_shelf_life_days IS NULL OR room_shelf_life_days BETWEEN 0 AND 3650),
+    fridge_shelf_life_days SMALLINT CHECK (fridge_shelf_life_days IS NULL OR fridge_shelf_life_days BETWEEN 0 AND 3650),
+    freezer_shelf_life_days SMALLINT CHECK (freezer_shelf_life_days IS NULL OR freezer_shelf_life_days BETWEEN 0 AND 3650),
+    shelf_life_source VARCHAR(255),
+    shelf_life_reviewed_at DATE,
     tags            JSONB           NOT NULL DEFAULT '[]'::jsonb,
     is_active       BOOLEAN         NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+    updated_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    CONSTRAINT ck_ingredient_procurement_fields CHECK (
+        purchase_mode = 'regular'
+        OR (
+            purchase_increment IS NULL
+            AND room_shelf_life_days IS NULL
+            AND fridge_shelf_life_days IS NULL
+            AND freezer_shelf_life_days IS NULL
+            AND shelf_life_source IS NULL
+            AND shelf_life_reviewed_at IS NULL
+        )
+    ),
+    CONSTRAINT ck_ingredient_shelf_life_provenance CHECK (
+        (
+            room_shelf_life_days IS NULL
+            AND fridge_shelf_life_days IS NULL
+            AND freezer_shelf_life_days IS NULL
+        )
+        OR (NULLIF(BTRIM(shelf_life_source), '') IS NOT NULL AND shelf_life_reviewed_at IS NOT NULL)
+    )
 );
 COMMENT ON TABLE ingredients IS 'Danh mục nguyên liệu nấu ăn; grams_per_unit để quy đổi về gram cho tính dinh dưỡng';
 
@@ -306,6 +336,17 @@ CREATE TABLE dish_ingredients (
     ingredient_id   INTEGER         NOT NULL REFERENCES ingredients(id) ON DELETE RESTRICT,
     quantity        NUMERIC(10,2)   NOT NULL CHECK (quantity > 0),
     unit            VARCHAR(20)     NOT NULL DEFAULT 'g',
+    max_extra_quantity NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (max_extra_quantity >= 0),
+    extra_step_quantity NUMERIC(10,2),
+    CONSTRAINT ck_dish_ingredient_flex CHECK (
+        (max_extra_quantity = 0 AND extra_step_quantity IS NULL)
+        OR (
+            max_extra_quantity > 0
+            AND extra_step_quantity > 0
+            AND extra_step_quantity <= max_extra_quantity
+            AND MOD(max_extra_quantity, extra_step_quantity) = 0
+        )
+    ),
     UNIQUE (dish_id, ingredient_id)
 );
 CREATE INDEX idx_dish_ingredients_ingredient ON dish_ingredients (ingredient_id);
@@ -483,9 +524,13 @@ CREATE TABLE shopping_lists (
     total_quantity  NUMERIC(12,2)   NOT NULL CHECK (total_quantity > 0),
     unit            VARCHAR(20)     NOT NULL DEFAULT 'g',
     estimated_cost  NUMERIC(12,2)   NOT NULL DEFAULT 0 CHECK (estimated_cost >= 0),
+    item_key        VARCHAR(160)     NOT NULL,
+    item_kind       VARCHAR(20)      NOT NULL DEFAULT 'purchase'
+                                      CHECK (item_kind IN ('purchase', 'pantry')),
+    scheduled_day   SMALLINT         CHECK (scheduled_day IS NULL OR scheduled_day BETWEEN 1 AND 7),
     is_purchased    BOOLEAN         NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-    UNIQUE (meal_plan_id, ingredient_id)
+    UNIQUE (meal_plan_id, item_key)
 );
 COMMENT ON TABLE shopping_lists IS 'Tổng hợp nguyên liệu cần mua cho một thực đơn';
 
@@ -497,6 +542,43 @@ CREATE TABLE shopping_list_shares (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE UNIQUE INDEX uq_active_shopping_list_share ON shopping_list_shares(meal_plan_id) WHERE revoked_at IS NULL;
+
+CREATE TABLE inventory_lots (
+    id                    BIGSERIAL       PRIMARY KEY,
+    user_id               INTEGER         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    ingredient_id         INTEGER         NOT NULL REFERENCES ingredients(id) ON DELETE RESTRICT,
+    quantity_remaining    NUMERIC(12,2)   NOT NULL CHECK (quantity_remaining >= 0),
+    unit                  VARCHAR(20)      NOT NULL,
+    purchase_increment    NUMERIC(12,2)   NOT NULL CHECK (purchase_increment > 0),
+    available_from        DATE            NOT NULL,
+    expires_on            DATE            NOT NULL,
+    storage_mode          VARCHAR(20)      NOT NULL
+                                           CHECK (storage_mode IN ('room', 'fridge', 'freezer', 'same_day')),
+    cost_basis_per_unit   NUMERIC(12,4)   NOT NULL DEFAULT 0 CHECK (cost_basis_per_unit >= 0),
+    source_plan_id        INTEGER         REFERENCES meal_plans(id) ON DELETE RESTRICT,
+    source_item_key       VARCHAR(160),
+    status                VARCHAR(20)      NOT NULL DEFAULT 'projected'
+                                           CHECK (status IN ('projected', 'available', 'consumed', 'expired', 'discarded')),
+    created_at            TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    updated_at            TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    CHECK (expires_on >= available_from),
+    UNIQUE (source_plan_id, source_item_key)
+);
+CREATE INDEX idx_inventory_lots_available
+    ON inventory_lots(user_id, available_from, expires_on)
+    WHERE quantity_remaining > 0 AND status IN ('projected', 'available');
+
+CREATE TABLE inventory_reservations (
+    id                BIGSERIAL       PRIMARY KEY,
+    inventory_lot_id  BIGINT          NOT NULL REFERENCES inventory_lots(id) ON DELETE CASCADE,
+    meal_plan_id      INTEGER         NOT NULL REFERENCES meal_plans(id) ON DELETE CASCADE,
+    item_key          VARCHAR(160)     NOT NULL,
+    quantity          NUMERIC(12,2)   NOT NULL CHECK (quantity > 0),
+    use_day           SMALLINT         NOT NULL CHECK (use_day BETWEEN 1 AND 7),
+    created_at        TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    UNIQUE (meal_plan_id, item_key, use_day)
+);
+CREATE INDEX idx_inventory_reservations_lot ON inventory_reservations(inventory_lot_id);
 
 
 -- ============================================================
@@ -511,6 +593,13 @@ SELECT
     i.food_group,
     i.default_unit,
     i.grams_per_unit,
+    i.purchase_mode,
+    i.purchase_increment,
+    i.room_shelf_life_days,
+    i.fridge_shelf_life_days,
+    i.freezer_shelf_life_days,
+    i.shelf_life_source,
+    i.shelf_life_reviewed_at,
     i.is_active,
     n.calories,
     n.protein_g,
@@ -572,12 +661,21 @@ SELECT
     COALESCE(SUM(di.quantity * i.grams_per_unit * nf.protein_g / 100.0), 0) AS total_protein_g,
     COALESCE(SUM(di.quantity * i.grams_per_unit * nf.carbs_g   / 100.0), 0) AS total_carbs_g,
     COALESCE(SUM(di.quantity * i.grams_per_unit * nf.fat_g     / 100.0), 0) AS total_fat_g,
-    COALESCE(SUM(di.quantity * lp.price_per_default_unit), 0)               AS estimated_cost,
+    COALESCE(SUM(
+        CASE WHEN i.purchase_mode = 'regular'
+             THEN di.quantity * lp.price_per_default_unit ELSE 0 END
+    ), 0)                                                                   AS estimated_cost,
     COUNT(di.id)                                                            AS ingredient_count,
     COUNT(nf.ingredient_id)                                                 AS nutrition_count,
-    COUNT(lp.price_per_default_unit)                                        AS priced_ingredient_count,
+    COUNT(lp.price_per_default_unit) FILTER (WHERE i.purchase_mode = 'regular') AS priced_ingredient_count,
     COUNT(di.id) > 0 AND COUNT(nf.ingredient_id) = COUNT(di.id)             AS has_complete_nutrition,
-    COUNT(di.id) > 0 AND COUNT(lp.price_per_default_unit) = COUNT(di.id)    AS has_complete_price,
+    COUNT(di.id) > 0 AND BOOL_AND(
+        i.purchase_mode <> 'regular' OR lp.price_per_default_unit IS NOT NULL
+    )                                                                       AS has_complete_price,
+    COUNT(di.id) > 0 AND BOOL_AND(
+        i.purchase_mode <> 'regular'
+        OR (i.purchase_increment IS NOT NULL AND lp.price_per_default_unit IS NOT NULL)
+    )                                                                       AS has_complete_procurement,
     COUNT(di.id) > 0 AND COALESCE(BOOL_AND(i.is_active), FALSE)             AS all_ingredients_active,
     COALESCE(
         JSONB_AGG(di.ingredient_id ORDER BY di.id) FILTER (WHERE di.id IS NOT NULL),
@@ -590,7 +688,23 @@ SELECT
                 'name', i.name,
                 'quantity', di.quantity,
                 'unit', di.unit,
-                'estimated_cost', COALESCE(di.quantity * lp.price_per_default_unit, 0)
+                'estimated_cost', CASE WHEN i.purchase_mode = 'regular'
+                    THEN COALESCE(di.quantity * lp.price_per_default_unit, 0) ELSE 0 END,
+                'purchase_mode', i.purchase_mode,
+                'purchase_increment', i.purchase_increment,
+                'price_per_default_unit', lp.price_per_default_unit,
+                'price_source', lp.source,
+                'price_recorded_at', lp.recorded_at,
+                'grams_per_unit', i.grams_per_unit,
+                'calories_per_100g', nf.calories,
+                'protein_g_per_100g', nf.protein_g,
+                'carbs_g_per_100g', nf.carbs_g,
+                'fat_g_per_100g', nf.fat_g,
+                'room_shelf_life_days', i.room_shelf_life_days,
+                'fridge_shelf_life_days', i.fridge_shelf_life_days,
+                'freezer_shelf_life_days', i.freezer_shelf_life_days,
+                'max_extra_quantity', di.max_extra_quantity,
+                'extra_step_quantity', di.extra_step_quantity
             ) ORDER BY di.id
         ) FILTER (WHERE di.id IS NOT NULL),
         '[]'::jsonb
@@ -600,7 +714,7 @@ LEFT JOIN dish_ingredients di ON di.dish_id = d.id
 LEFT JOIN ingredients     i  ON i.id = di.ingredient_id
 LEFT JOIN nutrition_facts nf ON nf.ingredient_id = di.ingredient_id
 LEFT JOIN LATERAL (
-    SELECT price_per_default_unit FROM price_snapshots ps
+    SELECT price_per_default_unit, source, recorded_at FROM price_snapshots ps
     WHERE ps.ingredient_id = di.ingredient_id ORDER BY ps.recorded_at DESC LIMIT 1
 ) lp ON TRUE
 GROUP BY d.id;
@@ -611,7 +725,7 @@ SELECT
     id, name, dish_type, cooking_method, tags,
     total_calories, total_protein_g, total_carbs_g, total_fat_g, estimated_cost,
     ingredient_count, nutrition_count, priced_ingredient_count,
-    all_ingredients_active, has_complete_nutrition, has_complete_price,
+    all_ingredients_active, has_complete_nutrition, has_complete_price, has_complete_procurement,
     ingredient_ids, ingredients
 FROM v_dishes_full
 WHERE is_active = TRUE
@@ -619,9 +733,8 @@ WHERE is_active = TRUE
   AND all_ingredients_active = TRUE
   AND has_complete_nutrition = TRUE
   AND has_complete_price = TRUE
-  AND total_calories > 0
-  AND estimated_cost > 0;
-COMMENT ON VIEW v_dish_candidates IS 'Dish planner-ready: active, đủ recipe, nutrition, giá và ingredient active.';
+  AND total_calories > 0;
+COMMENT ON VIEW v_dish_candidates IS 'Dish planner-ready V3: active, đủ recipe/nutrition và procurement cho regular ingredients.';
 
 -- v_meal_plan_summary: tóm tắt thực đơn kèm email người tạo
 CREATE VIEW v_meal_plan_summary AS
@@ -958,7 +1071,7 @@ JOIN meals m ON m.name = v.meal_name
 JOIN ingredients i ON i.name = v.ingredient_name;
 
 -- ============================================================
--- Seed Dish Planner V2: dishes + dish_ingredients.
+-- Seed Planner V3: dishes + dish_ingredients.
 -- ============================================================
 INSERT INTO dishes (name, dish_type, cooking_method, description, tags) VALUES
 ('Cơm trắng',            'staple',         'boil',     'Cơm gạo trắng', '["cơ bản"]'::jsonb),

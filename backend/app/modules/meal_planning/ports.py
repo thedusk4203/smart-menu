@@ -24,6 +24,10 @@ class MealPlanRepositoryPort(ABC):
     @abstractmethod
     def delete(self, plan_id: int) -> None: ...
 
+    def commit(self) -> None: ...
+
+    def rollback(self) -> None: ...
+
 
 class DishCandidateProviderPort(ABC):
 

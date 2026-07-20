@@ -7,7 +7,7 @@ Trình bày một luồng dọc đủ sâu để chứng minh frontend, contract
 ## Chuẩn bị
 
 - Mở trước `frontend/src/app/router.tsx`, `pages/meal-planning/CreateMenu.tsx`, `api/mealPlanApi.ts`.
-- Mở `backend/app/modules/meal_planning/router.py`, `use_cases.py`, `optimizer.py`, `constraint_checker.py`.
+- Mở `backend/app/modules/meal_planning/router.py`, `use_cases.py`, `optimizer_v3.py`, `procurement_checker.py`.
 - Mở `data/init_db.sql` tại `v_dish_candidates` và [API planner/shopping](../code/api/planner-shopping.md).
 - Dùng dữ liệu demo đã có; không chiếu `.env`, token, provider secret hoặc share link thật.
 
@@ -19,7 +19,7 @@ Trình bày một luồng dọc đủ sâu để chứng minh frontend, contract
 | 0:45–1:30 | `mealPlanApi.generate` | Wrapper giữ `POST /api/meal-plans/generate` và TypeScript contract. | API reference request/response |
 | 1:30–2:15 | Backend router + `BuildPlanRequestUseCase` | Backend xác thực User, đọc profile/exclusion, chuẩn hóa request. | 401/422/incomplete-profile path |
 | 2:15–3:15 | Candidate provider + `v_dish_candidates` | Chỉ dish active/đủ recipe, nutrition, price mới vào planner. | View SQL + quality boundary |
-| 3:15–4:30 | Feasibility + `DishCpSatOptimizer` | Hard constraint xác định miền nghiệm; soft objective tối ưu macro/diversity/tag/cost. | Infeasible reason hoặc solver result |
+| 3:15–4:30 | Feasibility + `ProcurementCpSatOptimizer` | Hard constraint giữ mục tiêu dinh dưỡng; objective tối ưu mua mới, tồn kho, FEFO và đa dạng. | Infeasible reason hoặc solver result |
 | 4:30–5:20 | `validate_plan` | Checker chạy độc lập sau solver, chặn plan có exclusion/cấu trúc sai/budget sai. | Validation result/warning |
 | 5:20–6:10 | Result page + save snapshot | UI render generated/infeasible union; save tạo history snapshot và shopping list. | `MealPlanResponse`, `plan_data` |
 | 6:10–7:00 | Regenerate/swap/AI boundary | Signature chống trùng; AI chỉ xếp hạng swap, checker quyết định cuối. | `SuggestSwapUseCase` + ADR-0008 |

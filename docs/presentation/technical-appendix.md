@@ -9,7 +9,7 @@ Không tính các slide này vào 22 slide chính. Dùng khi hội đồng hỏi
 | A3 | Frontend route guard không phải security boundary | `frontend/src/app/router.tsx`, `core/deps.py` | “UI điều hướng; backend vẫn trả 401/403.” | Data editor vào Admin có làm được mọi thứ? |
 | A4 | API contract: 70 path, 97 operation, 101 schema | `code/api/README.md` | “Schema copy từ OpenAPI; mỗi thay đổi router/schema phải đồng bộ docs.” | Làm sao tránh API docs cũ? |
 | A5 | Database: candidate view và snapshot | `data/init_db.sql`, `code/database.md` | “Planner không đọc raw dish; history dùng snapshot.” | Vì sao tồn tại meals và dishes? |
-| A6 | Planner CP-SAT + checker | `optimizer.py`, `constraint_checker.py` | “Solver tìm nghiệm, checker chứng minh lại rule độc lập.” | AI có tạo thực đơn không? |
+| A6 | Planner V3 CP-SAT + ledger checker | `optimizer_v3.py`, `procurement_checker.py` | “Solver tối ưu mua mới và tồn kho; checker chứng minh lại ledger và dinh dưỡng độc lập.” | AI có tạo thực đơn không? |
 | A7 | AI provider/SSE/retention | `ai/client.py`, `ai/use_cases.py` | “AI làm ngôn ngữ; backend giữ authority dữ liệu và log/history tách nhau.” | Khi AI tắt thì sao? |
 | A8 | Admin import và quality | `admin/use_cases.py`, `tag_catalog` | “Preview phát hiện lỗi/conflict; commit mới mutation.” | Vì sao typed tag? |
 | A9 | Security và public sharing | `core/deps.py`, `shopping_lists` | “Share token là capability 7 ngày, revoke được.” | Token link có an toàn không? |

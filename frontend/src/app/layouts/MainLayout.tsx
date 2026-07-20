@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard, User, UtensilsCrossed, History, Salad, ChefHat,
-  ShoppingCart, Sparkles, LogOut, Leaf,
+  ShoppingCart, PackageOpen, Sparkles, LogOut, Leaf,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
@@ -24,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/ingredients", label: "Nguyên liệu", icon: Salad },
   { to: "/meals", label: "Món ăn", icon: ChefHat },
   { to: "/shopping-list", label: "Đi chợ", icon: ShoppingCart },
+  { to: "/inventory", label: "Kho phần dư", icon: PackageOpen },
   { to: "/ai-chat", label: "Trợ lý Menuto", icon: Sparkles },
 ];
 
