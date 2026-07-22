@@ -14,6 +14,7 @@ import { ConversationRail } from "./assistant/ConversationRail";
 import { MAX_CONVERSATIONS, MAX_TURNS } from "./assistant/constants";
 import { MessageBubble, TurnMessages } from "./assistant/TurnMessages";
 import type {
+  ChatMode,
   ChatStreamEvent,
   ConversationDetail,
   ConversationSummary,
@@ -26,6 +27,12 @@ const SAMPLE_QUESTIONS = [
   "Làm sao để ăn đủ chất khi giảm cân?",
   "Thực đơn 1500 kcal cho một ngày?",
   "Nên ăn bao nhiêu tinh bột mỗi ngày?",
+];
+
+const MODE_OPTIONS: { value: ChatMode; label: string; description: string }[] = [
+  { value: "general", label: "Hỏi chung", description: "Không dùng dữ liệu hồ sơ" },
+  { value: "meal_advice", label: "Gợi ý theo hồ sơ", description: "Dùng mục tiêu và loại trừ" },
+  { value: "health_reference", label: "Sức khoẻ tham khảo", description: "Từ 18 tuổi, ưu tiên nguồn web" },
 ];
 
 type ActiveStream = {
@@ -50,6 +57,7 @@ export function Assistant() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [feedback, setFeedback] = useState<UserFeedback | null>(null);
   const [statusFeedback, setStatusFeedback] = useState<UserFeedback | null>(null);
+  const [chatMode, setChatMode] = useState<ChatMode>("general");
   const messagesRef = useRef<HTMLDivElement>(null);
   const historyButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -66,7 +74,7 @@ export function Assistant() {
   const sending = activeStream?.mode === "chat";
   const retrying = activeStream?.mode === "retry";
   const streaming = activeStream !== null;
-  const composerDisabled = enabled !== true || streaming || atTurnLimit || unresolvedLastTurn;
+  const composerDisabled = enabled !== true || streaming || conversationLoading || atTurnLimit || unresolvedLastTurn;
 
   const refreshList = async () => {
     const list = await aiApi.listConversations();
@@ -78,7 +86,9 @@ export function Assistant() {
     setSelectedId(id);
     setConversationLoading(true);
     try {
-      setConversation(await aiApi.getConversation(id));
+      const detail = await aiApi.getConversation(id);
+      setConversation(detail);
+      setChatMode(detail.mode);
     } catch (error) {
       setFeedback(toUserFeedback(error, "ai_chat"));
     } finally {
@@ -186,6 +196,7 @@ export function Assistant() {
     if (streaming || conversations.length >= MAX_CONVERSATIONS) return;
     setSelectedId(null);
     setConversation(null);
+    setChatMode("general");
     setInput("");
     setHistoryOpen(false);
   };
@@ -228,6 +239,7 @@ export function Assistant() {
       const response = await aiApi.chatStream(
         content,
         selectedId ?? undefined,
+        chatMode,
         (event: ChatStreamEvent) => {
           if (event.event === "start") {
             streamedConversationId = event.data.conversation_id;
@@ -350,6 +362,25 @@ export function Assistant() {
             : "AI chưa được quản trị viên kích hoạt. Lịch sử đã lưu vẫn có thể xem lại."}
         </span>
       </div>}
+
+      <div className="mb-4 grid gap-2 sm:grid-cols-3" aria-label="Chế độ tư vấn Menuto">
+        {MODE_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            disabled={streaming || selectedId !== null}
+            onClick={() => setChatMode(option.value)}
+            className={`rounded-xl border px-3 py-2 text-left transition ${
+              chatMode === option.value
+                ? "border-brand-300 bg-brand-50 text-brand-900"
+                : "border-sand-200 bg-white text-gray-700"
+            } disabled:cursor-not-allowed disabled:opacity-70`}
+          >
+            <span className="block text-sm font-semibold">{option.label}</span>
+            <span className="block text-xs text-gray-500">{option.description}</span>
+          </button>
+        ))}
+      </div>
 
       <div className="flex h-[calc(100vh-13rem)] min-h-[520px] max-h-[780px] overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-sm">
         <aside className="hidden w-72 shrink-0 border-r border-sand-200 lg:block">

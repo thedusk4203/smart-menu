@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import { Leaf } from "lucide-react";
-import type { CarryoverUsage, DailyLedgerDay } from "../../api/mealPlanApi";
 import { formatNumber, formatVND } from "../../lib/format";
 import type { ShoppingDisplayRow } from "./shoppingListView";
 
@@ -89,50 +88,5 @@ export function ShoppingDocumentHeader({
       <p className="mt-1 text-sm text-gray-700">{done}/{rowCount} đã mua · {formatVND(totalCost)}</p>
       {meta && <p className="mt-1 text-xs text-gray-600">{meta}</p>}
     </header>
-  );
-}
-
-export function ShoppingLedgerSections({ days }: { days: DailyLedgerDay[] }) {
-  return (
-    <div className="space-y-4">
-      {days.map((day) => (
-        <section key={day.day} className="shopping-print-section overflow-hidden rounded-2xl border border-sand-200 bg-white">
-          <div className="flex items-center justify-between gap-3 bg-sand-50 px-4 py-3">
-            <h2 className="font-semibold text-gray-900">Tồn theo ngày · Ngày {day.day}</h2>
-            <span className="text-xs font-medium text-sky-700">Tồn cuối {formatVND(day.totals.closing_value ?? 0)}</span>
-          </div>
-          <ul className="divide-y divide-sand-100">
-            {day.items.map((row) => (
-              <li key={row.item_key} className="shopping-print-row px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium text-gray-900">{row.name}</span>
-                  <span className="font-semibold text-brand-800">{formatNumber(row.closing_quantity, 1)} {row.unit} còn lại</span>
-                </div>
-                <p className="mt-1 text-xs text-gray-600">
-                  Đầu {formatNumber(row.opening_quantity, 1)} + mua {formatNumber(row.purchase_quantity, 1)} − dùng {formatNumber(row.usage_quantity, 1)} − hết hạn {formatNumber(row.expired_quantity, 1)} {row.unit}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-    </div>
-  );
-}
-
-export function CarryoverSection({ items }: { items: CarryoverUsage[] }) {
-  if (items.length === 0) return null;
-  return (
-    <section className="shopping-print-section mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4" aria-labelledby="carryover-title">
-      <h2 id="carryover-title" className="font-semibold text-sky-950">Dùng lại từ lần mua trước</h2>
-      <ul className="mt-2 space-y-2">
-        {items.map((item, index) => (
-          <li key={`${item.ingredient_id}-${item.purchase_day}-${index}`} className="text-sm text-sky-900">
-            <span className="font-medium">{item.name}</span>
-            {` · ${formatNumber(item.quantity, 1)} ${item.unit} · mua ngày ${item.purchase_day} · bảo quản ${item.storage_mode} đến ngày ${item.expiry_day}`}
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }

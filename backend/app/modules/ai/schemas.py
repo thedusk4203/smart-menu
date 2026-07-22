@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ChatMessage(BaseModel):
@@ -12,24 +12,16 @@ class ChatMessage(BaseModel):
 
 
 class ChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     message: str = Field(..., min_length=1, max_length=4000)
     conversation_id: int | None = Field(default=None, gt=0)
-    context: Any | None = None
-    # Giữ tạm field cũ để client phiên bản trước không lỗi validation. Backend
-    # không còn tin history do client gửi; lịch sử chính thức được đọc từ DB.
-    history: list[ChatMessage] = Field(default_factory=list, max_length=10)
+    mode: Literal["general", "meal_advice", "health_reference"] = "general"
 
     @field_validator("message")
     @classmethod
     def strip_message(cls, value: str) -> str:
         return value.strip()
-
-    @model_validator(mode="after")
-    def limit_history(self) -> "ChatRequest":
-        if sum(len(item.content) for item in self.history) > 12000:
-            raise ValueError("Tổng lịch sử hội thoại không được vượt quá 12000 ký tự")
-        return self
-
 
 class ChatResponse(BaseModel):
     reply: str
@@ -41,18 +33,30 @@ class ConversationTurn(BaseModel):
     user_content: str
     assistant_content: str | None = None
     status: Literal["pending", "completed", "failed"]
+    personalization_used: bool = False
+    grounding_mode: Literal["none", "native_web_search", "model_fallback"] = "none"
+    citations: list[Citation] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
+
+
+class Citation(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    url: str = Field(min_length=1, max_length=2000)
 
 
 class ConversationChatResponse(ChatResponse):
     conversation_id: int
     turn: ConversationTurn
+    personalization_used: bool = False
+    grounding_mode: Literal["none", "native_web_search", "model_fallback"] = "none"
+    citations: list[Citation] = Field(default_factory=list)
 
 
 class ConversationSummary(BaseModel):
     id: int
     title: str
+    mode: Literal["general", "meal_advice", "health_reference"] = "general"
     turn_count: int = Field(ge=0, le=20)
     last_message_preview: str | None = None
     created_at: datetime
@@ -64,6 +68,8 @@ class ConversationDetail(ConversationSummary):
 
 
 class ParseMenuRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     message: str = Field(..., min_length=1, max_length=4000)
 
     @field_validator("message")
@@ -79,11 +85,14 @@ class ParsedMenuRequest(BaseModel):
     meals_per_day: int | None = Field(default=None, ge=2, le=3)
     budget_limit: float | None = Field(default=None, ge=0)
     preferred_tags: list[str] = Field(default_factory=list)
+    unresolved_tags: list[str] = Field(default_factory=list)
     needs_clarification: bool = False
     clarification_question: str | None = None
 
 
 class ExplainPlanRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     plan_data: dict[str, Any]
     total_cost: float | None = None
     total_calories: float | None = None
@@ -120,6 +129,8 @@ class ExplainPlanResponse(PlanExplanationContent):
 
 
 class SwapSuggestionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     day: int = Field(ge=1, le=7)
     meal_type: Literal["breakfast", "lunch", "dinner"]
     target_dish_id: int = Field(gt=0)

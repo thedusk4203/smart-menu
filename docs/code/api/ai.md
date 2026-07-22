@@ -1,6 +1,6 @@
 # API — AI User và Admin Provider
 
-> Full schema catalog được sao chép từ OpenAPI runtime ngày 13/07/2026. `401`, `403`, `404`, `422` và `{ "detail": string }` áp dụng theo authentication, quyền, ownership, target và validation.
+> Operation index và phần contract thay đổi được đối chiếu với code ngày 22/07/2026. Schema catalog phía dưới là snapshot cũ ngày 13/07/2026; khi có khác biệt, phần “Contract AI hiện tại” và OpenAPI runtime là nguồn đúng.
 
 ## Operation index
 
@@ -30,6 +30,32 @@
 | POST | `/api/ai/parse-menu-request` | ParseMenuRequest | 200: ParsedMenuRequest<br>422: HTTPValidationError |
 | GET | `/api/ai/status` |  | 200: AIStatus |
 | POST | `/api/ai/suggest-swap` | SwapSuggestionRequest | 200: array<SwapSuggestion><br>422: HTTPValidationError |
+
+## Contract AI hiện tại (22/07/2026)
+
+### Chat, mode và dữ liệu cá nhân
+
+`ChatRequest` có `message`, `conversation_id` và `mode`. `mode` mặc định là `general` và chỉ nhận một trong ba giá trị:
+
+| Mode | Có đọc hồ sơ? | Dữ liệu được phép dùng | Grounding |
+| --- | --- | --- | --- |
+| `general` | Không | Chỉ nội dung hội thoại | `none` |
+| `meal_advice` | Có, nếu đã consent | Mục tiêu, mức vận động, số bữa, calorie, ngân sách, exclusions | `none` |
+| `health_reference` | Có, nếu đã consent và tuổi ≥ 18 | Như meal advice, thêm tuổi, giới tính, chiều cao, cân nặng | Web search native hoặc fallback có nhãn |
+
+Một conversation giữ nguyên mode từ lúc tạo; client không được đổi mode giữa chừng bằng cách gửi lại cùng `conversation_id`. `ConversationSummary` có thêm `mode`. Mỗi `ConversationTurn` và event SSE `done` có:
+
+- `personalization_used`: có thực sự đưa context cá nhân vào prompt hay không;
+- `grounding_mode`: `none`, `native_web_search` hoặc `model_fallback`;
+- `citations`: tối đa 10 phần tử `{title, url}`, URL chỉ nhận `http`/`https`.
+
+Các lỗi nghiệp vụ quan trọng: `AI_PERSONALIZATION_CONSENT_REQUIRED`, `AI_PROFILE_REQUIRED`, `AI_HEALTH_AGE_RESTRICTED`. UI nên dùng message thân thiện từ lỗi, không tự suy diễn rằng mọi lỗi đều do provider.
+
+### Parse tag và provider grounding
+
+`ParsedMenuRequest` có thêm `unresolved_tags`. Backend chỉ giữ tag khớp chính xác với `tag_catalog` đang active trong `preferred_tags`; tag AI đoán nhưng không tồn tại được chuyển sang `unresolved_tags`, không truyền thẳng vào optimizer.
+
+`ProviderWrite`/`ProviderItem` có `native_web_search_enabled`; `ProviderItem` còn có `capability_checked_at`. Khi bật capability, thao tác test provider chỉ pass nếu nhận được citation hợp lệ. Log thay đoạn message chứa marker `[PERSONAL_CONTEXT]` bằng `[PERSONAL_CONTEXT_REDACTED]`; đây là redaction có mục tiêu, không phải bộ lọc PII tổng quát cho mọi nội dung người dùng gõ.
 
 ## Parameters and content type
 ### `GET /api/admin/ai/logs`

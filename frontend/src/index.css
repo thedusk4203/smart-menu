@@ -65,7 +65,10 @@
 
 @media print {
   .no-print { display: none !important; }
-  .print-only { display: block !important; }
+  .print-only {
+    display: block !important;
+    padding-top: 16mm;
+  }
   body, .app-shell { background: white !important; }
   .app-content-shell {
     display: block !important;
@@ -79,7 +82,10 @@
   * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   @page {
     size: A4;
-    margin: 16mm 14mm 20mm;
+    margin: 0 14mm 20mm;
+    @top-left { content: none; }
+    @top-center { content: none; }
+    @top-right { content: none; }
     @bottom-right {
       content: "Trang " counter(page) "/" counter(pages);
       color: #4b5563;

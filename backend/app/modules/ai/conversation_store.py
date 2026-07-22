@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from sqlalchemy import text
@@ -23,14 +24,22 @@ def make_conversation_title(message: str) -> str:
 class ConversationStore:
     """Kho lịch sử chat của người dùng, độc lập với AI request logs."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, actor_id: int | None = None) -> None:
         self.session = session
+        self.actor_id = actor_id
+
+    def _set_actor(self) -> None:
+        if self.actor_id is not None:
+            self.session.execute(
+                text("SELECT set_config('app.current_user_id', :actor_id, true)"),
+                {"actor_id": str(self.actor_id)},
+            )
 
     def list_for_user(self, user_id: int) -> list[dict[str, Any]]:
-        self.purge_expired()
+        self._set_actor()
         rows = self.session.execute(
             text(
-                """SELECT c.id, c.title, COUNT(t.id)::integer AS turn_count,
+                """SELECT c.id, c.title, c.mode, COUNT(t.id)::integer AS turn_count,
                           (SELECT LEFT(COALESCE(NULLIF(last_turn.assistant_content, ''),
                                                 last_turn.user_content), 160)
                              FROM ai_conversation_turns last_turn
@@ -50,11 +59,12 @@ class ConversationStore:
         return [dict(row) for row in rows]
 
     def get_for_user(self, conversation_id: int, user_id: int) -> dict[str, Any]:
-        self.purge_expired()
+        self._set_actor()
         conversation = self._owned_conversation(conversation_id, user_id)
         turns = self.session.execute(
             text(
                 """SELECT id, turn_number, user_content, assistant_content, status,
+                          personalization_used, grounding_mode, citations,
                           created_at, updated_at
                      FROM ai_conversation_turns
                     WHERE conversation_id = :conversation_id
@@ -72,6 +82,7 @@ class ConversationStore:
         return result
 
     def delete_for_user(self, conversation_id: int, user_id: int) -> None:
+        self._set_actor()
         deleted = self.session.execute(
             text(
                 "DELETE FROM ai_conversations WHERE id=:id AND user_id=:user_id RETURNING id"
@@ -83,18 +94,23 @@ class ConversationStore:
             raise NotFoundError("Không tìm thấy cuộc hội thoại.")
         self.session.commit()
 
+    def mode_for_user(self, conversation_id: int, user_id: int) -> str:
+        self._set_actor()
+        return str(self._owned_conversation(conversation_id, user_id)["mode"])
+
     def start_turn(
         self,
         *,
         user_id: int,
         message: str,
         conversation_id: int | None,
+        mode: str = "general",
     ) -> tuple[int, dict[str, Any]]:
-        self.purge_expired()
+        self._set_actor()
         if conversation_id is None:
-            # Khóa row user để hai request đồng thời không cùng vượt giới hạn 10.
+            # Advisory lock avoids requiring AI state role to read/write business users.
             self.session.execute(
-                text("SELECT id FROM users WHERE id=:user_id FOR UPDATE"),
+                text("SELECT pg_advisory_xact_lock(7411, :user_id)"),
                 {"user_id": user_id},
             )
             count = self.session.execute(
@@ -109,14 +125,23 @@ class ConversationStore:
             conversation_id = int(
                 self.session.execute(
                     text(
-                        """INSERT INTO ai_conversations (user_id, title)
-                           VALUES (:user_id, :title) RETURNING id"""
+                        """INSERT INTO ai_conversations (user_id, title, mode)
+                           VALUES (:user_id, :title, :mode) RETURNING id"""
                     ),
-                    {"user_id": user_id, "title": make_conversation_title(message)},
+                    {
+                        "user_id": user_id,
+                        "title": make_conversation_title(message),
+                        "mode": mode,
+                    },
                 ).scalar_one()
             )
         else:
-            self._lock_owned_conversation(conversation_id, user_id)
+            owned = self._lock_owned_conversation(conversation_id, user_id)
+            if str(owned["mode"]) != mode:
+                self.session.rollback()
+                raise ConflictError(
+                    "Không thể đổi chế độ của cuộc hội thoại đang có. Hãy tạo cuộc mới."
+                )
 
         latest = self.session.execute(
             text(
@@ -155,6 +180,7 @@ class ConversationStore:
                        (conversation_id, turn_number, user_content, status)
                    VALUES (:conversation_id, :turn_number, :message, 'pending')
                    RETURNING id, turn_number, user_content, assistant_content, status,
+                             personalization_used, grounding_mode, citations,
                              created_at, updated_at"""
             ),
             {
@@ -170,11 +196,12 @@ class ConversationStore:
     def prepare_retry(
         self, *, conversation_id: int, turn_id: int, user_id: int
     ) -> dict[str, Any]:
-        self.purge_expired()
-        self._lock_owned_conversation(conversation_id, user_id)
+        self._set_actor()
+        owned = self._lock_owned_conversation(conversation_id, user_id)
         latest = self.session.execute(
             text(
                 """SELECT id, turn_number, user_content, assistant_content, status,
+                          personalization_used, grounding_mode, citations,
                           created_at, updated_at
                      FROM ai_conversation_turns
                     WHERE conversation_id=:conversation_id
@@ -195,20 +222,25 @@ class ConversationStore:
                       SET status='pending', updated_at=NOW()
                     WHERE id=:id
                     RETURNING id, turn_number, user_content, assistant_content, status,
+                              personalization_used, grounding_mode, citations,
                               created_at, updated_at"""
             ),
             {"id": turn_id},
         ).mappings().one()
         self._touch(conversation_id)
         self.session.commit()
-        return dict(pending)
+        result = dict(pending)
+        result["conversation_mode"] = str(owned["mode"])
+        return result
 
     def completed_turns_before(
         self, *, conversation_id: int, turn_number: int
     ) -> list[dict[str, Any]]:
+        self._set_actor()
         rows = self.session.execute(
             text(
                 """SELECT id, turn_number, user_content, assistant_content, status,
+                          personalization_used, grounding_mode, citations,
                           created_at, updated_at
                      FROM ai_conversation_turns
                     WHERE conversation_id=:conversation_id
@@ -222,20 +254,30 @@ class ConversationStore:
         return [dict(row) for row in rows]
 
     def complete_turn(
-        self, *, conversation_id: int, turn_id: int, assistant_content: str
+        self, *, conversation_id: int, turn_id: int, assistant_content: str,
+        personalization_used: bool = False, grounding_mode: str = "none",
+        citations: list[dict[str, str]] | None = None,
     ) -> dict[str, Any]:
+        self._set_actor()
         turn = self.session.execute(
             text(
                 """UPDATE ai_conversation_turns
-                      SET assistant_content=:content, status='completed', updated_at=NOW()
+                      SET assistant_content=:content, status='completed', updated_at=NOW(),
+                          personalization_used=:personalization_used,
+                          grounding_mode=:grounding_mode,
+                          citations=CAST(:citations AS JSONB)
                     WHERE id=:turn_id AND conversation_id=:conversation_id
                     RETURNING id, turn_number, user_content, assistant_content, status,
+                              personalization_used, grounding_mode, citations,
                               created_at, updated_at"""
             ),
             {
                 "turn_id": turn_id,
                 "conversation_id": conversation_id,
                 "content": assistant_content,
+                "personalization_used": personalization_used,
+                "grounding_mode": grounding_mode,
+                "citations": json.dumps(citations or []),
             },
         ).mappings().one()
         self._touch(conversation_id)
@@ -248,6 +290,7 @@ class ConversationStore:
         conversation_id: int,
         turn_id: int,
     ) -> None:
+        self._set_actor()
         self.session.execute(
             text(
                 """UPDATE ai_conversation_turns SET status=:status, updated_at=NOW()
@@ -283,7 +326,7 @@ class ConversationStore:
     def _owned_conversation(self, conversation_id: int, user_id: int):
         row = self.session.execute(
             text(
-                """SELECT id, title, created_at, updated_at
+                """SELECT id, title, mode, created_at, updated_at
                      FROM ai_conversations WHERE id=:id AND user_id=:user_id"""
             ),
             {"id": conversation_id, "user_id": user_id},
@@ -292,16 +335,17 @@ class ConversationStore:
             raise NotFoundError("Không tìm thấy cuộc hội thoại.")
         return row
 
-    def _lock_owned_conversation(self, conversation_id: int, user_id: int) -> None:
+    def _lock_owned_conversation(self, conversation_id: int, user_id: int):
         row = self.session.execute(
             text(
-                "SELECT id FROM ai_conversations WHERE id=:id AND user_id=:user_id FOR UPDATE"
+                "SELECT id, mode FROM ai_conversations WHERE id=:id AND user_id=:user_id FOR UPDATE"
             ),
             {"id": conversation_id, "user_id": user_id},
-        ).first()
+        ).mappings().first()
         if row is None:
             self.session.rollback()
             raise NotFoundError("Không tìm thấy cuộc hội thoại.")
+        return row
 
     def _touch(self, conversation_id: int) -> None:
         self.session.execute(

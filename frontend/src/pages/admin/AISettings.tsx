@@ -25,7 +25,7 @@ const PRESETS: Record<LLMProviderType, string> = {
 };
 const EMPTY: LLMProviderWrite = {
   name: "", provider_type: "openai", base_url: PRESETS.openai,
-  model: "", api_key: "", timeout_seconds: 60,
+  model: "", api_key: "", timeout_seconds: 60, native_web_search_enabled: false,
 };
 const PROMPT_OPTIONS: Array<{
   value: AISystemPromptFeature;
@@ -119,7 +119,8 @@ export function AISettings() {
     setEditing(item);
     setTestFeedback(null);
     setForm({ name: item.name, provider_type: item.provider_type, base_url: item.base_url,
-      model: item.model, api_key: "", timeout_seconds: item.timeout_seconds });
+      model: item.model, api_key: "", timeout_seconds: item.timeout_seconds,
+      native_web_search_enabled: item.native_web_search_enabled });
     setOpen(true);
   };
   const persistDraft = async () => editing
@@ -149,7 +150,8 @@ export function AISettings() {
       setEditing(result.provider);
       setForm({ name: result.provider.name, provider_type: result.provider.provider_type,
         base_url: result.provider.base_url, model: result.provider.model, api_key: "",
-        timeout_seconds: result.provider.timeout_seconds });
+        timeout_seconds: result.provider.timeout_seconds,
+        native_web_search_enabled: result.provider.native_web_search_enabled });
       setTestFeedback({ success, message });
       if (success) toast.success("Provider hoạt động và structured output hợp lệ.");
       else toast.error(message);
@@ -185,7 +187,8 @@ export function AISettings() {
       if (selected && !item.is_active) {
         setEditing(item);
         setForm({ name: item.name, provider_type: item.provider_type, base_url: item.base_url,
-          model: selected, api_key: "", timeout_seconds: item.timeout_seconds });
+          model: selected, api_key: "", timeout_seconds: item.timeout_seconds,
+          native_web_search_enabled: item.native_web_search_enabled });
         setOpen(true);
         toast(`Đã chọn ${selected}. Bạn có thể đổi model trong form trước khi lưu.`);
       }
@@ -326,6 +329,13 @@ export function AISettings() {
         <TextField label="Mô hình (model)" required value={form.model} onChange={event => changeForm({ model: event.target.value })} />
         <TextField label="API key" type="password" value={form.api_key ?? ""} onChange={event => changeForm({ api_key: event.target.value })} hint={editing?.has_api_key ? "Để trống để giữ key hiện tại." : "LM Studio local có thể để trống."} />
         <TextField label="Timeout (giây)" type="number" min={1} max={300} value={form.timeout_seconds} onChange={event => changeForm({ timeout_seconds: Number(event.target.value) })} />
+        <label className="flex items-start gap-3 rounded-xl border border-sand-200 p-3 text-sm text-gray-700">
+          <input type="checkbox" className="mt-0.5 h-4 w-4 accent-brand-600"
+            checked={form.native_web_search_enabled}
+            onChange={event => changeForm({ native_web_search_enabled: event.target.checked })} />
+          <span><strong className="block text-gray-800">Web search gốc của provider</strong>
+            Chỉ bật khi model/provider hỗ trợ và đã kiểm tra. Menuto chỉ chấp nhận kết quả sức khoẻ có URL citation hợp lệ.</span>
+        </label>
         {testFeedback && <div role="status" className={`rounded-xl border px-3.5 py-3 text-sm ${testFeedback.success ? "border-brand-200 bg-brand-50 text-brand-800" : "border-red-200 bg-red-50 text-red-700"}`}>
           <p className="font-medium">{testFeedback.success ? "Kết nối thành công" : "Kiểm tra thất bại"}</p>
           <p className="mt-1 break-words text-xs">{testFeedback.message}</p>

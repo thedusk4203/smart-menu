@@ -215,6 +215,8 @@ export interface LLMProvider {
   masked_api_key: string | null;
   timeout_seconds: number;
   structured_output_mode: "json_schema" | "json_object" | null;
+  native_web_search_enabled: boolean;
+  capability_checked_at: string | null;
   config_version: number;
   tested_version: number | null;
   test_status: "untested" | "success" | "failed";
@@ -233,6 +235,7 @@ export interface LLMProviderWrite {
   api_key?: string | null;
   clear_api_key?: boolean;
   timeout_seconds: number;
+  native_web_search_enabled: boolean;
 }
 
 export type AISystemPromptFeature = "chat" | "parse_menu" | "explain_plan" | "suggest_swap";

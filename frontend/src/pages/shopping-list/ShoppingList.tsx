@@ -14,9 +14,7 @@ import { isUserVisiblePlanNotice, planNoticeText } from "../../lib/domainMessage
 import { feedbackMessage, toUserFeedback, type UserFeedback } from "../../lib/userFeedback";
 import type { MealPlan } from "../../types";
 import {
-  CarryoverSection,
   ShoppingDocumentHeader,
-  ShoppingLedgerSections,
   ShoppingRows,
 } from "./ShoppingListDocument";
 import { buildShoppingRows, type ShoppingDisplayRow } from "./shoppingListView";
@@ -197,7 +195,7 @@ export function ShoppingList() {
   const shoppingRows = buildShoppingRows(visibleItems, purchaseItems, selectedDay === "all");
   const doneCount = shoppingRows.filter((row) => row.isPurchased).length;
   const visibleWarnings = warnings.filter(isUserVisiblePlanNotice);
-  const documentScopeLabel = `${viewMode === "purchase" ? "Cần mua" : "Tồn theo ngày"} · ${selectedScopeLabel}`;
+  const documentScopeLabel = `Cần mua · ${selectedScopeLabel}`;
 
   if (loadingPlans) {
     return (
@@ -324,9 +322,7 @@ export function ShoppingList() {
         printedAt={printedAt}
       />
       {visibleWarnings.length > 0 && <div className="mb-4 space-y-2">{visibleWarnings.map((warning) => <p key={warning.code} className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{planNoticeText(warning)}</p>)}</div>}
-      {viewMode === "purchase" && shoppingRows.length > 0 && <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white"><ShoppingRows rows={shoppingRows} /></section>}
-      {viewMode === "ledger" && <ShoppingLedgerSections days={dailyLedger} />}
-      {viewMode === "purchase" && <CarryoverSection items={carryoverUsage} />}
+      {shoppingRows.length > 0 && <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white"><ShoppingRows rows={shoppingRows} /></section>}
     </div>
     </>
   );

@@ -1,6 +1,6 @@
 # API — Meal Plan V3, Shopping List, Inventory và Public Sharing
 
-> Đối chiếu OpenAPI runtime và code ngày 20/07/2026. Planner chỉ hỗ trợ snapshot schema 3. Các endpoint trừ public share đều cần access token.
+> Đối chiếu OpenAPI runtime và code ngày 22/07/2026. Planner chỉ hỗ trợ snapshot schema 3. Các endpoint trừ public share đều cần access token.
 
 ## Operation index
 
@@ -13,10 +13,12 @@
 | `DELETE` | `/api/meal-plans/{plan_id}` | — | `204` |
 | `GET` | `/api/meal-plans/{plan_id}/shopping-list` | — | `ShoppingListResponse` |
 | `PATCH` | `/api/meal-plans/{plan_id}/shopping-list/items/{item_id}` | `PurchaseUpdate` | `ShoppingListResponse` |
+| `PATCH` | `/api/meal-plans/{plan_id}/shopping-list/items` | `BulkPurchaseUpdate` | `ShoppingListResponse` |
 | `POST` | `/api/meal-plans/{plan_id}/shopping-list/share` | — | `ShoppingShareResponse` |
 | `DELETE` | `/api/meal-plans/{plan_id}/shopping-list/share` | — | `204` |
 | `GET` | `/api/public/shopping-lists/{token}` | — | `PublicShoppingListResponse` |
 | `PATCH` | `/api/public/shopping-lists/{token}/items/{item_id}` | `PurchaseUpdate` | `PublicShoppingListResponse` |
+| `PATCH` | `/api/public/shopping-lists/{token}/items` | `BulkPurchaseUpdate` | `PublicShoppingListResponse` |
 | `GET` | `/api/inventory-lots` | — | `InventoryLotResponse[]` |
 | `PATCH` | `/api/inventory-lots/{lot_id}` | `InventoryLotUpdate` | `InventoryLotResponse` |
 
@@ -32,6 +34,16 @@ Ba owner endpoint GET/PATCH/share nhận cùng query:
 `purchase_day` và `usage_day` cần `day`. Khi không truyền scope: có day → `usage_day`; không day → `all`.
 
 Public endpoint không nhận day/scope qua query; phạm vi được ký trong token.
+
+## Cập nhật checkbox đơn và theo nhóm
+
+Body cập nhật một item là `{"is_purchased": true}`. Body cập nhật một nhóm đã gộp ở frontend:
+
+```json
+{"item_ids": [41, 57, 63], "is_purchased": true}
+```
+
+`item_ids` có từ 1 đến 200 phần tử. Cả owner route và public route đều kiểm mọi ID thuộc đúng danh sách đang nhìn thấy, bao gồm day/scope đã ký trong token public. Nếu có ID ngoài phạm vi trả `404`; nếu số row cập nhật không khớp do dữ liệu vừa thay đổi, transaction rollback và trả `409` để client tải lại. Vì vậy checkbox nhóm là all-or-nothing, không cập nhật dở một phần.
 
 ## GenerateMealPlanRequest
 

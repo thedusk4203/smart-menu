@@ -63,6 +63,7 @@ def _client(store: ProviderConfigStore, config_id: int, mode: str) -> OpenAIComp
     return OpenAICompatibleAIClient(
         base_url=data["base_url"], model=data["model"], api_key=data.get("api_key"),
         timeout_seconds=float(data["timeout_seconds"]), structured_output_mode=mode,
+        native_web_search_enabled=bool(data.get("native_web_search_enabled")),
     )
 
 
@@ -96,6 +97,12 @@ def test_provider(config_id: int, store: ProviderConfigStore = Depends(get_store
             )
             if result.get("ok") is not True:
                 raise ValueError("Structured output không khớp schema kiểm tra.")
+            if data.get("native_web_search_enabled"):
+                _, citations = client.complete_grounded_text([
+                    {"role": "user", "content": "Nêu một khuyến nghị dinh dưỡng phổ thông hiện hành và dẫn nguồn."}
+                ])
+                if not citations:
+                    raise ValueError("Web search không trả citation hợp lệ.")
             return ProviderTestResult(provider=store.mark_test(config_id, success=True, mode=mode, error=None), models=models)
         except Exception as exc:
             errors.append(f"{mode}: {exc}")

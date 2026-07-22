@@ -12,6 +12,23 @@ Tạo `backend/.env` từ `.env.example`; không commit secret. Database local m
 
 Đọc [backend handbook](../docs/code/backend.md), [API reference](../docs/code/api/README.md), [database/migrations](../docs/code/database.md) và [operations](../docs/code/operations.md) trước khi sửa contract hoặc persistence.
 
+## Tài khoản database dành cho Menuto
+
+Migration `20260722_ai_personalization_boundary.sql` tạo hai role không có quyền
+superuser/BYPASSRLS: `menuto_ai_context_reader` chỉ đọc context và
+`menuto_ai_state_writer` chỉ ghi consent, hội thoại, citation và log AI. Khi triển
+khai, quản trị database đặt hai mật khẩu riêng bằng kênh secret của môi trường,
+sau đó cấu hình URL tương ứng (không commit giá trị thật):
+
+```text
+AI_CONTEXT_DATABASE_URL=postgresql+psycopg2://menuto_ai_context_reader:<secret>@<host>:<port>/<db>
+AI_STATE_DATABASE_URL=postgresql+psycopg2://menuto_ai_state_writer:<secret>@<host>:<port>/<db>
+```
+
+Ngoài development, backend từ chối khởi động AI nếu thiếu một trong hai URL.
+`AI_NATIVE_WEB_SEARCH_ENABLED` chỉ áp dụng cho provider cấu hình bằng environment;
+provider lưu trong database có công tắc và phải test thành công trước khi active.
+
 ## Hợp đồng lỗi API
 
 Lỗi API giữ `detail` để tương thích với client cũ và bổ sung dữ liệu có cấu trúc cho UI:

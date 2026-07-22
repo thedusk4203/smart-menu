@@ -6,7 +6,7 @@
 
 ## Nguồn sự thật
 
-- `backend/app/core/security.py`, `core/deps.py`, `core/config.py` và identity/AI/shopping-list routers.
+- `backend/app/core/security.py`, `core/deps.py`, `core/config.py`, `ai/personalization.py` và identity/AI/shopping-list routers.
 - `frontend/src/context/AuthContext.tsx`, route guards, `lib/apiClient.ts`, `.env.example` và `backend/.env.example`.
 
 ## Control matrix
@@ -20,6 +20,7 @@
 | Ownership | Router/use case kiểm owner resource | Lấy ID từ URL rồi query không check user |
 | Provider secret | Encryption/config env | Trả API key hoặc encrypted blob cho UI |
 | Public share | Token scope + expiry + revoke | Coi token như ID công khai vô hại |
+| AI personalization | Consent + purpose mode + context/state role + RLS | Tin User ID/context từ request body |
 
 ## Role matrix
 
@@ -27,11 +28,22 @@
 
 ## Share token và privacy
 
-Shopping share hết hạn sau 7 ngày, có thể scope phần dữ liệu GET theo ngày và revoke. Người có token còn hiệu lực có thể xem/toggle trạng thái purchased, nên token là capability nhạy cảm. Purchased state hiện là toàn plan; public PATCH mới kiểm item thuộc plan, chưa kiểm item thuộc đúng ngày trong token. Vì vậy không mô tả day token là write-scope hoàn toàn cho đến khi backend cưỡng chế thêm. Không đưa token thật vào docs, log, screenshot, analytics hoặc error message.
+Shopping share hết hạn sau 7 ngày, scope dữ liệu theo ngày và có thể revoke. Người có token còn hiệu lực có thể xem/toggle purchased state nên token là capability nhạy cảm. Public PATCH một item và bulk PATCH đều build đúng `day/list_scope`, chỉ nhận ID trong visible set; bulk mismatch rollback và trả conflict. Không đưa token thật vào docs, log, screenshot, analytics hoặc error message.
 
 ## Logging/retention
 
-AI request log và conversation history khác nhau. Provider secret/header được loại khỏi response/audit, nhưng request log hiện có thể chứa prompt, context, plan payload và response đầy đủ; chưa có redaction tổng quát cho dữ liệu cá nhân trong content. Conversation inactive dọn sau 30 ngày; request logs có retention 30 ngày riêng. Xóa conversation không xóa request log tương ứng. Retention không thay thế quyền access, tối thiểu hóa dữ liệu hoặc encryption.
+AI request log và conversation history khác nhau. Provider secret/header được loại khỏi response/audit. Message chứa `[PERSONAL_CONTEXT]` được thay bằng marker redacted trước khi ghi log, nhưng không có redaction PII tổng quát cho User message, response hoặc payload khác. Conversation và request log có policy 30 ngày riêng; xóa conversation không xóa log tương ứng. Retention không thay thế quyền access, tối thiểu hóa dữ liệu hoặc encryption.
+
+## AI consent và purpose limitation
+
+- `general` không đọc profile và không cần consent.
+- `meal_advice`/`health_reference` yêu cầu consent version hiện hành; notice đổi sẽ tắt personalization cho đến khi User đồng ý lại.
+- Health mode yêu cầu profile tuổi từ 18 và chỉ là thông tin tham khảo.
+- Context reader chỉ SELECT field allow-list; state writer chỉ ghi consent/history/log.
+- Actor lấy từ token và được đẩy xuống RLS; client không được chọn User ID khác.
+- Native web search chỉ được coi là grounded khi provider trả URL citation hợp lệ; citation không biến nội dung thành chẩn đoán y khoa.
+
+Đường cleanup hiện mở primary engine; deployment tách AI state DB phải kiểm tra retention job thật sự dọn đúng database.
 
 ## Khi nào phải cập nhật tài liệu này
 

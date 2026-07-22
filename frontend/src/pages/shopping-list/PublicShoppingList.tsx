@@ -6,9 +6,7 @@ import { formatDate } from "../../lib/format";
 import { isUserVisiblePlanNotice, planNoticeText } from "../../lib/domainMessages";
 import { toUserFeedback, type UserFeedback } from "../../lib/userFeedback";
 import {
-  CarryoverSection,
   ShoppingDocumentHeader,
-  ShoppingLedgerSections,
   ShoppingRows,
 } from "./ShoppingListDocument";
 import { buildShoppingRows, type ShoppingDisplayRow } from "./shoppingListView";
@@ -67,11 +65,7 @@ export function PublicShoppingList() {
   const dayLabel = data.day
     ? `Ngày ${data.day}${data.date ? ` · ${formatDate(data.date)}` : ""}`
     : "Toàn bộ thực đơn";
-  const scopeLabel = data.scope === "purchase_day"
-    ? `Cần mua · ${dayLabel}`
-    : data.scope === "usage_day"
-      ? `Tồn theo ngày · ${dayLabel}`
-      : `Cần mua · ${dayLabel}`;
+  const scopeLabel = `Cần mua · ${dayLabel}`;
   const visibleWarnings = data.warnings.filter(isUserVisiblePlanNotice);
 
   return (
@@ -100,10 +94,6 @@ export function PublicShoppingList() {
           <ShoppingRows rows={rows} onToggle={toggle} />
         </section>
       )}
-      {data.daily_ledger.length > 0 && data.scope === "usage_day" && (
-        <ShoppingLedgerSections days={data.daily_ledger} />
-      )}
-      <CarryoverSection items={data.carryover_usage} />
     </main>
   );
 }

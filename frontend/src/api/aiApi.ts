@@ -14,13 +14,20 @@ export interface ConversationTurn {
   user_content: string;
   assistant_content: string | null;
   status: ConversationTurnStatus;
+  personalization_used: boolean;
+  grounding_mode: "none" | "native_web_search" | "model_fallback";
+  citations: { title: string; url: string }[];
   created_at: string;
   updated_at: string;
 }
 export interface ConversationChatResponse extends ChatResponse {
   conversation_id: number;
   turn: ConversationTurn;
+  personalization_used: boolean;
+  grounding_mode: "none" | "native_web_search" | "model_fallback";
+  citations: { title: string; url: string }[];
 }
+export type ChatMode = "general" | "meal_advice" | "health_reference";
 export type ChatStreamEvent =
   | { event: "start"; data: { conversation_id: number; turn: ConversationTurn } }
   | { event: "delta"; data: { content: string } }
@@ -38,6 +45,7 @@ export type ChatStreamEvent =
 export interface ConversationSummary {
   id: number;
   title: string;
+  mode: ChatMode;
   turn_count: number;
   last_message_preview: string | null;
   created_at: string;
@@ -59,6 +67,7 @@ export interface ParsedMenuRequest {
   meals_per_day: number | null;
   budget_limit: number | null;
   preferred_tags: string[];
+  unresolved_tags: string[];
   needs_clarification: boolean;
   clarification_question: string | null;
 }
@@ -89,12 +98,12 @@ export const aiApi = {
   chatStream: (
     message: string,
     conversationId: number | undefined,
+    mode: ChatMode,
     onEvent: (event: ChatStreamEvent) => void,
     signal?: AbortSignal,
-    context?: unknown,
   ) => consumeChatStream(
     "/api/ai/chat",
-    { message, conversation_id: conversationId, context },
+    { message, conversation_id: conversationId, mode },
     onEvent,
     signal,
   ),

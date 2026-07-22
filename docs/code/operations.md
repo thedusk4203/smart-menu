@@ -26,6 +26,20 @@ Không chạy local backend khác ở `8000`: Vite proxy `/api` tới `127.0.0.1
 4. Trong `frontend`, cài dependency rồi `npm run dev`.
 5. Kiểm `/health/live` và `/health/ready`; `ready` kiểm database, `live` chỉ xác nhận process.
 
+## Kết nối database dành riêng cho AI
+
+Ngoài `DATABASE_URL`, AI có hai URL tách theo quyền:
+
+| Biến | Vai trò đề xuất | Phạm vi |
+| --- | --- | --- |
+| `AI_CONTEXT_DATABASE_URL` | `menuto_ai_context_reader` | Chỉ đọc projection profile/exclusion đúng User qua RLS |
+| `AI_STATE_DATABASE_URL` | `menuto_ai_state_writer` | Ghi consent, conversation, turn, citation và log AI |
+| `AI_NATIVE_WEB_SEARCH_ENABLED` | boolean | Capability cho provider cấu hình từ environment |
+
+Trong development, hai URL có thể bỏ trống để fallback về `DATABASE_URL`. Ngoài development, khi AI bật, cả hai URL là bắt buộc; tài khoản không nên là owner, superuser hay có `BYPASSRLS`. Migration `20260722_ai_personalization_boundary.sql` tạo role/policy cần thiết, nhưng secret cụ thể vẫn phải được cấp qua môi trường triển khai.
+
+Lưu ý hiện tại: vòng cleanup conversation 30 ngày trong `app/main.py` vẫn mở primary `engine`. Nếu triển khai AI state sang database vật lý khác, phải sửa/kiểm chứng đường cleanup dùng `ai_state_engine` trước khi coi retention là hoàn chỉnh.
+
 ## Docker demo và migration
 
 `docker compose --profile demo up --build -d` dùng env Docker. Database mới nhận baseline schema từ volume init. Database tồn tại cần migration runner; không hy vọng init script chạy lại khi volume đã có dữ liệu. `DEMO_SEED` là opt-in; account demo và secret không được commit/chụp ảnh.
@@ -37,7 +51,8 @@ Không chạy local backend khác ở `8000`: Vite proxy `/api` tới `127.0.0.1
 | `ready` 503 | Connection env, DB container health, port 5433 |
 | Login 401 | Token expiry, account active, backend secret/config |
 | Google button không hiện | Client ID frontend config; backend verify vẫn bắt buộc |
-| AI unavailable | Active provider, encrypted key, base URL/model/timeout; planner vẫn có form structured |
+| AI unavailable | Active provider, encrypted key, base URL/model/timeout; kiểm thêm hai AI DB URL và quyền RLS; planner vẫn có form structured |
+| Health không hiện nguồn | Provider đã bật `native_web_search_enabled`, test capability có citation hợp lệ, hoặc UI đang hiển thị đúng nhãn model fallback |
 | Candidate ít | Quality issue/view `v_dish_candidates`, không phải solver timeout |
 | Migration không chạy | `schema_migrations`, filename order, backup và runner log |
 

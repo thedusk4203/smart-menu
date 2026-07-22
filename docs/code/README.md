@@ -1,6 +1,6 @@
 # Smart Menu — Handbook kỹ thuật
 
-Tài liệu này dành cho developer bảo trì Smart Menu, người thuyết trình phần kỹ thuật và người chưa vững code nhưng muốn hiểu trọn luồng. Nguồn sự thật là working tree hiện tại, được đối chiếu ngày **20/07/2026**. Không tài liệu nào ở đây thay thế code, OpenAPI runtime hoặc migration SQL.
+Tài liệu này dành cho developer bảo trì Smart Menu, người thuyết trình phần kỹ thuật và người chưa vững code nhưng muốn hiểu trọn luồng. Nguồn sự thật là working tree hiện tại, được đối chiếu ngày **22/07/2026**. Không tài liệu nào ở đây thay thế code, OpenAPI runtime hoặc migration SQL.
 
 ## Lộ trình đọc
 
@@ -50,10 +50,10 @@ flowchart LR
 | Mục | Giá trị |
 | --- | --- |
 | Frontend routes khai báo | 24 |
-| OpenAPI paths / operations / schemas | 75 / 103 / 112 |
-| PostgreSQL tables / views / enums | 23 / 5 / 10 |
-| Backend tests gần nhất | 217 passed; coverage 67,63% (gate 65%) |
-| Frontend tests gần nhất | 17 passed; API client 95% statement / 84% branch |
+| OpenAPI paths / operations / schemas | 78 / 107 / 115 |
+| PostgreSQL tables / views / enums | 25 / 5 / 10 |
+| Backend tests gần nhất | 232 passed; coverage 67,54% (gate 65%) |
+| Frontend tests gần nhất | 25 passed; API client 93,15% statement / 87,06% branch |
 
 Các số này là baseline, không phải hằng số. Khi code thay đổi, chạy lại kiểm kê trong [testing](testing.md) và cập nhật tài liệu liên quan.
 

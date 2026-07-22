@@ -1,6 +1,6 @@
 # Smart Menu — Bộ tài liệu đồ án
 
-Đây là bộ tài liệu chuẩn đi cùng mã nguồn Smart Menu, được đối chiếu gần nhất với working tree ngày **20/07/2026**. Tài liệu phục vụ hai mục đích: chuẩn bị báo cáo đồ án dài hơn 20 phút và giúp người không chuyên kỹ thuật tự thao tác, quan sát kết quả rồi kiểm tra mức độ hiểu.
+Đây là bộ tài liệu chuẩn đi cùng mã nguồn Smart Menu, được đối chiếu gần nhất với working tree ngày **22/07/2026**. Tài liệu phục vụ hai mục đích: chuẩn bị báo cáo đồ án dài hơn 20 phút và giúp người không chuyên kỹ thuật tự thao tác, quan sát kết quả rồi kiểm tra mức độ hiểu.
 
 ## Bắt đầu nhanh
 

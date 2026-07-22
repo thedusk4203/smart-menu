@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.shared.enums import ActivityLevel, ExclusionReason, FitnessGoal, Gender
 
@@ -44,3 +46,17 @@ class ExclusionResponse(BaseModel):
     id: int
     ingredient_id: int
     reason: ExclusionReason
+
+
+class AIPreferencesUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    personalization_enabled: bool
+    notice_version: str = Field(min_length=1, max_length=40)
+
+
+class AIPreferencesResponse(BaseModel):
+    personalization_enabled: bool
+    notice_version: str
+    consented_at: datetime | None
+    updated_at: datetime | None

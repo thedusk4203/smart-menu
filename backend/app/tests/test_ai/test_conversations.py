@@ -10,6 +10,7 @@ from app.core.exceptions import ConflictError, NotFoundError
 from app.modules.ai.conversation_store import ConversationStore, make_conversation_title
 from app.modules.ai.exceptions import AIUnavailableError
 from app.modules.ai.schemas import ChatRequest
+from app.modules.ai.personalization import AuthenticatedAIRequestScope
 from app.modules.ai.use_cases import ChatUseCase, _recent_chat_history
 
 
@@ -87,17 +88,20 @@ class _MemoryStore:
         self.history = [_turn(1)]
         self.fail_kwargs = None
 
-    def start_turn(self, *, user_id, message, conversation_id):
+    def start_turn(self, *, user_id, message, conversation_id, mode="general"):
         self.turn = {**self.turn, "user_content": message, "assistant_content": None, "status": "pending"}
         return conversation_id or 7, self.turn
 
     def prepare_retry(self, *, conversation_id, turn_id, user_id):
         return dict(self.turn)
 
+    def mode_for_user(self, conversation_id, user_id):
+        return "general"
+
     def completed_turns_before(self, *, conversation_id, turn_number):
         return self.history
 
-    def complete_turn(self, *, conversation_id, turn_id, assistant_content):
+    def complete_turn(self, *, conversation_id, turn_id, assistant_content, **metadata):
         self.turn = {**self.turn, "assistant_content": assistant_content, "status": "completed"}
         return self.turn
 
@@ -106,16 +110,22 @@ class _MemoryStore:
         self.turn = {**self.turn, "status": "failed"}
 
 
-def test_chat_uses_server_history_instead_of_client_history():
+def test_chat_rejects_client_supplied_history_and_context():
+    with pytest.raises(Exception, match="Extra inputs are not permitted"):
+        ChatRequest(message="Câu mới", history=[])
+    with pytest.raises(Exception, match="Extra inputs are not permitted"):
+        ChatRequest(message="Câu mới", context={"user_id": 999})
+
+
+def test_chat_uses_only_server_history():
     store = _MemoryStore()
     client = _Client(["Mới"])
     events = list(ChatUseCase(client, store).open_chat_stream(
         ChatRequest(
             message="Câu mới",
             conversation_id=7,
-            history=[{"role": "user", "content": "history giả từ client"}],
         ),
-        user_id=1,
+        scope=AuthenticatedAIRequestScope(1),
     ).events())
 
     assert events[-1]["data"]["reply"] == "Mới"
@@ -129,7 +139,7 @@ def test_empty_chat_stream_marks_turn_failed():
 
     events = list(ChatUseCase(client, store).open_chat_stream(
         ChatRequest(message="Gợi ý món ăn", conversation_id=7),
-        user_id=1,
+        scope=AuthenticatedAIRequestScope(1),
     ).events())
 
     assert events[-1]["event"] == "error"
@@ -142,7 +152,7 @@ def test_retry_replaces_latest_answer_without_creating_turn():
     client = _Client(["Câu trả lời mới"])
 
     events = list(ChatUseCase(client, store).open_retry_stream(
-        conversation_id=7, turn_id=3, user_id=1
+        conversation_id=7, turn_id=3, scope=AuthenticatedAIRequestScope(1)
     ).events())
 
     assert events[-1]["data"]["turn"]["id"] == 3
@@ -155,7 +165,7 @@ def test_failed_retry_keeps_existing_answer():
     client = _Client(unavailable=True)
 
     events = list(ChatUseCase(client, store).open_retry_stream(
-        conversation_id=7, turn_id=3, user_id=1
+        conversation_id=7, turn_id=3, scope=AuthenticatedAIRequestScope(1)
     ).events())
 
     assert events[-1]["event"] == "error"
@@ -305,6 +315,7 @@ def test_conversation_store_purges_only_history_inactive_for_over_thirty_days(db
     store = ConversationStore(db_session)
 
     try:
+        store.purge_expired()
         summaries = store.list_for_user(user_id)
 
         assert {item["id"] for item in summaries} == {recent_conversation_id}

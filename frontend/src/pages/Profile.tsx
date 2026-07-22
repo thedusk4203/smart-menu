@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import toast from "react-hot-toast";
-import { Save, Trash2, Ban, Flame } from "lucide-react";
+import { Save, Trash2, Ban, Flame, ShieldCheck } from "lucide-react";
 import { profileApi } from "../api/profileApi";
 import { ingredientApi } from "../api/ingredientApi";
 import { nutritionApi } from "../api/nutritionApi";
@@ -43,6 +43,9 @@ export function Profile() {
   const [reason, setReason] = useState<ExclusionReason>("dislike");
   const [feedback, setFeedback] = useState<UserFeedback | null>(null);
   const [nutritionFeedback, setNutritionFeedback] = useState<UserFeedback | null>(null);
+  const [aiPersonalization, setAiPersonalization] = useState(false);
+  const [aiNoticeVersion, setAiNoticeVersion] = useState("2026-07-22");
+  const [savingAIConsent, setSavingAIConsent] = useState(false);
 
   const applyProfile = (p: ProfileType) => {
     setFullName(p.full_name ?? "");
@@ -79,8 +82,13 @@ export function Profile() {
   useEffect(() => {
     (async () => {
       try {
-        const p = await profileApi.getMyProfile();
+        const [p, aiPreferences] = await Promise.all([
+          profileApi.getMyProfile(),
+          profileApi.getMyAIPreferences(),
+        ]);
         applyProfile(p);
+        setAiPersonalization(aiPreferences.personalization_enabled);
+        setAiNoticeVersion(aiPreferences.notice_version);
       } catch (err) {
         setFeedback(toUserFeedback(err, "load_profile"));
       } finally {
@@ -146,6 +154,22 @@ export function Profile() {
       setFeedback(toUserFeedback(err, "save_profile"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleAIConsent = async () => {
+    const next = !aiPersonalization;
+    setSavingAIConsent(true);
+    setFeedback(null);
+    try {
+      const updated = await profileApi.updateMyAIPreferences(next, aiNoticeVersion);
+      setAiPersonalization(updated.personalization_enabled);
+      setAiNoticeVersion(updated.notice_version);
+      toast.success(next ? "Đã bật cá nhân hoá Menuto." : "Đã tắt cá nhân hoá Menuto.");
+    } catch (err) {
+      setFeedback(toUserFeedback(err, "save_profile"));
+    } finally {
+      setSavingAIConsent(false);
     }
   };
 
@@ -270,6 +294,35 @@ export function Profile() {
         </div>
 
         <div className="space-y-6 lg:col-span-2">
+          <Card title="Quyền cá nhân hoá Menuto" icon={<ShieldCheck className="h-5 w-5" />}>
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600">
+                Cho phép Menuto chỉ đọc mục tiêu, chỉ số cơ thể, ngân sách và nguyên liệu loại trừ
+                trong hồ sơ của chính tài khoản đang đăng nhập. Menuto không thể sửa dữ liệu này.
+              </p>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={aiPersonalization}
+                disabled={savingAIConsent}
+                onClick={toggleAIConsent}
+                className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition ${
+                  aiPersonalization
+                    ? "border-brand-300 bg-brand-50 text-brand-800"
+                    : "border-sand-200 bg-white text-gray-700"
+                } disabled:cursor-not-allowed disabled:opacity-60`}
+              >
+                <span>{aiPersonalization ? "Đang cho phép" : "Chưa cho phép"}</span>
+                <span className={`relative h-6 w-11 rounded-full transition ${aiPersonalization ? "bg-brand-600" : "bg-gray-300"}`}>
+                  <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${aiPersonalization ? "left-6" : "left-1"}`} />
+                </span>
+              </button>
+              <p className="text-xs text-gray-500">
+                Có thể thu hồi bất cứ lúc nào. Chat chung vẫn dùng được khi tắt quyền này.
+              </p>
+            </div>
+          </Card>
+
           <Card title="Nhu cầu dinh dưỡng" icon={<Flame className="h-5 w-5" />}>
             {nutritionFeedback ? (
               <FeedbackBanner feedback={nutritionFeedback} onDismiss={() => setNutritionFeedback(null)} />

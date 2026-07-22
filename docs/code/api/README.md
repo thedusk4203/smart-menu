@@ -6,13 +6,13 @@ API reference này được chia theo domain để dễ bảo trì. Các file do
 
 | Domain | Operation baseline | File |
 | --- | ---: | --- |
-| System/Auth/User/Profile/Nutrition | 24 | [auth-profile.md](auth-profile.md) |
+| System/Auth/User/Profile/Nutrition | 26 | [auth-profile.md](auth-profile.md) |
 | Catalog/Dish/Meal/Tag | 17 | [catalog-tags.md](catalog-tags.md) |
-| Meal plan/Shopping/Inventory/Public share | 13 | [planner-shopping.md](planner-shopping.md) |
+| Meal plan/Shopping/Inventory/Public share | 15 | [planner-shopping.md](planner-shopping.md) |
 | User AI/Admin AI | 24 | [ai.md](ai.md) |
 | Admin user/data/quality/import | 25 | [admin.md](admin.md) |
 
-Baseline ngày 20/07/2026: **75 paths, 103 operations, 112 component schemas**. OpenAPI runtime tại `/openapi.json` và Swagger tại `/docs` là nguồn kiểm chứng; không xem count trong Markdown là hằng số.
+Baseline ngày 22/07/2026: **78 paths, 107 operations, 115 component schemas**. OpenAPI runtime tại `/openapi.json` và Swagger tại `/docs` là nguồn kiểm chứng; không xem count trong Markdown là hằng số.
 
 ## Contract chung
 

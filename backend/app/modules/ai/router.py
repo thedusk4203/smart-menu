@@ -36,6 +36,7 @@ from app.modules.ai.use_cases import (
 )
 from app.modules.identity.domain import UserEntity
 from app.modules.ai.admin_schemas import AIStatus
+from app.modules.ai.personalization import AuthenticatedAIRequestScope
 from app.modules.ai.provider_store import ProviderConfigStore
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
@@ -67,7 +68,8 @@ def ai_status(session: Session = Depends(get_session),
         return AIStatus(enabled=False, features=[])
     return AIStatus(enabled=True, source=config.source, provider_name=config.name,
                     provider_type=config.provider_type, model=config.model,
-                    features=["chat", "parse_menu", "explain_plan", "suggest_swap"])
+                    features=["chat", "personalized_chat", "health_reference",
+                              "parse_menu", "active_tags", "explain_plan", "suggest_swap"])
 
 
 @router.post("/chat", responses={200: {"content": {"text/event-stream": {}}}})
@@ -76,7 +78,9 @@ def chat(
     current_user: UserEntity = Depends(get_current_user),
     use_case: ChatUseCase = Depends(get_ai_chat_use_case),
 ):
-    stream = use_case.open_chat_stream(data, user_id=current_user.id)
+    stream = use_case.open_chat_stream(
+        data, scope=AuthenticatedAIRequestScope(current_user.id)
+    )
     return _stream_response(stream.events())
 
 
@@ -127,7 +131,7 @@ def retry_conversation_turn(
     stream = use_case.open_retry_stream(
         conversation_id=conversation_id,
         turn_id=turn_id,
-        user_id=current_user.id,
+        scope=AuthenticatedAIRequestScope(current_user.id),
     )
     return _stream_response(stream.events())
 

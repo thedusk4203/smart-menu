@@ -15,6 +15,7 @@ from app.core.exceptions import AppException
 from app.core.config import settings
 from app.core.database import engine
 from app.modules.ai.conversation_store import ConversationStore
+from app.modules.ai.provider_store import AIRequestLogStore
 from sqlmodel import Session
 
 
@@ -23,7 +24,9 @@ logger = logging.getLogger(__name__)
 
 def _purge_expired_conversations() -> int:
     with Session(engine) as session:
-        return ConversationStore(session).purge_expired()
+        conversations = ConversationStore(session).purge_expired()
+        AIRequestLogStore(session).purge_expired()
+        return conversations
 
 
 async def _conversation_retention_loop() -> None:

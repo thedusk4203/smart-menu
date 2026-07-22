@@ -11,14 +11,14 @@ Gom nguyên liệu từ thực đơn đã lưu, theo dõi món đã mua, in danh
 ## Điều kiện trước khi bắt đầu
 
 - User đã lưu ít nhất một thực đơn.
-- Thực đơn mới được tạo bằng Planner V3 và có ledger tồn kho. Thực đơn V3 cũ chưa có ledger vẫn mở được ở chế độ lịch mua.
+- Thực đơn được tạo bằng Planner V3 và có ledger tồn kho; plan thiếu ledger không còn được hỗ trợ.
 
 ## Các bước thực hiện
 
 1. Mở **Đi chợ** và chọn một thực đơn đã lưu.
-2. Chọn **Dòng tồn kho** để xem tồn đầu ngày, mua mới, sử dụng, hết hạn và tồn cuối ngày; hoặc chọn **Lịch mua** để chỉ xem lượng cần mua mới. Có thể lọc theo ngày khi cần.
-3. Tích ô trước nguyên liệu đã mua. Bộ đếm cập nhật và trạng thái được lưu theo **nguyên liệu của toàn thực đơn**: tích ở một ngày cũng làm nguyên liệu đó hiện đã mua ở ngày khác/toàn bộ.
-4. Chọn **In danh sách** nếu cần bản giấy.
+2. Chọn **Tồn theo ngày** để xem tồn đầu, mua, sử dụng, hết hạn và tồn cuối; hoặc **Cần mua** để xem hàng cần mua. Có thể lọc theo ngày.
+3. Ở toàn kỳ, giao diện gộp các lần mua cùng nguyên liệu và đơn vị thành một dòng; tích dòng này cập nhật nguyên tử mọi lần mua nguồn. Ở từng ngày, mỗi lần mua vẫn có trạng thái riêng.
+4. Chọn **In danh sách** để in riêng phần hàng cần mua; bản in không chứa bảng ledger/carryover.
 5. Chọn **Chia sẻ**. Kiểm tra câu mô tả phạm vi, thời điểm hết hạn và lưu ý quyền của người có link; chọn **Sao chép link**.
 6. Gửi link bằng kênh phù hợp. Người nhận mở public page, xem phạm vi và có thể tích/bỏ tích nguyên liệu; thay đổi này dùng chung với danh sách của chủ sở hữu.
 7. Khi không cần nữa, mở lại **Chia sẻ** và chọn **Thu hồi**. Thu hồi vô hiệu hóa mọi link shopping list hiện hành của thực đơn đó.
@@ -55,7 +55,7 @@ Chú thích đọc ảnh: (1) tên thực đơn/phạm vi; (2) số đã mua; (3
 
 - Link là một “chìa khóa”: bất kỳ ai có link đều xem và tích đã mua. Không đăng link công khai ngoài nhóm cần dùng.
 - Không chụp màn hình ô link hoặc đưa token vào slide/tài liệu.
-- Link theo ngày giới hạn danh sách hiển thị, nhưng backend hiện chưa kiểm `item_id` thuộc đúng ngày khi public PATCH. Không coi đây là write-scope tuyệt đối; thu hồi ngay nếu link bị lộ.
+- Link theo ngày cưỡng chế write scope: cả PATCH một item và bulk PATCH đều kiểm mọi ID thuộc danh sách nhìn thấy trong token. Dù vậy token vẫn là quyền ghi checkbox; thu hồi ngay nếu bị lộ.
 - AI không tham gia gộp danh sách; hệ thống tính chi phí, dinh dưỡng, dị ứng, ngân sách và tính hợp lệ.
 
 ## Kiểm tra mức độ hiểu
