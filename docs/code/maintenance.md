@@ -24,7 +24,7 @@ Biến một yêu cầu thay đổi thành patch có scope rõ, contract nhất 
 
 ## Docs synchronization gate
 
-Trước PR, đối chiếu: developer chapter liên quan, API domain/schema, ADR nếu quyết định lâu dài, guide non-tech nếu UI behavior đổi, slide/demo nếu feature được trình diễn, launch-readiness nếu evidence/count thay đổi.
+Trước PR, đối chiếu: bài Dusk liên quan, developer chapter, API domain/schema và ADR nếu quyết định có ảnh hưởng lâu dài. Khi evidence/count thay đổi, cập nhật baseline trong `code/README.md` và `testing.md`.
 
 ## Khi nào phải cập nhật tài liệu này
 

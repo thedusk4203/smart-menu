@@ -60,7 +60,4 @@ Các số này là baseline, không phải hằng số. Khi code thay đổi, ch
 ## Tài liệu liên quan
 
 - [Tổng quan kỹ thuật ngắn](../technical-overview.md)
-- [Tài liệu người dùng](../guides/README.md)
-- [Dàn ý trình bày](../presentation/slide-outline.md)
-- [Technical appendix](../presentation/technical-appendix.md)
-- [Code walkthrough khi bảo vệ](../presentation/code-walkthrough.md)
+- [Bộ Dusk dễ đọc](../dusk/README.md)

@@ -7,7 +7,7 @@ Biết test nào bảo vệ rule nào, chạy đúng gate trước khi bàn giao
 ## Nguồn sự thật
 
 - `backend/app/tests/` và `backend/pyproject.toml`.
-- `frontend/package.json`, `frontend/scripts/release-check.mjs` và `docs/launch-readiness.md`.
+- `frontend/package.json`, `frontend/scripts/release-check.mjs` và baseline ở handbook này.
 
 ## Test map
 
