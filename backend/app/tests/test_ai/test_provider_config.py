@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.core.config import settings
-from app.modules.ai.client import OpenAICompatibleAIClient
+from app.modules.ai.client import LoggedAIClient, OpenAICompatibleAIClient
 from app.modules.ai.exceptions import AIResponseValidationError
 from app.modules.ai.provider_store import decrypt_secret, encrypt_secret, validate_base_url
 from app.modules.ai.schemas import ChatRequest
@@ -45,14 +45,11 @@ def test_system_prompt_content_is_trimmed_and_bounded():
         SystemPromptWrite(content="x" * 20_001)
 
 
-def test_chat_history_total_is_limited():
-    with pytest.raises(ValidationError, match="12000"):
-        ChatRequest(message="hi", history=[
-            {"role": "user", "content": "x" * 4000},
-            {"role": "assistant", "content": "x" * 4000},
-            {"role": "user", "content": "x" * 4000},
-            {"role": "assistant", "content": "x"},
-        ])
+def test_chat_rejects_legacy_history_and_arbitrary_user_fields():
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        ChatRequest(message="hi", history=[])
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        ChatRequest(message="hi", user_id=999)
 
 
 def test_empty_ai_message_is_rejected():
@@ -60,6 +57,20 @@ def test_empty_ai_message_is_rejected():
         OpenAICompatibleAIClient._extract_message_content(
             {"choices": [{"message": {"content": "  \n "}}]}
         )
+
+
+def test_ai_log_redacts_server_injected_personal_context():
+    request = {
+        "messages": [
+            {"role": "user", "content": "Câu hỏi của người dùng"},
+            {"role": "system", "content": "[PERSONAL_CONTEXT]\n{\"age\":30}\n[/PERSONAL_CONTEXT]"},
+        ]
+    }
+    redacted = LoggedAIClient._redact_personal_context(request)
+
+    assert redacted["messages"][0]["content"] == "Câu hỏi của người dùng"
+    assert redacted["messages"][1]["content"] == "[PERSONAL_CONTEXT_REDACTED]"
+    assert '\"age\"' not in json.dumps(redacted)
 
 
 class _CapturingClient(OpenAICompatibleAIClient):
@@ -84,6 +95,38 @@ def test_structured_output_mode(mode, expected):
     assert client.payload["stream"] is False
     assert "temperature" not in client.payload
     assert "max_tokens" not in client.payload
+
+
+def test_native_web_search_requires_valid_url_citations():
+    class _GroundedClient(OpenAICompatibleAIClient):
+        def __init__(self):
+            super().__init__(
+                base_url="https://api.openai.com/v1",
+                model="search-model",
+                native_web_search_enabled=True,
+            )
+            self.payload = None
+
+        def _request_json(self, method, path, payload=None):
+            self.payload = payload
+            return {
+                "choices": [{"message": {
+                    "content": "Thông tin có nguồn.",
+                    "annotations": [{"type": "url_citation", "url_citation": {
+                        "title": "WHO", "url": "https://www.who.int/example"
+                    }}],
+                }}],
+                "usage": {},
+            }
+
+    client = _GroundedClient()
+    reply, citations = client.complete_grounded_text([
+        {"role": "user", "content": "Câu hỏi sức khoẻ"}
+    ])
+
+    assert reply == "Thông tin có nguồn."
+    assert citations == [{"title": "WHO", "url": "https://www.who.int/example"}]
+    assert client.payload["web_search_options"] == {}
 
 
 class _StreamingResponse:

@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 from fastapi import Depends
+from sqlalchemy import text
 from sqlmodel import Session
 
-from app.core.database import get_session
+from app.core.database import get_ai_context_session, get_ai_state_session, get_session
 from app.core.deps import get_current_user
 # ── identity ──────────────────────────────────────────────────────────────
 from app.modules.identity.repository import SqlUserRepository
@@ -223,6 +224,7 @@ def get_calculate_nutrition_target_use_case() -> CalculateNutritionTargetUseCase
 from app.modules.ai.client import DisabledAIClient, LoggedAIClient, OpenAICompatibleAIClient
 from app.modules.ai.conversation_store import ConversationStore
 from app.modules.ai.ports import AIClientPort
+from app.modules.ai.personalization import AIContextReader, AIPreferenceStore, ActiveDishTagReader
 from app.modules.ai.prompt_store import SystemPromptStore
 from app.modules.ai.provider_store import AIRequestLogStore, ProviderConfigStore
 from app.modules.identity.domain import UserEntity
@@ -235,8 +237,13 @@ from app.modules.ai.use_cases import (
 )
 
 
-def _get_ai_client(session: Session, user: UserEntity, feature: str) -> AIClientPort:
-    config = ProviderConfigStore(session).active()
+def _get_ai_client(
+    config_session: Session,
+    state_session: Session,
+    user: UserEntity,
+    feature: str,
+) -> AIClientPort:
+    config = ProviderConfigStore(config_session).active()
     if config is None:
         return DisabledAIClient()
     client = OpenAICompatibleAIClient(
@@ -245,47 +252,79 @@ def _get_ai_client(session: Session, user: UserEntity, feature: str) -> AIClient
         api_key=config.api_key,
         timeout_seconds=config.timeout_seconds,
         structured_output_mode=config.structured_output_mode or "json_schema",
+        native_web_search_enabled=config.native_web_search_enabled,
     )
-    return LoggedAIClient(client, AIRequestLogStore(session), config, user_id=user.id, feature=feature)
+    return LoggedAIClient(
+        client,
+        AIRequestLogStore(state_session, actor_id=user.id),
+        config,
+        user_id=user.id,
+        feature=feature,
+    )
 
 
-def get_ai_chat_use_case(s: Session = Depends(get_session),
-                         user: UserEntity = Depends(get_current_user)) -> ChatUseCase:
+def get_ai_chat_use_case(
+    s: Session = Depends(get_session),
+    context_s: Session = Depends(get_ai_context_session),
+    state_s: Session = Depends(get_ai_state_session),
+    user: UserEntity = Depends(get_current_user),
+) -> ChatUseCase:
     return ChatUseCase(
-        _get_ai_client(s, user, "chat"), ConversationStore(s),
+        _get_ai_client(s, state_s, user, "chat"),
+        ConversationStore(state_s, actor_id=user.id),
         SystemPromptStore(s).get_effective("chat"),
+        context_reader=AIContextReader(context_s),
+        preferences=AIPreferenceStore(state_s),
     )
 
 
 def get_ai_conversation_history_use_case(
-    s: Session = Depends(get_session),
+    s: Session = Depends(get_ai_state_session),
+    user: UserEntity = Depends(get_current_user),
 ) -> ConversationHistoryUseCase:
-    return ConversationHistoryUseCase(ConversationStore(s))
+    return ConversationHistoryUseCase(ConversationStore(s, actor_id=user.id))
 
 
-def get_ai_parse_menu_request_use_case(s: Session = Depends(get_session),
-                                       user: UserEntity = Depends(get_current_user)) -> ParseMenuRequestUseCase:
+def get_ai_parse_menu_request_use_case(
+    s: Session = Depends(get_session),
+    context_s: Session = Depends(get_ai_context_session),
+    state_s: Session = Depends(get_ai_state_session),
+    user: UserEntity = Depends(get_current_user),
+) -> ParseMenuRequestUseCase:
     return ParseMenuRequestUseCase(
-        _get_ai_client(s, user, "parse_menu"),
+        _get_ai_client(s, state_s, user, "parse_menu"),
         SystemPromptStore(s).get_effective("parse_menu"),
+        tags=ActiveDishTagReader(context_s),
     )
 
 
-def get_ai_explain_plan_use_case(s: Session = Depends(get_session),
-                                 user: UserEntity = Depends(get_current_user)) -> ExplainPlanUseCase:
+def get_ai_explain_plan_use_case(
+    s: Session = Depends(get_session),
+    state_s: Session = Depends(get_ai_state_session),
+    user: UserEntity = Depends(get_current_user),
+) -> ExplainPlanUseCase:
     return ExplainPlanUseCase(
-        _get_ai_client(s, user, "explain_plan"),
+        _get_ai_client(s, state_s, user, "explain_plan"),
         SystemPromptStore(s).get_effective("explain_plan"),
     )
 
 
-def get_ai_suggest_swap_use_case(s: Session = Depends(get_session),
-                                 user: UserEntity = Depends(get_current_user)) -> SuggestSwapUseCase:
+def get_ai_suggest_swap_use_case(
+    s: Session = Depends(get_session),
+    context_s: Session = Depends(get_ai_context_session),
+    state_s: Session = Depends(get_ai_state_session),
+    user: UserEntity = Depends(get_current_user),
+) -> SuggestSwapUseCase:
+    context_s.execute(
+        text("SELECT set_config('app.current_user_id', :actor_id, true)"),
+        {"actor_id": str(user.id)},
+    )
     return SuggestSwapUseCase(
-        _get_ai_client(s, user, "suggest_swap"),
-        SqlDishCandidateProvider(s),
+        _get_ai_client(s, state_s, user, "suggest_swap"),
+        SqlDishCandidateProvider(context_s),
         BuildPlanRequestUseCase(
-            SqlUserProfileRepository(s), SqlExclusionRepository(s), SqlInventoryRepository(s)
+            SqlUserProfileRepository(context_s), SqlExclusionRepository(context_s),
+            SqlInventoryRepository(context_s)
         ),
         SystemPromptStore(s).get_effective("suggest_swap"),
     )

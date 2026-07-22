@@ -14,7 +14,7 @@ Hiểu dữ liệu nguồn, derived view và quy trình thay đổi schema an to
 
 | Nhóm | Đối tượng |
 | --- | --- |
-| Identity/profile | `users`, `user_profiles`, `user_excluded_ingredients` |
+| Identity/profile | `users`, `user_profiles`, `user_excluded_ingredients`, `user_ai_preferences`, `ai_consent_events` |
 | Food data | `ingredients`, `nutrition_facts`, `price_snapshots`, `meals`, `meal_ingredients`, `dishes`, `dish_ingredients`, `tag_catalog` |
 | Planner/shopping | `meal_plans`, `shopping_lists`, `shopping_list_shares` |
 | AI/Admin | `llm_provider_configs`, `ai_request_logs`, `ai_conversations`, `ai_conversation_turns`, `import_jobs`, `audit_logs` |
@@ -36,6 +36,8 @@ erDiagram
     meal_plans ||--o{ shopping_lists : materializes
     meal_plans ||--o{ shopping_list_shares : exposes
     users ||--o{ ai_conversations : owns
+    users ||--o| user_ai_preferences : controls
+    users ||--o{ ai_consent_events : audits
     ai_conversations ||--o{ ai_conversation_turns : has
 ```
 
@@ -47,6 +49,8 @@ erDiagram
 - Database tồn tại dùng `uv run python scripts/apply_migrations.py` từ `backend`; runner ghi `schema_migrations` và không chạy lại file đã nhận.
 - Migration là bất biến sau khi đã dùng ở môi trường demo. Tạo file SQL mới có tiền tố ngày/ý nghĩa; không sửa migration lịch sử để thay đổi database đã tồn tại.
 - Sao lưu trước migration dữ liệu demo. DDL destructive hoặc data reset phải có ADR, kế hoạch backup và xác nhận phạm vi.
+
+Migration `20260722_ai_personalization_boundary.sql` thêm consent/audit, conversation mode, turn grounding/citations, provider web-search capability, hai database role giới hạn quyền và RLS. `menuto_ai_context_reader` chỉ đọc projection cần cho Menuto và mặc định transaction read-only; `menuto_ai_state_writer` chỉ ghi bảng consent/history/log. RLS so actor với `app.current_user_id` do backend đặt từ token.
 
 ## Snapshot và dữ liệu dẫn xuất
 

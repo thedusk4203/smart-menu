@@ -1,4 +1,4 @@
-import { Leaf, RefreshCw, User } from "lucide-react";
+import { ExternalLink, Leaf, RefreshCw, ShieldCheck, User } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ConversationTurn } from "../../../api/aiApi";
 import { ChatMarkdown } from "../../../components/domain/ChatMarkdown";
@@ -44,6 +44,29 @@ export function TurnMessages({
             ) : undefined
           }
         />
+      )}
+      {!streaming && turn.status === "completed" && (turn.personalization_used || turn.citations.length > 0) && (
+        <div className="ml-10 max-w-[78%] space-y-2 text-xs text-gray-600">
+          {turn.personalization_used && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-1 text-brand-800">
+              <ShieldCheck className="h-3.5 w-3.5" /> Đã dùng hồ sơ của bạn ở chế độ chỉ đọc
+            </span>
+          )}
+          {turn.citations.length > 0 && (
+            <div className="rounded-xl border border-sand-200 bg-white px-3 py-2">
+              <p className="mb-1 font-semibold text-gray-700">Nguồn tham khảo</p>
+              <ul className="space-y-1">
+                {turn.citations.map((citation) => (
+                  <li key={citation.url}>
+                    <a className="inline-flex items-start gap-1 text-brand-700 hover:underline" href={citation.url} target="_blank" rel="noreferrer">
+                      {citation.title}<ExternalLink className="mt-0.5 h-3 w-3 shrink-0" />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       )}
       {streaming && !content && (
         <MessageBubble role="assistant" content="" streaming />

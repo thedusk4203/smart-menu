@@ -56,6 +56,8 @@ def _default_ai_base_url(provider: str) -> str:
 class Settings:
     app_env: str = os.getenv("APP_ENV", "development").strip().lower()
     database_url: str = _database_url()
+    ai_context_database_url: str = os.getenv("AI_CONTEXT_DATABASE_URL", "").strip()
+    ai_state_database_url: str = os.getenv("AI_STATE_DATABASE_URL", "").strip()
     secret_key: str = os.getenv("SECRET_KEY", "change-me-in-env")
     algorithm: str = os.getenv("ALGORITHM", "HS256")
     access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
@@ -69,6 +71,7 @@ class Settings:
     )
     ai_model: str = os.getenv("AI_MODEL", "").strip()
     ai_timeout_seconds: float = float(os.getenv("AI_TIMEOUT_SECONDS", "60"))
+    ai_native_web_search_enabled: bool = _env_bool("AI_NATIVE_WEB_SEARCH_ENABLED", False)
     ai_conversation_cleanup_interval_seconds: int = int(
         os.getenv("AI_CONVERSATION_CLEANUP_INTERVAL_SECONDS", "3600")
     )
@@ -87,6 +90,12 @@ class Settings:
             raise RuntimeError("CORS_ORIGINS phải có ít nhất một origin ngoài development.")
         if self.ai_enabled and (not self.ai_config_encryption_key or self.ai_config_encryption_key in invalid_values):
             raise RuntimeError("AI_CONFIG_ENCRYPTION_KEY phải được cấu hình khi AI được bật.")
+        if self.ai_enabled and (
+            not self.ai_context_database_url or not self.ai_state_database_url
+        ):
+            raise RuntimeError(
+                "AI_CONTEXT_DATABASE_URL và AI_STATE_DATABASE_URL là bắt buộc khi AI bật ngoài development."
+            )
 
 
 settings = Settings()

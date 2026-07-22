@@ -7,7 +7,7 @@ Biết test nào bảo vệ rule nào, chạy đúng gate trước khi bàn giao
 ## Nguồn sự thật
 
 - `backend/app/tests/` và `backend/pyproject.toml`.
-- `frontend/package.json`, `frontend/scripts/release-check.mjs` và `docs/launch-readiness.md`.
+- `frontend/package.json`, `frontend/scripts/release-check.mjs` và baseline ở handbook này.
 
 ## Test map
 
@@ -16,7 +16,7 @@ Biết test nào bảo vệ rule nào, chạy đúng gate trước khi bàn giao
 | Identity/profile/nutrition | Registration, Google login, profile update, calculator/domain tests |
 | Catalog/data | Dish candidate invariants, typed tags, quality issues, import templates |
 | Planner/shopping | Dish planner, models, shopping list, infeasible/constraint behavior |
-| AI | Request parser, chat template, use cases, provider config, conversations, retention, plan explanation |
+| AI | Request parser, chat template, use cases, provider config, conversations, consent/personalization boundary, grounding/citation và retention |
 | Frontend | Vitest/RTL, API client coverage, TypeScript, ESLint, release guard, Vite build |
 
 Backend đang cấu hình `fail_under=65`; kế hoạch refactor đặt mục tiêu tiếp theo là 70%. Frontend chạy Vitest coverage cho các file được đưa vào suite; coverage cao của `apiClient.ts` không đồng nghĩa toàn bộ UI đã đạt cùng tỷ lệ. Thay đổi behavior vẫn phải có test có ý nghĩa tại module/use-case và regression test cho bug đã thấy.
@@ -34,7 +34,7 @@ cd frontend; npm run lint
 cd frontend; npm run check:release
 ```
 
-Production build đã bao gồm `tsc -b` trước Vite. Baseline tự động ngày 20/07/2026: backend 217 test pass, coverage 67,63%; frontend 17 test pass; Ruff, TypeScript, ESLint, release guard và Vite build đều pass. Browser smoke chưa được chạy lại trong lượt refactor này.
+Production build đã bao gồm `tsc -b` trước Vite. Baseline tự động ngày 22/07/2026: backend 232 test pass, coverage 67,54%; frontend 25 test pass, `apiClient.ts` đạt 93,15% statement và 87,06% branch; Ruff, TypeScript, ESLint, release guard và Vite build đều pass. Browser smoke chưa được chạy lại trong lượt cập nhật này.
 
 ## Thêm regression test
 

@@ -16,4 +16,5 @@ Các ADR dưới đây được backfill ngày **13/07/2026** từ source, tests
 | [0010](0010-typed-tags-import.md) | Typed tags và import preview/commit |
 | [0011](0011-shopping-share-capability.md) | Shopping-share capability token |
 | [0012](0012-schema-migrations-health.md) | Baseline schema, migration và health |
+| [0013](0013-ai-personalization-boundary.md) | AI personalization, consent, purpose và database role |
 

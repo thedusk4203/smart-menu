@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, status
+from sqlmodel import Session
 
+from app.core.database import get_ai_state_session
 from app.core.deps import get_current_user, require_admin
 from app.dependencies import (
     get_add_exclusion_use_case,
@@ -12,7 +14,11 @@ from app.dependencies import (
 )
 from app.modules.identity.domain import UserEntity
 from app.modules.profiles.schemas import (
-    ExclusionCreate, ExclusionResponse, ProfileResponse, ProfileUpdate,
+    AIPreferencesResponse, AIPreferencesUpdate, ExclusionCreate, ExclusionResponse,
+    ProfileResponse, ProfileUpdate,
+)
+from app.modules.ai.personalization import (
+    AIPreferenceStore, AuthenticatedAIRequestScope,
 )
 from app.modules.profiles.use_cases import (
     AddExclusionUseCase, GetProfileUseCase, ListExclusionsUseCase,
@@ -39,6 +45,29 @@ def update_my_profile(
     use_case: UpdateProfileUseCase = Depends(get_update_profile_use_case),
 ):
     return use_case.execute(current_user.id, **data.model_dump(exclude_unset=True)).__dict__
+
+
+@router.get("/me/ai-preferences", response_model=AIPreferencesResponse)
+def get_my_ai_preferences(
+    current_user: UserEntity = Depends(get_current_user),
+    session: Session = Depends(get_ai_state_session),
+):
+    return AIPreferenceStore(session).get(
+        AuthenticatedAIRequestScope(current_user.id)
+    )
+
+
+@router.put("/me/ai-preferences", response_model=AIPreferencesResponse)
+def update_my_ai_preferences(
+    data: AIPreferencesUpdate,
+    current_user: UserEntity = Depends(get_current_user),
+    session: Session = Depends(get_ai_state_session),
+):
+    return AIPreferenceStore(session).update(
+        AuthenticatedAIRequestScope(current_user.id),
+        personalization_enabled=data.personalization_enabled,
+        notice_version=data.notice_version,
+    )
 
 
 @router.get("/me/exclusions", response_model=list[ExclusionResponse])

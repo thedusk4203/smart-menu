@@ -22,6 +22,8 @@ Frontend dùng route guard để tách khu người dùng và khu quản trị. 
 erDiagram
     USERS ||--|| USER_PROFILES : has
     USERS ||--o{ EXCLUDED_INGREDIENTS : excludes
+    USERS ||--o| USER_AI_PREFERENCES : controls
+    USERS ||--o{ AI_CONSENT_EVENTS : audits
     INGREDIENTS ||--|| NUTRITION_FACTS : has
     INGREDIENTS ||--o{ PRICE_SNAPSHOTS : priced_by
     DISHES ||--o{ DISH_INGREDIENTS : contains
@@ -63,7 +65,9 @@ Khi “Tạo lại”, signature của thực đơn trước được đưa vào
 
 ## Ranh giới AI
 
-AI có bốn nhóm tác vụ: parse mô tả tiếng Việt, giải thích thực đơn đã kiểm tra, gợi ý đổi món và hội thoại Menuto. Mọi output có cấu trúc phải qua schema validation.
+AI có bốn nhóm tác vụ: parse mô tả tiếng Việt, giải thích thực đơn đã kiểm tra, gợi ý đổi món và hội thoại Menuto. Mọi output có cấu trúc phải qua schema validation. Chat chia thành `general`, `meal_advice` và `health_reference`; mode được cố định theo conversation.
+
+`general` không đọc profile. Hai mode cá nhân hóa chỉ đọc projection đúng User sau consent phiên bản hiện hành; health reference còn yêu cầu tuổi từ 18 và được phép đọc thêm tuổi, giới tính, chiều cao, cân nặng. Backend tách session đọc context và session ghi state, kết hợp role PostgreSQL/RLS để giảm quyền. Health reference ưu tiên native web search có citation hợp lệ; nếu không có, UI ghi rõ model fallback chưa được kiểm chứng web theo thời gian thực.
 
 AI không phải nguồn đúng cho giá, dinh dưỡng hoặc tính hợp lệ. Backend tính lại các số liệu từ snapshot/công thức và quyết định kết quả cuối. Nếu AI tắt, User vẫn tạo thực đơn bằng form có cấu trúc và xem dữ liệu đã lưu.
 
@@ -71,12 +75,12 @@ Lịch sử Menuto tách khỏi log vận hành:
 
 - Tối đa 10 cuộc hội thoại/User và 20 câu/cuộc.
 - Chỉ retry câu gần nhất; câu lỗi phải được retry trước khi hỏi tiếp trong cùng cuộc.
-- Cuộc hội thoại không hoạt động quá 30 ngày được dọn ở background và trước các thao tác đọc/ghi.
+- Cuộc hội thoại không hoạt động quá 30 ngày được dọn trước thao tác đọc/ghi và có vòng background. Vòng background hiện còn dùng primary engine; phải đổi sang AI state engine nếu triển khai state ở database vật lý riêng.
 - AI request log có thời hạn 30 ngày riêng và không được dùng làm lịch sử hội thoại sản phẩm.
 
 ## Chia sẻ và bảo mật
 
-Link danh sách đi chợ chứa token có phạm vi hẹp, hết hạn sau 7 ngày và có thể thu hồi. Link có thể giới hạn ở một ngày cụ thể. Bất kỳ ai có link còn hiệu lực đều xem và thay đổi trạng thái “đã mua”, vì vậy phải coi link như thông tin nhạy cảm.
+Link danh sách đi chợ chứa token có phạm vi hẹp, hết hạn sau 7 ngày và có thể thu hồi. Link có thể giới hạn ở một ngày cụ thể. Bất kỳ ai có link còn hiệu lực đều xem và thay đổi trạng thái “đã mua”, vì vậy phải coi link như thông tin nhạy cảm. Cập nhật nhóm chỉ thành công khi mọi item đều thuộc đúng scope đã ký; nếu dữ liệu đổi đồng thời, transaction rollback để tránh trạng thái nửa vời.
 
 Mật khẩu được hash; API kiểm tra token, trạng thái tài khoản, ownership và role. Secret, khóa mã hóa cấu hình AI, Google client ID và CORS được cấu hình qua biến môi trường. Google ID token được xác minh phía backend; phiên bản hiện tại chỉ chấp nhận email Gmail đã được Google xác minh.
 

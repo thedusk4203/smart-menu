@@ -9,6 +9,7 @@ import pytest
 from app.modules.ai.exceptions import AIResponseValidationError, AIUnavailableError
 from app.modules.ai.ports import AIClientPort, AIMessage
 from app.modules.ai.schemas import ChatRequest, ParseMenuRequest, SwapSuggestionRequest
+from app.modules.ai.personalization import AuthenticatedAIRequestScope
 from app.modules.ai.use_cases import ChatUseCase, ParseMenuRequestUseCase, SuggestSwapUseCase
 from app.modules.inventory.repository import SqlInventoryRepository
 from app.modules.meal_planning.domain import DishCandidate, MealPlanEntity, PlanRequest
@@ -52,7 +53,7 @@ class _FakeConversationStore:
     def __init__(self) -> None:
         self.failed = False
 
-    def start_turn(self, *, user_id, message, conversation_id):
+    def start_turn(self, *, user_id, message, conversation_id, mode="general"):
         now = datetime.now(timezone.utc)
         return 9, {
             "id": 11,
@@ -67,7 +68,7 @@ class _FakeConversationStore:
     def completed_turns_before(self, *, conversation_id, turn_number):
         return []
 
-    def complete_turn(self, *, conversation_id, turn_id, assistant_content):
+    def complete_turn(self, *, conversation_id, turn_id, assistant_content, **metadata):
         now = datetime.now(timezone.utc)
         return {
             "id": turn_id,
@@ -86,7 +87,7 @@ class _FakeConversationStore:
 def test_chat_stream_returns_deltas_then_completes_turn():
     client = _FakeAIClient(text="Chào bạn")
     events = list(ChatUseCase(client, _FakeConversationStore(), "Prompt chat tùy chỉnh").open_chat_stream(
-        ChatRequest(message="Xin chào"), user_id=1
+        ChatRequest(message="Xin chào"), scope=AuthenticatedAIRequestScope(1)
     ).events())
 
     assert [event["event"] for event in events] == ["start", "delta", "done"]
@@ -96,6 +97,37 @@ def test_chat_stream_returns_deltas_then_completes_turn():
     assert client.messages is not None
     assert client.messages[0]["role"] == "system"
     assert client.messages[0]["content"] == "Prompt chat tùy chỉnh"
+
+
+def test_health_chat_uses_personal_context_and_labels_model_fallback():
+    class _Preferences:
+        def require_enabled(self, scope):
+            assert scope.user_id == 7
+
+    class _Context:
+        def build(self, scope, *, mode):
+            assert scope.user_id == 7
+            assert mode == "health_reference"
+            return {"age": 30, "goal": "maintain"}
+
+    client = _FakeAIClient(text="Nội dung tham khảo")
+    events = list(ChatUseCase(
+        client,
+        _FakeConversationStore(),
+        context_reader=_Context(),
+        preferences=_Preferences(),
+    ).open_chat_stream(
+        ChatRequest(message="Tôi nên ăn thế nào?", mode="health_reference"),
+        scope=AuthenticatedAIRequestScope(7),
+    ).events())
+
+    done = events[-1]["data"]
+    assert done["personalization_used"] is True
+    assert done["grounding_mode"] == "model_fallback"
+    assert done["citations"] == []
+    assert done["reply"].startswith("Thông tin tham khảo từ kiến thức của mô hình")
+    assert client.messages is not None
+    assert any("[PERSONAL_CONTEXT]" in message["content"] for message in client.messages)
 
 
 def test_parse_menu_request_validates_structured_output():
@@ -120,6 +152,24 @@ def test_parse_menu_request_validates_structured_output():
     assert result.preferred_tags == ["healthy", "ít dầu mỡ"]
     assert client.messages is not None
     assert client.messages[0]["content"] == "Prompt parse tùy chỉnh"
+
+
+def test_parse_menu_uses_active_server_tags_and_reports_unknown_values():
+    class _Tags:
+        def list_names(self):
+            return ["giàu đạm", "lành mạnh"]
+
+    client = _FakeAIClient(json_data={
+        "preferred_tags": ["Giàu Đạm", "không tồn tại", "lành mạnh"],
+    })
+    result = ParseMenuRequestUseCase(client, tags=_Tags()).execute(
+        ParseMenuRequest(message="Ưu tiên giàu đạm và lành mạnh")
+    )
+
+    assert result.preferred_tags == ["giàu đạm", "lành mạnh"]
+    assert result.unresolved_tags == ["không tồn tại"]
+    assert client.messages is not None
+    assert "giàu đạm" in client.messages[0]["content"]
 
 
 def test_parse_menu_request_rejects_invalid_ai_shape():
@@ -396,12 +446,12 @@ def test_swap_dependency_builds_request_with_inventory_repository(monkeypatch):
         def get_effective(self, _feature: str) -> str:
             return "swap prompt"
 
-    session = object()
+    session = SimpleNamespace(execute=lambda *_args, **_kwargs: None)
     monkeypatch.setattr(dependencies, "_get_ai_client", lambda *_args: _FakeAIClient())
     monkeypatch.setattr(dependencies, "SystemPromptStore", _PromptStore)
 
     use_case = dependencies.get_ai_suggest_swap_use_case(
-        session, SimpleNamespace(id=7)
+        s=session, context_s=session, state_s=session, user=SimpleNamespace(id=7)
     )
 
     inventory = use_case._build_request._inventory

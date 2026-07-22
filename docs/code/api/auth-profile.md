@@ -1,6 +1,6 @@
 # API — System, Auth, User, Profile và Nutrition
 
-> Full schema catalog được sao chép từ OpenAPI runtime ngày 13/07/2026. `401`, `403`, `404`, `422` và `{ "detail": string }` áp dụng theo authentication, quyền, ownership, target và validation.
+> Operation index và phần contract thay đổi được đối chiếu với code ngày 22/07/2026. Schema catalog phía dưới là snapshot cũ ngày 13/07/2026; OpenAPI runtime vẫn là nguồn máy đọc đầy đủ nhất.
 
 ## Operation index
 
@@ -19,6 +19,8 @@
 | DELETE | `/api/profiles/{user_id}/exclusions/{ingredient_id}` |  | 204: no body<br>422: HTTPValidationError |
 | GET | `/api/profiles/me` |  | 200: ProfileResponse |
 | PUT | `/api/profiles/me` | ProfileUpdate | 200: ProfileResponse<br>422: HTTPValidationError |
+| GET | `/api/profiles/me/ai-preferences` |  | 200: AIPreferencesResponse |
+| PUT | `/api/profiles/me/ai-preferences` | AIPreferencesUpdate | 200: AIPreferencesResponse<br>422: HTTPValidationError |
 | GET | `/api/profiles/me/exclusions` |  | 200: array<ExclusionResponse> |
 | POST | `/api/profiles/me/exclusions` | ExclusionCreate | 201: ExclusionResponse<br>422: HTTPValidationError |
 | DELETE | `/api/profiles/me/exclusions/{ingredient_id}` |  | 204: no body<br>422: HTTPValidationError |
@@ -88,6 +90,34 @@ No path/query parameter.
 ### `PUT /api/profiles/me`
 No path/query parameter.
 Request content type: `application/json`
+
+### `GET /api/profiles/me/ai-preferences`
+
+Không có path/query parameter. Identity luôn lấy từ access token. Khi chưa có row hoặc notice cũ, response an toàn là `personalization_enabled=false` với notice hiện hành.
+
+### `PUT /api/profiles/me/ai-preferences`
+
+Không có path/query parameter. Request content type: `application/json`.
+
+```json
+{
+  "personalization_enabled": true,
+  "notice_version": "2026-07-22"
+}
+```
+
+`notice_version` phải đúng phiên bản backend hiện hành; bản cũ trả lỗi `AI_NOTICE_VERSION_STALE`. Mỗi lần bật/tắt đều ghi một consent event. Endpoint chỉ sửa quyền AI, không sửa profile, menu hay inventory.
+
+Response:
+
+```json
+{
+  "personalization_enabled": true,
+  "notice_version": "2026-07-22",
+  "consented_at": "2026-07-22T10:30:00Z",
+  "updated_at": "2026-07-22T10:30:00Z"
+}
+```
 
 ### `GET /api/profiles/me/exclusions`
 No path/query parameter.

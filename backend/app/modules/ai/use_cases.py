@@ -24,7 +24,9 @@ from app.modules.ai.request_parser import DeterministicMenuFields, extract_menu_
 from app.modules.ai.prompts import (
     CHAT_SYSTEM_PROMPT,
     EXPLAIN_PLAN_SYSTEM_PROMPT,
+    HEALTH_SAFETY_POLICY,
     PARSE_MENU_SYSTEM_PROMPT,
+    PERSONALIZATION_CONTEXT_POLICY,
     SWAP_SYSTEM_PROMPT,
 )
 from app.modules.ai.schemas import (
@@ -42,6 +44,13 @@ from app.modules.ai.schemas import (
     SwapSuggestion,
 )
 from app.modules.ai.conversation_store import ConversationStore
+from app.modules.ai.personalization import (
+    AIContextReader,
+    AIPreferenceStore,
+    ActiveDishTagReader,
+    AuthenticatedAIRequestScope,
+    ChatMode,
+)
 from app.modules.meal_planning import constraint_checker
 from app.modules.meal_planning.domain import ComposedMeal, DishCandidate
 from app.modules.meal_planning.optimizer_v3 import ProcurementCpSatOptimizer
@@ -52,58 +61,116 @@ from app.shared.enums import MealType
 
 
 class ChatUseCase:
-    def __init__(self, client: AIClientPort, conversations: ConversationStore,
-                 system_prompt: str = CHAT_SYSTEM_PROMPT) -> None:
+    def __init__(
+        self,
+        client: AIClientPort,
+        conversations: ConversationStore,
+        system_prompt: str = CHAT_SYSTEM_PROMPT,
+        *,
+        context_reader: AIContextReader | None = None,
+        preferences: AIPreferenceStore | None = None,
+    ) -> None:
         self._client = client
         self._conversations = conversations
+        self._context_reader = context_reader
+        self._preferences = preferences
         self._system_prompt = system_prompt
 
-    def open_chat_stream(self, data: ChatRequest, *, user_id: int) -> "ChatStream":
+    def _messages(
+        self,
+        *,
+        mode: ChatMode,
+        context: dict[str, Any],
+        history: list[dict[str, Any]],
+        user_content: str,
+    ) -> list[dict[str, str]]:
+        messages = [{"role": "system", "content": self._system_prompt}]
+        if mode == "health_reference":
+            messages.append({"role": "system", "content": HEALTH_SAFETY_POLICY})
+        if context:
+            messages.append(
+                {
+                    "role": "system",
+                    "content": PERSONALIZATION_CONTEXT_POLICY
+                    + "\n\n[PERSONAL_CONTEXT]\n"
+                    + _compact_json(context)
+                    + "\n[/PERSONAL_CONTEXT]",
+                }
+            )
+        messages.extend(_recent_chat_history(history))
+        messages.append({"role": "user", "content": user_content})
+        return messages
+
+    def _personal_context(
+        self, scope: AuthenticatedAIRequestScope, mode: ChatMode
+    ) -> dict[str, Any]:
+        if mode == "general":
+            return {}
+        if self._preferences is None or self._context_reader is None:
+            raise RuntimeError("Personalized AI dependencies are not configured.")
+        self._preferences.require_enabled(scope)
+        return self._context_reader.build(scope, mode=mode)
+
+    def open_chat_stream(
+        self, data: ChatRequest, *, scope: AuthenticatedAIRequestScope
+    ) -> "ChatStream":
+        context = self._personal_context(scope, data.mode)
         conversation_id, turn = self._conversations.start_turn(
-            user_id=user_id,
+            user_id=scope.user_id,
             message=data.message,
             conversation_id=data.conversation_id,
+            mode=data.mode,
         )
         history = self._conversations.completed_turns_before(
             conversation_id=conversation_id,
             turn_number=int(turn["turn_number"]),
         )
-        user_content = data.message
-        if data.context is not None:
-            user_content += "\n\nNgữ cảnh ứng dụng:\n" + _compact_json(data.context)
-
-        messages = [{"role": "system", "content": self._system_prompt}]
-        messages.extend(_recent_chat_history(history))
-        messages.append({"role": "user", "content": user_content})
         return ChatStream(
             client=self._client,
             conversations=self._conversations,
             conversation_id=conversation_id,
             turn=turn,
-            messages=messages,
+            messages=self._messages(
+                mode=data.mode,
+                context=context,
+                history=history,
+                user_content=data.message,
+            ),
+            personalization_used=bool(context),
+            health_reference=data.mode == "health_reference",
         )
 
     def open_retry_stream(
-        self, *, conversation_id: int, turn_id: int, user_id: int
+        self,
+        *,
+        conversation_id: int,
+        turn_id: int,
+        scope: AuthenticatedAIRequestScope,
     ) -> "ChatStream":
+        mode = self._conversations.mode_for_user(conversation_id, scope.user_id)
+        context = self._personal_context(scope, mode)
         turn = self._conversations.prepare_retry(
             conversation_id=conversation_id,
             turn_id=turn_id,
-            user_id=user_id,
+            user_id=scope.user_id,
         )
         history = self._conversations.completed_turns_before(
             conversation_id=conversation_id,
             turn_number=int(turn["turn_number"]),
         )
-        messages = [{"role": "system", "content": self._system_prompt}]
-        messages.extend(_recent_chat_history(history))
-        messages.append({"role": "user", "content": str(turn["user_content"])})
         return ChatStream(
             client=self._client,
             conversations=self._conversations,
             conversation_id=conversation_id,
             turn=turn,
-            messages=messages,
+            messages=self._messages(
+                mode=mode,
+                context=context,
+                history=history,
+                user_content=str(turn["user_content"]),
+            ),
+            personalization_used=bool(context),
+            health_reference=mode == "health_reference",
         )
 
 
@@ -116,6 +183,8 @@ class ChatStream:
     conversation_id: int
     turn: dict[str, Any]
     messages: list[dict[str, str]]
+    personalization_used: bool = False
+    health_reference: bool = False
 
     def events(self) -> Iterator[dict[str, Any]]:
         settled = False
@@ -139,9 +208,39 @@ class ChatStream:
                 },
             }
             chunks: list[str] = []
-            for chunk in self.client.stream_text(self.messages):
-                chunks.append(chunk)
-                yield {"event": "delta", "data": {"content": chunk}}
+            grounding_mode = "none"
+            citations: list[dict[str, str]] = []
+            grounded = getattr(self.client, "complete_grounded_text", None)
+            if self.health_reference and callable(grounded):
+                try:
+                    reply, citations = grounded(self.messages)
+                    grounding_mode = "native_web_search"
+                    chunks.append(reply)
+                    yield {"event": "delta", "data": {"content": reply}}
+                except (AIUnavailableError, AIResponseValidationError, NotImplementedError):
+                    grounding_mode = "model_fallback"
+            elif self.health_reference:
+                grounding_mode = "model_fallback"
+
+            if not chunks:
+                fallback_messages = self.messages
+                if self.health_reference:
+                    fallback_label = (
+                        "Thông tin tham khảo từ kiến thức của mô hình, chưa được "
+                        "kiểm chứng web theo thời gian thực.\n\n"
+                    )
+                    chunks.append(fallback_label)
+                    yield {"event": "delta", "data": {"content": fallback_label}}
+                    fallback_messages = [
+                        *self.messages,
+                        {
+                            "role": "system",
+                            "content": "Không có web search đã xác minh cho lượt này. Hệ thống đã chèn nhãn fallback; không lặp lại và không bịa nguồn.",
+                        },
+                    ]
+                for chunk in self.client.stream_text(fallback_messages):
+                    chunks.append(chunk)
+                    yield {"event": "delta", "data": {"content": chunk}}
 
             reply = "".join(chunks).strip()
             if not reply:
@@ -150,12 +249,18 @@ class ChatStream:
                 conversation_id=self.conversation_id,
                 turn_id=int(self.turn["id"]),
                 assistant_content=reply,
+                personalization_used=self.personalization_used,
+                grounding_mode=grounding_mode,
+                citations=citations,
             )
             settled = True
             response = ConversationChatResponse(
                 reply=reply,
                 conversation_id=self.conversation_id,
                 turn=ConversationTurn.model_validate(completed),
+                personalization_used=self.personalization_used,
+                grounding_mode=grounding_mode,
+                citations=citations,
             )
             yield {"event": "done", "data": response.model_dump(mode="json")}
         except GeneratorExit:
@@ -212,16 +317,25 @@ class ConversationHistoryUseCase:
 
 class ParseMenuRequestUseCase:
     def __init__(self, client: AIClientPort,
-                 system_prompt: str = PARSE_MENU_SYSTEM_PROMPT) -> None:
+                 system_prompt: str = PARSE_MENU_SYSTEM_PROMPT,
+                 *, tags: ActiveDishTagReader | None = None) -> None:
         self._client = client
+        self._tags = tags
         self._system_prompt = system_prompt
 
     def execute(self, data: ParseMenuRequest) -> ParsedMenuRequest:
         deterministic = extract_menu_fields(data.message)
+        active_tags = self._tags.list_names() if self._tags is not None else None
+        tag_instruction = ""
+        if active_tags is not None:
+            tag_instruction = (
+                "\n\nTag món đang active; preferred_tags chỉ được dùng đúng tên trong danh sách: "
+                + _compact_json(active_tags)
+            )
         try:
             raw = self._client.complete_json(
                 [
-                    {"role": "system", "content": self._system_prompt},
+                    {"role": "system", "content": self._system_prompt + tag_instruction},
                     {"role": "user", "content": data.message},
                 ],
                 schema_name="smart_menu_plan_request",
@@ -229,23 +343,32 @@ class ParseMenuRequestUseCase:
             )
         except (AIUnavailableError, AIResponseValidationError):
             if deterministic.has_value:
-                return self._merge(deterministic, None)
+                return self._merge(deterministic, None, active_tags=active_tags)
             raise
         try:
             llm_result = ParsedMenuRequest.model_validate(raw)
         except ValidationError as exc:
             if deterministic.has_value:
-                return self._merge(deterministic, None)
+                return self._merge(deterministic, None, active_tags=active_tags)
             raise AIResponseValidationError("AI parse request không khớp schema.") from exc
-        return self._merge(deterministic, llm_result)
+        return self._merge(deterministic, llm_result, active_tags=active_tags)
 
     @staticmethod
     def _merge(
         deterministic: DeterministicMenuFields,
         llm_result: ParsedMenuRequest | None,
+        *,
+        active_tags: list[str] | None = None,
     ) -> ParsedMenuRequest:
         llm = llm_result or ParsedMenuRequest()
-        tags = [tag for tag in llm.preferred_tags if tag.strip()]
+        requested = [tag.strip() for tag in llm.preferred_tags if tag.strip()][:12]
+        if active_tags is None:
+            tags = requested
+            unresolved: list[str] = []
+        else:
+            catalog = {tag.strip().casefold(): tag for tag in active_tags}
+            tags = [catalog[tag.casefold()] for tag in requested if tag.casefold() in catalog]
+            unresolved = [tag for tag in requested if tag.casefold() not in catalog]
         days = deterministic.days if deterministic.days is not None else llm.days
         meals_per_day = (
             deterministic.meals_per_day
@@ -262,7 +385,8 @@ class ParseMenuRequestUseCase:
             days=days,
             meals_per_day=meals_per_day,
             budget_limit=budget_limit,
-            preferred_tags=tags,
+            preferred_tags=list(dict.fromkeys(tags))[:12],
+            unresolved_tags=list(dict.fromkeys(unresolved))[:12],
             needs_clarification=not actionable,
             clarification_question=(
                 None

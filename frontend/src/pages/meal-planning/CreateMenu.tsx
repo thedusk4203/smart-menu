@@ -30,6 +30,7 @@ export function CreateMenu() {
   const [naturalRequest, setNaturalRequest] = useState("");
   const [parsing, setParsing] = useState(false);
   const [clarification, setClarification] = useState("");
+  const [unresolvedTags, setUnresolvedTags] = useState<string[]>([]);
   const [catalogTags, setCatalogTags] = useState<Tag[]>([]);
   const [feedback, setFeedback] = useState<UserFeedback | null>(null);
 
@@ -37,13 +38,14 @@ export function CreateMenu() {
 
   const parseNaturalRequest = async () => {
     if (!naturalRequest.trim()) return;
-    setParsing(true); setClarification("");
+    setParsing(true); setClarification(""); setUnresolvedTags([]);
     try {
       const parsed = await aiApi.parseMenuRequest(naturalRequest.trim());
       if (parsed.days) setDays(String(parsed.days));
       if (parsed.meals_per_day) setMealsPerDay(String(parsed.meals_per_day));
       if (parsed.budget_limit != null) setBudget(String(parsed.budget_limit));
       if (parsed.preferred_tags.length) setTags(parsed.preferred_tags.filter((tag) => catalogTags.some((item) => item.name.toLocaleLowerCase("vi") === tag.toLocaleLowerCase("vi"))));
+      setUnresolvedTags(parsed.unresolved_tags);
       if (parsed.needs_clarification) setClarification(parsed.clarification_question ?? "Hãy bổ sung thêm yêu cầu.");
       else toast.success("Đã điền các lựa chọn từ yêu cầu. Hãy kiểm tra trước khi tạo thực đơn.");
     } catch (err) { setFeedback(toUserFeedback(err, "ai_chat")); }
@@ -102,6 +104,11 @@ export function CreateMenu() {
                 hint="Menuto chỉ điền giúp các lựa chọn bên dưới; kết quả vẫn được kiểm tra bằng dữ liệu món ăn và dinh dưỡng của Smart Menu." />
               <Button type="button" variant="secondary" size="sm" className="mt-3" loading={parsing} onClick={parseNaturalRequest}><Sparkles className="h-4 w-4" /> Phân tích yêu cầu</Button>
               {clarification && <p className="mt-3 text-sm text-amber-800">AI cần làm rõ: {clarification}</p>}
+              {unresolvedTags.length > 0 && (
+                <p className="mt-3 text-sm text-amber-800">
+                  Không tìm thấy tag đang hoạt động: {unresolvedTags.join(", ")}. Các tag này chưa được đưa vào bộ lập thực đơn.
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <SelectField

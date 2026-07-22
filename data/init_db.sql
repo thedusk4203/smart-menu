@@ -379,6 +379,8 @@ CREATE TABLE llm_provider_configs (
     timeout_seconds         NUMERIC(6,2)    NOT NULL DEFAULT 60
                                             CHECK (timeout_seconds BETWEEN 1 AND 300),
     structured_output_mode  VARCHAR(20)     CHECK (structured_output_mode IN ('json_schema', 'json_object')),
+    native_web_search_enabled BOOLEAN       NOT NULL DEFAULT FALSE,
+    capability_checked_at   TIMESTAMPTZ,
     config_version          INTEGER         NOT NULL DEFAULT 1,
     tested_version          INTEGER,
     test_status             VARCHAR(20)     NOT NULL DEFAULT 'untested'
@@ -425,10 +427,30 @@ CREATE TABLE ai_request_logs (
 CREATE INDEX idx_ai_request_logs_created_at ON ai_request_logs (created_at DESC);
 CREATE INDEX idx_ai_request_logs_filters ON ai_request_logs (feature, status, user_id);
 
+CREATE TABLE user_ai_preferences (
+    user_id                  INTEGER         PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    personalization_enabled BOOLEAN         NOT NULL DEFAULT FALSE,
+    notice_version           VARCHAR(40)     NOT NULL,
+    consented_at             TIMESTAMPTZ,
+    updated_at               TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE ai_consent_events (
+    id                       BIGSERIAL       PRIMARY KEY,
+    user_id                  INTEGER         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    personalization_enabled BOOLEAN         NOT NULL,
+    notice_version           VARCHAR(40)     NOT NULL,
+    created_at               TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_ai_consent_events_user_created
+    ON ai_consent_events (user_id, created_at DESC);
+
 CREATE TABLE ai_conversations (
     id          BIGSERIAL       PRIMARY KEY,
     user_id     INTEGER         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title       VARCHAR(80)     NOT NULL,
+    mode        VARCHAR(24)     NOT NULL DEFAULT 'general'
+                                CHECK (mode IN ('general', 'meal_advice', 'health_reference')),
     created_at  TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ     NOT NULL DEFAULT NOW()
 );
@@ -446,6 +468,10 @@ CREATE TABLE ai_conversation_turns (
     assistant_content   TEXT,
     status              VARCHAR(20)     NOT NULL DEFAULT 'pending'
                                         CHECK (status IN ('pending', 'completed', 'failed')),
+    personalization_used BOOLEAN        NOT NULL DEFAULT FALSE,
+    grounding_mode      VARCHAR(24)     NOT NULL DEFAULT 'none'
+                                        CHECK (grounding_mode IN ('none', 'native_web_search', 'model_fallback')),
+    citations           JSONB           NOT NULL DEFAULT '[]'::JSONB,
     created_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
     UNIQUE (conversation_id, turn_number),

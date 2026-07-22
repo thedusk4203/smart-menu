@@ -16,6 +16,7 @@ class ProviderWrite(BaseModel):
     api_key: str | None = Field(default=None, max_length=1000)
     clear_api_key: bool = False
     timeout_seconds: float = Field(default=60, ge=1, le=300)
+    native_web_search_enabled: bool = False
 
     @field_validator("name", "base_url", "model")
     @classmethod
@@ -36,6 +37,8 @@ class ProviderItem(BaseModel):
     masked_api_key: str | None = None
     timeout_seconds: float
     structured_output_mode: str | None = None
+    native_web_search_enabled: bool = False
+    capability_checked_at: datetime | None = None
     config_version: int
     tested_version: int | None = None
     test_status: str

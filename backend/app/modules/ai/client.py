@@ -43,6 +43,7 @@ class OpenAICompatibleAIClient(AIClientPort):
         api_key: str | None = None,
         timeout_seconds: float = 60,
         structured_output_mode: str = "json_schema",
+        native_web_search_enabled: bool = False,
     ) -> None:
         if not base_url:
             raise AIUnavailableError("Thiếu AI_BASE_URL cho AI provider.")
@@ -51,6 +52,7 @@ class OpenAICompatibleAIClient(AIClientPort):
         self._api_key = api_key
         self._timeout_seconds = timeout_seconds
         self._structured_output_mode = structured_output_mode
+        self._native_web_search_enabled = native_web_search_enabled
         self.last_usage: dict[str, int | None] = {}
 
     def complete_text(
@@ -59,6 +61,37 @@ class OpenAICompatibleAIClient(AIClientPort):
     ) -> str:
         data = self._create_chat_completion(messages)
         return self._extract_message_content(data)
+
+    def complete_grounded_text(
+        self, messages: list[AIMessage]
+    ) -> tuple[str, list[dict[str, str]]]:
+        if not self._native_web_search_enabled:
+            raise NotImplementedError("Provider chưa được xác minh web search.")
+        payload = {
+            "model": self._resolve_model(),
+            "messages": messages,
+            "stream": False,
+            "web_search_options": {},
+        }
+        data = self._request_json("POST", "chat/completions", payload)
+        self._update_usage(data)
+        content = self._extract_message_content(data)
+        message = data.get("choices", [{}])[0].get("message", {})
+        annotations = message.get("annotations", []) if isinstance(message, dict) else []
+        citations: list[dict[str, str]] = []
+        for annotation in annotations if isinstance(annotations, list) else []:
+            citation = annotation.get("url_citation") if isinstance(annotation, dict) else None
+            if not isinstance(citation, dict):
+                continue
+            url = citation.get("url")
+            if isinstance(url, str) and url.startswith(("http://", "https://")):
+                citations.append({
+                    "title": str(citation.get("title") or url)[:300],
+                    "url": url[:2000],
+                })
+        if not citations:
+            raise AIResponseValidationError("Web search không trả về trích dẫn hợp lệ.")
+        return content, citations[:10]
 
     def stream_text(self, messages: list[AIMessage]) -> Iterator[str]:
         """Trả từng content delta từ OpenAI-compatible SSE stream."""
@@ -286,6 +319,18 @@ class LoggedAIClient(AIClientPort):
     def complete_text(self, messages: list[AIMessage]) -> str:
         return self._run(messages, {"stream": False}, lambda: self.inner.complete_text(messages))
 
+    def complete_grounded_text(
+        self, messages: list[AIMessage]
+    ) -> tuple[str, list[dict[str, str]]]:
+        method = getattr(self.inner, "complete_grounded_text", None)
+        if not callable(method):
+            raise NotImplementedError
+        return self._run(
+            messages,
+            {"stream": False, "native_web_search": True},
+            lambda: method(messages),
+        )
+
     def stream_text(self, messages: list[AIMessage]) -> Iterator[str]:
         return self._run_stream(messages, {"stream": True}, lambda: self.inner.stream_text(messages))
 
@@ -351,7 +396,7 @@ class LoggedAIClient(AIClientPort):
             feature=self.feature,
             provider_type=self.config.provider_type,
             model=self.config.model,
-            request_data=request_data,
+            request_data=self._redact_personal_context(request_data),
             response_data={"content": response} if response is not None else None,
             status=status,
             latency_ms=round((perf_counter() - started) * 1000),
@@ -360,3 +405,16 @@ class LoggedAIClient(AIClientPort):
             total_tokens=usage.get("total_tokens"),
             error_message=error,
         )
+
+    @staticmethod
+    def _redact_personal_context(request_data: dict[str, Any]) -> dict[str, Any]:
+        redacted = dict(request_data)
+        messages: list[dict[str, Any]] = []
+        for message in request_data.get("messages", []):
+            item = dict(message)
+            content = item.get("content")
+            if isinstance(content, str) and "[PERSONAL_CONTEXT]" in content:
+                item["content"] = "[PERSONAL_CONTEXT_REDACTED]"
+            messages.append(item)
+        redacted["messages"] = messages
+        return redacted

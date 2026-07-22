@@ -22,18 +22,18 @@ flowchart LR
     Repo --> DB[(PostgreSQL)]
 ```
 
-`main.py` cài CORS, lifespan và AppException handler. Lifespan chạy cleanup conversation retention nhưng không để cleanup failure làm liveness/readiness fail. `api.py` gom router; mọi router mới phải được include ở đây.
+`main.py` cài CORS, lifespan và AppException handler. Lifespan chạy cleanup conversation/request-log retention nhưng không để cleanup failure làm liveness/readiness fail. `api.py` gom router; mọi router mới phải được include ở đây.
 
 ## Module map
 
 | Module | Trách nhiệm chính | Điểm cần cẩn trọng |
 | --- | --- | --- |
 | `identity` | Register/login/JWT/Google/user CRUD | Token, user active, Gmail verification |
-| `profiles` + `nutrition` | Hồ sơ, exclusions, nutrition target | Input profile thiếu phải trả lỗi rõ |
+| `profiles` + `nutrition` | Hồ sơ, exclusions, nutrition target, AI consent | Input profile thiếu và notice version stale phải trả lỗi rõ |
 | `ingredients`, `meals`, `dishes`, `tags` | Catalog và contract đọc/ghi | `dishes` là nguồn planner-ready hiện tại |
 | `meal_planning` | Generate/save/history/snapshot | Solver luôn đi qua checker |
 | `shopping_lists` | Aggregate, purchased state, public share | Token scope, expiry, revoke |
-| `ai` | Provider, SSE, parse/explain/swap/chat | Encryption, logging, retention, fallback |
+| `ai` | Provider, SSE, parse/explain/swap/chat/personalization | Consent, purpose mode, context/state DB, RLS, citation, logging |
 | `admin` | User/data/quality/import/export | Role và preview-before-commit |
 
 ## Error và transaction
@@ -46,6 +46,10 @@ flowchart LR
 ## Dependency injection
 
 `dependencies.py` là composition root. Một use case mới cần factory dependency riêng, rồi router inject qua `Depends`. AI client được chọn từ active provider và bọc `LoggedAIClient`; không khởi tạo provider client rải rác trong router/page.
+
+AI hiện dùng ba session: primary cho config/prompt, context session read-only cho profile/tag/candidate, state session cho consent/conversation/log. `AuthenticatedAIRequestScope` luôn lấy actor từ JWT rồi đặt `app.current_user_id` để RLS lọc đúng User. Ngoài development, AI bật mà thiếu `AI_CONTEXT_DATABASE_URL` hoặc `AI_STATE_DATABASE_URL` thì Settings từ chối khởi động.
+
+Lưu ý vận hành hiện tại: retention loop vẫn mở primary `engine`. Nếu AI state được đặt ở database khác, cần kiểm chứng và điều chỉnh cleanup path trước production.
 
 ## Dòng lỗi nên debug
 

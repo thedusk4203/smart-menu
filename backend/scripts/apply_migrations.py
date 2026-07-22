@@ -38,6 +38,7 @@ MIGRATIONS = (
     MigrationSpec("20260719_procurement_planner_v3.sql"),
     MigrationSpec("20260720_v3_ledger_inventory.sql", destructive=True),
     MigrationSpec("20260720_catalog_density_cleanup.sql"),
+    MigrationSpec("20260722_ai_personalization_boundary.sql"),
 )
 
 MANUAL_SCRIPTS = {"20260713_reset_food_catalog.sql"}
